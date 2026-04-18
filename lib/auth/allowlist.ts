@@ -1,18 +1,27 @@
-/**
- * STUB — created by the A3 tester only so the failing tests parse and the
- * pre-commit typecheck hook succeeds. Developer (Codex) will replace this
- * with the real implementation in the `implement` phase.
- *
- * Running against this stub, every test in tests/unit/auth/allowlist.test.ts
- * fails at runtime with the TODO error below — which is the intended
- * red-phase signal.
- */
+import { env } from '../env';
 
 export type AllowlistResult =
   | { ok: true }
   | { ok: false; reason: 'not_allowed' | 'invalid_format' };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function assertAllowedEmail(email: string): AllowlistResult {
-  void email;
-  throw new Error('TODO(a3.implement): assertAllowedEmail not yet implemented');
+  if (typeof email !== 'string') {
+    return { ok: false, reason: 'invalid_format' };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail || !EMAIL_RE.test(normalizedEmail)) {
+    return { ok: false, reason: 'invalid_format' };
+  }
+
+  const allowedEmail = env.ALLOWED_EMAIL.trim().toLowerCase();
+
+  if (normalizedEmail !== allowedEmail) {
+    return { ok: false, reason: 'not_allowed' };
+  }
+
+  return { ok: true };
 }
