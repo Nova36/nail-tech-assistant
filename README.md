@@ -15,7 +15,7 @@ A single-user web app built as a personal gift. Bridges Pinterest inspiration to
 
 ## Tech
 
-Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, Supabase (Postgres + Storage + Auth), Vercel, Pinterest API v5, Google Gemini 2.5 Flash Image.
+Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, Firebase (Firestore + Auth + Cloud Storage + AI Logic), Vercel, Pinterest API v5, Gemini 2.5 Flash Image (via Firebase AI Logic).
 
 ## Privacy
 

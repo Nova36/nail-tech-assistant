@@ -25,14 +25,14 @@ tech_stack:
   hosting:
     - Vercel
   database:
-    - Supabase (Postgres)
+    - Firebase Firestore         # amended 2026-04-17 (sign-off #15; was Supabase Postgres)
   storage:
-    - Supabase Storage
+    - Firebase Cloud Storage     # amended 2026-04-17 (sign-off #15; was Supabase Storage)
   auth:
-    - Supabase Auth (email-scoped, single-user)
+    - Firebase Auth (email link sign-in, email-allowlisted single-user)  # amended 2026-04-17 (sign-off #15; was Supabase Auth)
   external_apis:
-    - Pinterest API v5
-    - Google Generative AI (Gemini 2.5 Flash Image / "Nano Banana")
+    - Pinterest API v5 (static access token, single-user — see sign-off #17)
+    - Firebase AI Logic for Gemini 2.5 Flash Image access (sign-off #16)
   versions: {}
 
 structure:
