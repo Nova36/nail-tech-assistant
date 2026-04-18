@@ -1,0 +1,173 @@
+id: a5-firestore-profiles-baseline
+epic: epic-a-foundation-auth
+title: 'Baseline Firestore rules + indexes for profiles collection aligned with Firebase Auth uid'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [a2-firebase-env-wiring]
+
+description: |
+  Establish the baseline Firestore security surface: a `profiles` collection whose
+  document IDs match Firebase Auth `uid` (FR-A-7, Risk #6), Security Rules that let
+  only the authenticated owner read/write their own profile, and a default-deny
+  stance on all other collections. Create firestore.indexes.json as an empty-but-
+  valid baseline that later epics extend.
+
+  This is the persistence foundation everything else inherits. If `profiles.id`
+  drifts from Firebase Auth `uid`, Security Rules behavior across Pinterest,
+  references, designs, and generations will drift silently (structured-outline
+  Silent-Break Risk). Lock it here.
+
+acceptance_criteria:
+  - 'Given firestore.rules is deployed to the emulator, when an authenticated user reads their own /profiles/{uid} document, then the read succeeds.'
+  - 'Given firestore.rules, when an authenticated user tries to read /profiles/{other-uid}, then the read is denied.'
+  - 'Given firestore.rules, when an unauthenticated client tries to read any document, then the read is denied.'
+  - 'Given firestore.rules, when an authenticated user writes to any collection other than their own /profiles/{uid}, then the write is denied by default (no other collections have permissive rules yet).'
+  - 'Given firestore.indexes.json, when it is deployed to an empty Firebase project, then the deploy succeeds with zero errors.'
+  - 'Given the rules test suite, when `pnpm test:rules` runs, then all assertions pass against @firebase/rules-unit-testing emulator.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) @firebase/rules-unit-testing — current API for emulator-backed rules testing
+      in a Vitest environment, and how to start/stop the emulator in CI?
+      (2) Firestore Security Rules best practice for an owner-only document keyed by
+      Auth uid — the canonical `request.auth.uid == resource.id` pattern?
+      (3) firestore.indexes.json — minimal valid schema for an empty baseline,
+      and how Firebase CLI validates it on deploy?
+      Scope boundary: do NOT research Pinterest, references, designs, or chat-turn
+      collection schemas — those come with their respective epics.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE writing firestore.rules:
+      - tests/rules/profiles.rules.test.ts (using @firebase/rules-unit-testing):
+        (1) auth user with uid=X can READ /profiles/X
+        (2) auth user with uid=X can WRITE /profiles/X
+        (3) auth user with uid=X CANNOT READ /profiles/Y (Y != X)
+        (4) auth user with uid=X CANNOT WRITE /profiles/Y
+        (5) unauthenticated client CANNOT READ /profiles/anything
+        (6) unauthenticated client CANNOT WRITE /profiles/anything
+        (7) auth user CANNOT READ or WRITE any other top-level collection (e.g.,
+            /designs, /references, /generations) — default-deny baseline
+      - Ensure the test harness starts the Firestore emulator, loads firestore.rules,
+        runs tests, tears down. Document the `pnpm test:rules` script.
+      - Add a build-time schema check on firestore.indexes.json (JSON Schema or manual
+        shape assertion).
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass. Create:
+      - firestore.rules at repo root:
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /profiles/{uid} {
+              allow read, write: if request.auth != null && request.auth.uid == uid;
+            }
+            // Default deny for all other paths — later epics add their own rules.
+            match /{document=**} {
+              allow read, write: if false;
+            }
+          }
+        }
+      - firestore.indexes.json at repo root:
+        { "indexes": [], "fieldOverrides": [] }
+      - Update package.json scripts: add `test:rules` (runs Firestore emulator +
+        the rules test suite).
+      - firebase.json (if not present from a2) with emulators config:
+        { "emulators": { "firestore": { "port": 8080 }, "auth": { "port": 9099 } } }
+      Do NOT add rules for any collection other than `profiles`. Those belong to
+      their originating epic (references/designs/etc.).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify:
+      - Silent-break risk resolved: the rule `request.auth.uid == uid` guarantees
+        profile doc ID matches Auth uid; pair with lib/types.ts Profile type from a2
+        to ensure the contract is enforced at both DB + TypeScript layers.
+      - Default-deny `match /{document=**}` rule is LAST in the match chain so
+        profile rules take precedence.
+      - firestore.indexes.json is valid JSON with correct top-level shape.
+      - No rule permits `request.auth == null` reads anywhere — sign-off #1 locks
+        single-user, authenticated-only access.
+      - `pnpm test:rules` is wired into `pnpm test` pipeline OR has its own CI job.
+      - Clean emulator startup/teardown — no leaked processes in CI.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit `feat(a5): firestore baseline rules + indexes + rules test harness`.
+      Branch: `epic-a/a5-firestore-profiles-baseline`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    rules_testing: '@firebase/rules-unit-testing + Firebase emulator suite'
+    indexes: 'firestore.indexes.json (empty baseline)'
+  key_files:
+    - path: lib/types.ts
+      purpose: 'Consumed from a2 — Profile type must match profiles/{uid} document shape'
+    - path: state/planning/structured-outline.md
+      purpose: 'File manifest item #22 — firestore.rules + firestore.indexes.json are named explicitly'
+
+files_to_modify:
+  - file: firestore.rules
+    change: 'Create; profiles owner-only + default deny'
+  - file: firestore.indexes.json
+    change: 'Create; empty but valid baseline'
+  - file: firebase.json
+    change: 'Create or extend; emulators config for firestore + auth'
+  - file: package.json
+    change: 'Add `test:rules` script'
+  - file: tests/rules/profiles.rules.test.ts
+    change: 'Created in test-spec'
+
+design_decisions:
+  - decision: 'profiles/{uid} key matches Firebase Auth uid exactly'
+    rationale: 'FR-A-7 + Risk #6 — any other ID scheme causes silent drift across all later epics'
+  - decision: 'Default-deny for all other collections (match /{document=**} → if false)'
+    rationale: 'Sign-off #15 — Firebase Security Rules replace RLS; baseline must be deny-by-default so later epics add narrow positive rules'
+  - decision: 'Rules test suite is a distinct `pnpm test:rules` command'
+    rationale: 'Requires Firestore emulator; too slow for every unit-test run but MUST run in CI'
+  - decision: 'firestore.indexes.json starts empty'
+    rationale: 'Thin-foundation — indexes are added when queries that need them land in their story'
+
+cross_cutting: []
+
+risks:
+  - severity: high
+    description: 'Silent drift between TS Profile type and Firestore document shape'
+    mitigation: 'lib/types.ts Profile type explicitly references Firebase Auth uid as the id field; reviewer cross-checks in the review step'
+  - severity: medium
+    description: 'Emulator flakiness in CI (port conflicts, startup timing)'
+    mitigation: 'Use emulator --only firestore,auth with fixed ports; add retry-on-startup logic in test harness'
+  - severity: low
+    description: 'Future epic accidentally adds a permissive rule that shadows the default-deny'
+    mitigation: 'Document the rule-precedence convention in the rules file comments; reviewer enforces on downstream PRs'
+
+references:
+  - path: state/planning/prd.md
+    relevant_excerpt: |
+      FR-A-7: The `profiles` persistence model must align with Firebase Auth `uid` so
+      downstream profile access and Security Rules contracts do not drift.
+      US-A-3 (partial): Given a fresh Firebase project, when baseline rules and
+      indexes are applied, then the `profiles` schema and Security Rules baseline
+      come up cleanly in a way that matches the auth model.
+  - path: state/planning/structured-outline.md
+    relevant_excerpt: |
+      `firestore.rules` and `firestore.indexes.json` — create the baseline Firestore
+      security and index surfaces for `profiles` and later collections.
+      Silent-break risk: if `profiles.id` is not aligned with Firebase Auth `uid`,
+      later profile access and Security Rules behavior will drift before Pinterest
+      work even starts.
+  - path: state/planning/sign-off.md
+    relevant_excerpt: |
+      #15 — Firebase Security Rules replace Postgres RLS.
+      #1 — Single-user allowlist via ALLOWED_EMAIL + server-side checks + RLS
+      (i.e., Security Rules in Firebase).

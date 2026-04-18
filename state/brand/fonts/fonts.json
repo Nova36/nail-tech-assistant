@@ -1,0 +1,70 @@
+{
+  "$schema": "design-system-fonts-v1",
+  "families": {
+    "fraunces": {
+      "role": "heading",
+      "type": "variable",
+      "files": [
+        {
+          "path": "fonts/fraunces/Fraunces[SOFT,WONK,opsz,wght].woff2",
+          "style": "normal",
+          "subset": "latin",
+          "axes": {
+            "wght": { "min": 100, "max": 900 },
+            "opsz": { "min": 9, "max": 144 },
+            "SOFT": { "min": 0, "max": 100 },
+            "WONK": { "min": 0, "max": 1 }
+          }
+        },
+        {
+          "path": "fonts/fraunces/Fraunces-Italic[SOFT,WONK,opsz,wght].woff2",
+          "style": "italic",
+          "subset": "latin",
+          "axes": {
+            "wght": { "min": 100, "max": 900 },
+            "opsz": { "min": 9, "max": 144 },
+            "SOFT": { "min": 0, "max": 100 },
+            "WONK": { "min": 0, "max": 1 }
+          }
+        }
+      ],
+      "source": "https://github.com/undercasetype/Fraunces",
+      "version": "1.000",
+      "license": "OFL-1.1",
+      "license_file": "fonts/fraunces/OFL.txt",
+      "download_route": "Google Fonts CDN (fonts.gstatic.com v38)",
+      "note": "Latin-subset variable font served by Google Fonts CDN; covers full wght 100–900, opsz 9–144, SOFT 0–100, WONK 0–1 axes"
+    },
+    "inter": {
+      "role": "body",
+      "type": "variable",
+      "files": [
+        {
+          "path": "fonts/inter/InterVariable.woff2",
+          "style": "normal",
+          "subset": "latin",
+          "axes": {
+            "wght": { "min": 100, "max": 900 },
+            "opsz": { "min": 14, "max": 32 }
+          }
+        },
+        {
+          "path": "fonts/inter/InterVariable-Italic.woff2",
+          "style": "italic",
+          "subset": "latin",
+          "axes": {
+            "wght": { "min": 100, "max": 900 },
+            "opsz": { "min": 14, "max": 32 }
+          }
+        }
+      ],
+      "source": "https://github.com/rsms/inter",
+      "version": "v4.1",
+      "license": "OFL-1.1",
+      "license_file": "fonts/inter/OFL.txt",
+      "download_route": "Google Fonts CDN (fonts.gstatic.com v20)",
+      "note": "Latin-subset variable font served by Google Fonts CDN; covers full wght 100–900, opsz 14–32 axes"
+    }
+  },
+  "usage_guidance": "Use next/font/google at build time for the production Next.js app (it self-hosts these same files). These manifest files are the design-system's canonical offline copy for reference, specimen work, and third-party tools that need actual binaries."
+}

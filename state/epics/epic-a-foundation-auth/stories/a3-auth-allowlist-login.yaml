@@ -1,0 +1,193 @@
+id: a3-auth-allowlist-login
+epic: epic-a-foundation-auth
+title: 'Server-enforced email allowlist + Firebase email-link login page with sent-state UX'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [a2-firebase-env-wiring]
+
+description: |
+  Build the login flow for the single allowed user (wife's email). A `/login` page
+  accepts an email, the server-side action checks it against `ALLOWED_EMAIL` BEFORE
+  any Firebase send action occurs (sign-off #1 + FR-A-2), and on success triggers
+  Firebase email-link sign-in and renders a "sent" confirmation state.
+
+  CRITICAL: allowlist enforcement must happen server-side, not just in the client form.
+  A bypass via direct fetch to the server action must also be rejected (US-A-1 AC#2).
+
+acceptance_criteria:
+  - 'Given I am on /login and I enter the configured ALLOWED_EMAIL, when I submit the form, then the server action calls Firebase sendSignInLinkToEmail and the UI transitions to a sent-state confirmation.'
+  - "Given I enter any email that is NOT the configured ALLOWED_EMAIL, when the server action runs, then it returns { status: 'rejected', message: 'Only the configured email can sign in.' } and NO Firebase send call is issued."
+  - 'Given I bypass the login UI and POST directly to the login server action with an unauthorized email, when the server processes it, then the same rejection path is taken.'
+  - 'Given I click the email link Firebase sends, when the client handles it, then a session cookie is set and the next navigation to a protected route succeeds (full redirect flow tested in a4).'
+  - "Given `assertAllowedEmail(email)` is called with the allowed email, then it returns `{ ok: true }`; with any other email, it returns `{ ok: false, reason: 'not_allowed' }`."
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions via context7:
+      (1) Next 15 server action idioms — function return shape for form results?
+      (2) Firebase `sendSignInLinkToEmail` ActionCodeSettings — what URL/handling is
+      needed for the email-link redirect back to our app?
+      (3) Any known pitfalls with email-link auth in a single-user allowlist context
+      (e.g., open-redirect concerns on the return URL)?
+      Read a2 outputs (lib/firebase/client.ts, lib/env.ts) to understand the APIs this
+      story consumes. Do NOT read middleware or shell code — a4 scope.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Tests target BEHAVIOR, not the
+      HTML structure — they should still pass if the dev refactors the markup.
+      - tests/unit/auth/allowlist.test.ts — `assertAllowedEmail` unit test covering:
+        exact match returns ok:true, case-insensitive match returns ok:true,
+        wrong email returns ok:false with reason, empty/malformed string returns
+        ok:false (not throws).
+      - tests/unit/auth/login-action.test.ts — server action unit tests:
+        allowed email path calls a mocked sendSignInLinkToEmail and returns
+        { status: 'sent' }; rejected email path returns { status: 'rejected', ... }
+        and does NOT call sendSignInLinkToEmail (assert on mock call count = 0);
+        malformed email returns rejected with reason 'invalid_format'.
+      - tests/e2e/login-flow.spec.ts — Playwright:
+        load /login, fill allowed email, submit, assert sent-state UI visible
+        (assert by role/text — "check your inbox" or "check your email" — not by
+        class names); load /login, fill wrong email, submit, assert inline error
+        visible and URL still /login.
+      DO NOT write the direct-POST bypass e2e test here — that belongs to a4 once
+      middleware is in place (test needs the full route surface).
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass. The VISUAL SPEC is already finished — translate
+      the supplied Anthropic HTML into Tailwind + shadcn + our tokens.
+
+      VISUAL SOURCE (authoritative):
+      - state/design/anthropic-source/Login.html — full-fidelity finished design.
+        Already uses our brand palette (Mulberry Dusk #6B3F5E, Ivory Cream #FAF7F2,
+        Dusty Rose #D4A5A8, Champagne Gold #C9A96E) and our fonts (Fraunces /
+        Inter via `var(--ff-display)` / `var(--ff-body)`).
+
+      Translation rules (for implement):
+      - Inline hex values → Tailwind color classes bound to our tokens in
+        tailwind.config.ts (from a1). Mulberry Dusk → `bg-primary`, Ivory Cream →
+        `bg-background`, etc., via the shadcn aliases in tokens.json.
+      - CSS custom properties `--ff-display` / `--ff-body` / `--fs-h1` → already
+        emitted by a1's globals.css via next/font variable names; use Tailwind
+        `font-display` / `font-body` utility classes.
+      - Half-pixel font-sizes in the source (10.5px, 11.5px, 14.5px) → snap to
+        nearest token (11/12/14). Use Tailwind arbitrary values only if the
+        rhythm genuinely breaks.
+      - Stray grays `#999` and `#666` in the source → snap to `text-muted-foreground`
+        or `text-neutral-muted` (our Taupe Mist token) as appropriate.
+      - Repeating div structures → extract shadcn primitives: `<Input>`, `<Button>`,
+        `<Label>`, `<Form>` (from shadcn/ui). Card-like sections use shadcn `<Card>`.
+      - SVG icons in the source → keep inline or extract to `components/icons/`.
+      - Brand G2 logo (from state/brand/brand-guide.html) appears in the Login
+        layout — reuse the same SVG. Do not regenerate.
+
+      Files to produce:
+      - lib/auth/allowlist.ts — `assertAllowedEmail(email): { ok: true } | { ok: false; reason: 'not_allowed' | 'invalid_format' }`
+      - app/(auth)/login/page.tsx — client component, form + sent state, matches Login.html
+      - app/(auth)/login/actions.ts — server action:
+        1. Validate email format (basic RFC check)
+        2. Call `assertAllowedEmail` — if not ok, return { status: 'rejected' }
+        3. Only then call Firebase `sendSignInLinkToEmail` with ActionCodeSettings
+        4. Return { status: 'sent' } on success
+      - app/(auth)/layout.tsx — minimal public auth layout (no header nav)
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the server-side-enforcement invariant (FR-A-2):
+      - In app/(auth)/login/actions.ts, is `assertAllowedEmail` called BEFORE any
+        Firebase SDK import/call in the request path?
+      - Can an attacker bypass by calling the server action directly? Review network
+        contract — rejection must happen on the server, never just the client.
+      - Does the return URL passed to `sendSignInLinkToEmail` reject open-redirect
+        attempts (must be same-origin APP_URL only)?
+      - Does the sent-state UI match the ui-design wireframe?
+      - Zero secrets logged in error messages on the rejection path.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit `feat(a3): allowlist + email-link login page`.
+      Branch: `epic-a/a3-auth-allowlist-login`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router + server actions'
+    auth_sdk: 'firebase (JS SDK) — sendSignInLinkToEmail'
+  key_files:
+    - path: lib/auth/allowlist.ts
+      purpose: 'Created this story — the single server-enforced allowlist function'
+    - path: lib/env.ts
+      purpose: 'Consumed from a2 — provides ALLOWED_EMAIL and APP_URL'
+    - path: lib/firebase/client.ts
+      purpose: 'Consumed from a2 — the Firebase client used by sendSignInLinkToEmail'
+    - path: state/planning/prd.md
+      purpose: 'US-A-1 acceptance criteria and FR-A-1 / FR-A-2'
+
+files_to_modify:
+  - file: lib/auth/allowlist.ts
+    change: 'Create; exports assertAllowedEmail'
+  - file: app/(auth)/login/page.tsx
+    change: 'Create; client component form + sent state'
+  - file: app/(auth)/login/actions.ts
+    change: 'Create; server action with server-side allowlist enforcement'
+  - file: app/(auth)/layout.tsx
+    change: 'Create; minimal public auth layout'
+  - file: tests/unit/auth/allowlist.test.ts
+    change: 'Created in test-spec'
+  - file: tests/unit/auth/login-action.test.ts
+    change: 'Created in test-spec'
+  - file: tests/e2e/login-flow.spec.ts
+    change: 'Created in test-spec'
+
+design_decisions:
+  - decision: 'Server action (not API route) for login submission'
+    rationale: 'Next 15 idiomatic; keeps client form + server logic colocated'
+  - decision: 'Case-insensitive allowlist comparison'
+    rationale: 'Firebase Auth normalizes emails to lowercase; matching behavior prevents user friction'
+  - decision: 'Rejection message does NOT name the allowed email'
+    rationale: "Minimal info disclosure; the allowed email is still effectively public via env.example but the rejection UI shouldn't advertise it"
+  - decision: 'Email-link ActionCodeSettings url = APP_URL'
+    rationale: 'Prevent open-redirect; the handler route on APP_URL processes the link callback'
+
+cross_cutting: []
+
+risks:
+  - severity: high
+    description: 'Client-only allowlist check — rejection happens in browser JS, server still processes any submission'
+    mitigation: 'Test contract explicitly asserts mock.sendSignInLinkToEmail.called = false on rejection path; reviewer verifies server order-of-operations'
+  - severity: medium
+    description: 'Rate-limit abuse — attacker could spam the server action with the allowed email'
+    mitigation: 'Out of scope for A3 (no rate limit in v1 — single user, private URL). Flagged for Epic F (polish) if exposure materializes.'
+  - severity: low
+    description: 'Email-link redirect fails if APP_URL is wrong in non-prod envs'
+    mitigation: 'Env validation in a2 ensures APP_URL is present; local dev uses http://localhost:3000'
+
+references:
+  - path: state/planning/prd.md
+    relevant_excerpt: |
+      US-A-1: Allowlisted login. Given I am on /login and I enter the configured
+      allowed email, when I submit the login form, then the app triggers the Firebase
+      email-link flow and shows a sent-state confirmation. Given I enter an email
+      that does not match ALLOWED_EMAIL, when I submit, then the app rejects the
+      request before any Firebase send action occurs.
+      FR-A-2: Server-side allowlist enforcement must reject non-authorized emails
+      BEFORE auth side effects occur.
+  - path: state/planning/structured-outline.md
+    relevant_excerpt: |
+      `lib/auth/allowlist.ts` — isolate the `ALLOWED_EMAIL` check so the allowlist
+      rule is server-enforced and reusable. Login submit contract: POST /login server
+      action or route handler accepts `{ email: string }`. Success: `{ status: 'sent' }`.
+      Blocked: `{ status: 'rejected'; message: 'Only the configured email can sign in.' }`.
+  - path: state/planning/sign-off.md
+    relevant_excerpt: |
+      #1 — APPROACH — Single-user allowlist via ALLOWED_EMAIL + server-side checks + RLS
+
+ui_indicators: 'page, UX, form, input — visual spec already supplied at state/design/anthropic-source/Login.html (no ui-design step needed)'

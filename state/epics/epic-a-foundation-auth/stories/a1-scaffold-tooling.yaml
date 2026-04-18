@@ -1,0 +1,183 @@
+id: a1-scaffold-tooling
+epic: epic-a-foundation-auth
+title: 'Next.js 15 scaffold + TypeScript + Tailwind (tablet breakpoints) + shadcn/ui + Vitest + Playwright + ESLint + Prettier + Husky + GitHub Actions CI'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: []
+
+description: |
+  Stand up the repo-level toolchain for the Nail Tech Assistant app. After this story,
+  a fresh `pnpm install && pnpm dev` starts an empty Next.js 15 App Router project, and
+  a fresh PR triggers typecheck + lint + unit tests as required gates. No Firebase, no
+  auth, no domain logic — pure scaffold.
+
+  Tablet-first breakpoints and touch-size tokens MUST be established now because
+  tablet is the target device (kickoff-decisions #9). This is the only structural UI
+  decision carried by this story; everything else is toolchain.
+
+acceptance_criteria:
+  - 'Given a fresh clone, when I run `pnpm install && pnpm build`, then the build completes with zero errors.'
+  - 'Given the repo on any branch, when CI runs on a PR, then typecheck + lint + unit tests all execute and the PR is blocked if any fail.'
+  - 'Given a developer commits locally, when the Husky pre-commit hook fires, then it runs typecheck + lint on staged files.'
+  - 'Given a developer opens Tailwind classes in a component, when they use `md:` or the custom tablet breakpoint, then tablet-landscape styles render correctly in Storybook/Playwright.'
+  - 'Given Vitest and Playwright are installed, when I run `pnpm test` and `pnpm test:e2e`, then both harnesses execute against at least one smoke test that passes.'
+
+steps:
+  - id: research
+    description: |
+      Validate current versions and setup commands via context7 for:
+      Next.js 15 App Router, React 19, Tailwind CSS 4 (or 3 if 4 is unstable),
+      shadcn/ui CLI, Vitest + React Testing Library, Playwright, pnpm workspace.
+      Confirm Turbopack is the right dev server choice for Next 15.
+      Note any breaking changes between training-data era and current stable.
+      Max 3 focused questions: (1) correct Next 15 create command, (2) Tailwind v4 vs v3
+      stability for shadcn/ui, (3) Playwright + Next 15 app-router test setup.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE any implementation. Do NOT read implementation code.
+      - tests/unit/smoke.test.ts — a trivial passing unit test to prove Vitest works.
+      - tests/e2e/smoke.spec.ts — Playwright test that loads "/" and asserts the page responds
+        200 (even if body is empty placeholder).
+      - Add a CI assertion: commit a workflow file and validate its YAML parses.
+      These are smoke tests only. The real auth tests come in A3/A4.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass. Do NOT modify the tests. Create:
+      - package.json with scripts: dev, build, start, typecheck, lint, format, test, test:e2e
+      - tsconfig.json (Next 15 + strict mode + paths alias `@/*`)
+      - next.config.ts (Turbopack on, image domains empty for now)
+      - tailwind.config.ts with tablet-first breakpoints: sm/md/lg/xl matching iPad landscape/portrait
+      - components.json (shadcn/ui config) — do NOT add components yet
+      - eslint.config.js (flat config, Next + TS recommended)
+      - .prettierrc (2-space, single quote, trailing comma es5)
+      - .env.example (placeholder — real keys added in a2)
+      - .github/workflows/ci.yml (Node 20, pnpm, run typecheck+lint+test on PR)
+      - .husky/pre-commit running `pnpm typecheck && pnpm lint-staged`
+      - app/layout.tsx + app/page.tsx as empty placeholders
+      - vitest.config.ts + playwright.config.ts + tests/fixtures/ directory
+      Do NOT create Firebase helpers, auth routes, or middleware — those are a2/a3/a4.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the scaffold against the thin-foundation NFR (structured-outline Risk #3).
+      Review checklist:
+      - No Firebase, Pinterest, or Gemini code leaked in.
+      - tsconfig strict mode on; no `any` escape hatches added.
+      - Tailwind breakpoints match tablet-landscape first, not mobile-first.
+      - CI workflow triggers on PR + push to main; no other branches auto-deploy.
+      - Husky hook does NOT run full Playwright (too slow for pre-commit).
+      - All acceptance criteria verifiable with runnable commands.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit with message `chore(a1): scaffold Next.js 15 + Tailwind + test harness + CI`.
+      Do NOT push to main. Create branch `epic-a/a1-scaffold-tooling`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 (App Router) + React 19'
+    language: 'TypeScript (strict)'
+    styling: 'Tailwind CSS + shadcn/ui'
+    testing: 'Vitest (unit) + Playwright (e2e)'
+    ci: 'GitHub Actions'
+    package_manager: 'pnpm'
+  key_files:
+    - path: state/planning/structured-outline.md
+      purpose: 'Slice 0 file manifest lines 79-103 — authoritative list of files this story creates'
+    - path: state/project-profile.yaml
+      purpose: 'Tech stack of record; confirms Next 15, React 19, TS, Tailwind, shadcn/ui, Vitest, Playwright'
+    - path: hive.config.yaml
+      purpose: 'Defines required quality gates: typecheck, lint, unit_tests'
+
+files_to_modify:
+  - file: package.json
+    change: 'Create with scripts for dev/build/typecheck/lint/test/test:e2e/format; Tailwind v4 deps (@tailwindcss/postcss, NOT autoprefixer/postcss-import)'
+  - file: tsconfig.json
+    change: 'Strict TS config (create-next-app default) with `@/*` path alias'
+  - file: next.config.ts
+    change: 'Minimal Next 15 config; image domains list (empty for now)'
+  - file: postcss.config.mjs
+    change: 'Tailwind v4 PostCSS plugin (@tailwindcss/postcss); no autoprefixer'
+  - file: app/globals.css
+    change: "Tailwind v4 CSS-first config — @import 'tailwindcss' + @theme directive containing brand tokens (emitted from state/brand/tokens.json). Tablet-first breakpoints + touch-size tokens live here, NOT in a tailwind.config.ts (v4 removes JS config)."
+  - file: components.json
+    change: 'shadcn/ui config via `npx shadcn@latest init`; do NOT manually configure'
+  - file: eslint.config.js
+    change: 'Flat config with Next + TS + import/order rules'
+  - file: .prettierrc
+    change: '2-space indent, single quote, trailing commas'
+  - file: .env.example
+    change: 'Placeholder only; real keys in a2'
+  - file: .github/workflows/ci.yml
+    change: 'Run typecheck+lint+test on PR to main (Node 20, pnpm)'
+  - file: .husky/pre-commit
+    change: 'Run typecheck + lint-staged before commit'
+  - file: app/layout.tsx
+    change: 'Root layout wiring next/font/google for Fraunces + Inter as CSS variables --font-heading / --font-body'
+  - file: app/page.tsx
+    change: 'Empty placeholder home'
+  - file: vitest.config.ts
+    change: 'Jsdom env; tests/unit path'
+  - file: playwright.config.ts
+    change: 'Chromium default; webServer: pnpm dev; reuseExistingServer: !CI; timeout 120000; baseURL http://localhost:3000'
+  - file: tests/unit/smoke.test.ts
+    change: 'Created in test-spec step'
+  - file: tests/e2e/smoke.spec.ts
+    change: 'Created in test-spec step'
+
+tailwind_version_note: |
+  UPDATED POST-RESEARCH: Story originally specified Tailwind as tailwind.config.ts.
+  Research (2026-04-18) confirmed Tailwind v4 is the correct version — shadcn/ui
+  officially supports v4 as of Feb 2025. v4 drops tailwind.config.js/ts in favor
+  of CSS-first config via @import "tailwindcss" + @theme directive in globals.css.
+  Tokens from state/brand/tokens.json flow into @theme as CSS custom properties.
+
+design_decisions:
+  - decision: 'pnpm (not npm/yarn)'
+    rationale: 'project-profile.yaml tech_stack.build_tools — already locked in kickoff'
+  - decision: 'Turbopack for dev server'
+    rationale: 'Next 15 default; confirmed stable enough for greenfield per Next 15 release notes'
+  - decision: 'Tablet-landscape-first breakpoints (not mobile-first)'
+    rationale: 'kickoff-decisions #9 + structured-outline #4 — landscape-first tablet is locked'
+  - decision: 'No shadcn/ui components installed yet'
+    rationale: 'This story is pure toolchain; components come with feature stories in later epics'
+
+cross_cutting: []
+
+risks:
+  - severity: medium
+    description: 'Tailwind v4 churn — API changes since model training cutoff'
+    mitigation: 'Research step MUST verify via context7 which v4 release is stable; fall back to v3.4 if v4 is unstable'
+  - severity: low
+    description: 'Playwright + Next 15 test-runner friction'
+    mitigation: 'Start with minimal smoke spec; defer full auth e2e to a4'
+  - severity: low
+    description: 'Husky + pnpm install ordering'
+    mitigation: 'Use `pnpm prepare` script to install hooks post-install'
+
+references:
+  - path: state/planning/structured-outline.md
+    relevant_excerpt: |
+      **`package.json`** — define the Next.js 15, React 19, TypeScript, Tailwind,
+      shadcn/ui, Vitest, Playwright, MSW, Husky, and lint/typecheck scripts needed by
+      the baseline scaffold. ... **`tailwind.config.ts`** — define tablet-first
+      breakpoints and any touch-size tokens implied by the horizontal plan UI
+      foundation. ... **`.github/workflows/ci.yml`** — run `typecheck`, `lint`, and
+      unit tests on PRs, matching the required gates.
+  - path: state/planning/vertical-plan.md
+    relevant_excerpt: |
+      LAYERS TOUCHED — Infrastructure: Vercel app scaffold, Firebase project wiring,
+      env handling, GitHub PR checks, dev/build conventions. ... VERIFIED BY —
+      Playwright auth test. Vitest unit test run passes. Vercel preview deploy is green.
+  - path: hive.config.yaml
+    relevant_excerpt: |
+      quality_gates: typecheck: required, lint: required, unit_tests: required

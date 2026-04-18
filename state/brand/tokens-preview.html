@@ -1,0 +1,1571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Design Tokens — Nail Tech Assistant</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ── Chrome ──────────────────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #f5f5f5;
+        color: #1a1a1a;
+        padding: 40px 32px;
+        line-height: 1.5;
+      }
+
+      section {
+        background: white;
+        padding: 32px;
+        margin-bottom: 24px;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      }
+
+      .section-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: #888;
+        margin-bottom: 24px;
+      }
+
+      h1.page-title {
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 32px;
+        font-weight: 400;
+        color: #6b3f5e;
+        margin-bottom: 6px;
+      }
+
+      .page-desc {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 32px;
+      }
+      .page-desc a {
+        color: #6b3f5e;
+        text-decoration: none;
+      }
+      .page-desc a:hover {
+        text-decoration: underline;
+      }
+
+      code {
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 11px;
+        background: #f0f0f0;
+        padding: 2px 6px;
+        border-radius: 3px;
+        color: #444;
+      }
+
+      /* ── Color Tokens ────────────────────────────────────── */
+      .color-namespace {
+        margin-bottom: 28px;
+      }
+      .color-namespace h3 {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #aaa;
+        margin-bottom: 14px;
+      }
+
+      .color-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .color-card {
+        width: 180px;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #e8e8e8;
+      }
+      .color-swatch {
+        height: 100px;
+        width: 100%;
+      }
+      .color-info {
+        padding: 10px 12px;
+      }
+      .color-info .token-path {
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 10px;
+        color: #888;
+        display: block;
+        margin-bottom: 4px;
+      }
+      .color-info .hex {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1a1a1a;
+      }
+      .color-info .usage-note {
+        font-size: 11px;
+        color: #777;
+        margin-top: 4px;
+        line-height: 1.4;
+      }
+
+      /* shadcn mapping */
+      .shadcn-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .shadcn-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
+      }
+      .shadcn-dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        flex-shrink: 0;
+      }
+      .shadcn-label {
+        font-size: 11px;
+      }
+      .shadcn-label strong {
+        display: block;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 10px;
+        font-weight: 600;
+        color: #444;
+      }
+      .shadcn-label span {
+        color: #888;
+        font-size: 10px;
+      }
+
+      /* ── Gradient ────────────────────────────────────────── */
+      .gradient-demos {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .gradient-demo {
+      }
+      .gradient-demo .demo-label {
+        font-size: 11px;
+        color: #888;
+        margin-bottom: 8px;
+      }
+      .gradient-hero {
+        height: 140px;
+        border-radius: 12px;
+        background: linear-gradient(
+          135deg,
+          #e8d5e0 0%,
+          #c9b4c9 40%,
+          #d4a8b0 70%,
+          #e8c9a0 100%
+        );
+      }
+      .gradient-cards {
+        display: flex;
+        gap: 16px;
+      }
+      .gradient-card-thumb {
+        width: 200px;
+        height: 120px;
+        border-radius: 10px;
+        background: linear-gradient(
+          135deg,
+          #e8d5e0 0%,
+          #c9b4c9 40%,
+          #d4a8b0 70%,
+          #e8c9a0 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .gradient-card-thumb span {
+        font-family: 'Fraunces', Georgia, serif;
+        font-size: 13px;
+        color: #6b3f5e;
+        opacity: 0.8;
+      }
+      .gradient-button {
+        display: inline-block;
+        padding: 12px 28px;
+        border-radius: 9999px;
+        background: linear-gradient(
+          135deg,
+          #e8d5e0 0%,
+          #c9b4c9 40%,
+          #d4a8b0 70%,
+          #e8c9a0 100%
+        );
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        color: #6b3f5e;
+        border: none;
+        cursor: pointer;
+      }
+      .token-tag {
+        display: inline-block;
+        margin-top: 8px;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 10px;
+        background: #f0f0f0;
+        color: #666;
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+
+      /* ── Typography ──────────────────────────────────────── */
+      .type-scale {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .type-row {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .type-row:last-child {
+        border-bottom: none;
+      }
+      .type-meta {
+        min-width: 140px;
+        flex-shrink: 0;
+      }
+      .type-meta code {
+        display: block;
+        margin-bottom: 3px;
+      }
+      .type-meta .type-detail {
+        font-size: 10px;
+        color: #aaa;
+      }
+      .type-sample {
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* ── Spacing ─────────────────────────────────────────── */
+      .spacing-viz {
+        display: flex;
+        align-items: flex-end;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 32px;
+      }
+      .spacing-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .spacing-box {
+        background: #6b3f5e;
+        border-radius: 3px;
+      }
+      .spacing-item code {
+        font-size: 9px;
+      }
+
+      .spacing-context {
+        background: #faf7f2;
+        border: 1px solid #e8e4de;
+        border-radius: 10px;
+        padding: 24px;
+        max-width: 420px;
+      }
+      .spacing-context h4 {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+      .ctx-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 24px;
+        padding: 12px 16px;
+        background: #6b3f5e;
+        color: #faf7f2;
+        border-radius: 10px;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+      }
+      .ctx-button .icon-placeholder {
+        width: 20px;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+      }
+      .spacing-annotations {
+        margin-top: 10px;
+        font-size: 11px;
+        color: #888;
+      }
+      .spacing-annotations span {
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 10px;
+        background: #f0f0f0;
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* ── Radius ──────────────────────────────────────────── */
+      .radius-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        align-items: flex-start;
+      }
+      .radius-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .radius-box {
+        width: 90px;
+        height: 90px;
+        background: #d4a5a8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #6b3f5e;
+        font-weight: 500;
+      }
+
+      /* ── Size & Breakpoint ───────────────────────────────── */
+      .size-section {
+        margin-bottom: 28px;
+      }
+      .size-section h3 {
+        font-size: 12px;
+        font-weight: 600;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 14px;
+      }
+
+      .touch-target {
+        width: 44px;
+        height: 44px;
+        border: 2px dashed #6b3f5e;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 9px;
+        color: #6b3f5e;
+        font-weight: 600;
+      }
+      .touch-target-wrap {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .touch-target-wrap p {
+        font-size: 12px;
+        color: #888;
+      }
+
+      .container-bar-wrap {
+        overflow-x: auto;
+        padding-bottom: 8px;
+      }
+      .container-bar {
+        position: relative;
+        height: 48px;
+        background: #f0ebe3;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+      }
+      .container-bar-inner {
+        height: 100%;
+        background: linear-gradient(90deg, #d4a5a8 0%, #c9a96e 100%);
+        border-radius: 4px;
+        opacity: 0.4;
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      .container-bar-label {
+        position: relative;
+        font-size: 11px;
+        font-weight: 600;
+        color: #6b3f5e;
+        z-index: 1;
+      }
+
+      .breakpoint-bar-wrap {
+        position: relative;
+        height: 60px;
+        background: #f7f7f7;
+        border-radius: 8px;
+        overflow: hidden;
+        min-width: 500px;
+      }
+      .bp-marker {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        border-left: 2px dashed;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding-left: 6px;
+        padding-top: 8px;
+      }
+      .bp-marker .bp-name {
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .bp-marker .bp-val {
+        font-size: 9px;
+        color: #aaa;
+        margin-top: 2px;
+      }
+      .bp-bg {
+        background: #e8e8e8;
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+      }
+
+      /* ── shadcn table ────────────────────────────────────── */
+      table.shadcn-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      table.shadcn-table th {
+        text-align: left;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #aaa;
+        padding: 6px 10px;
+        border-bottom: 1px solid #eee;
+      }
+      table.shadcn-table td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #f5f5f5;
+        vertical-align: middle;
+      }
+      table.shadcn-table tr:last-child td {
+        border-bottom: none;
+      }
+      .dot-swatch {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        vertical-align: middle;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        margin-right: 6px;
+      }
+
+      /* ── Raw JSON ────────────────────────────────────────── */
+      details {
+        margin-top: 0;
+      }
+      summary {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b3f5e;
+        cursor: pointer;
+        padding: 8px 0;
+        user-select: none;
+      }
+      details pre {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 20px;
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.6;
+        overflow-x: auto;
+        margin-top: 12px;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══ PAGE HEADER ══════════════════════════════════════════════ -->
+    <h1 class="page-title">Design Tokens</h1>
+    <p class="page-desc">
+      W3C Design Token JSON for <strong>Nail Tech Assistant</strong> — derived
+      from <a href="brand-system.yaml">brand-system.yaml</a>. Stack: Next.js 15
+      + Tailwind CSS + shadcn/ui · Target: tablet-landscape 1180×820.
+    </p>
+
+    <!-- ═══ 1. COLOR TOKENS ══════════════════════════════════════════ -->
+    <section>
+      <p class="section-label">Color Tokens</p>
+
+      <!-- brand -->
+      <div class="color-namespace">
+        <h3>brand</h3>
+        <div class="color-row">
+          <div class="color-card">
+            <div class="color-swatch" style="background: #6b3f5e"></div>
+            <div class="color-info">
+              <span class="token-path">color.brand.primary</span>
+              <div class="hex">#6B3F5E</div>
+              <div class="usage-note">
+                Primary actions, active states, wordmark
+              </div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div class="color-swatch" style="background: #d4a5a8"></div>
+            <div class="color-info">
+              <span class="token-path">color.brand.primary-tint</span>
+              <div class="hex">#D4A5A8</div>
+              <div class="usage-note">
+                Hover states, secondary highlights, decorative accents
+              </div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div class="color-swatch" style="background: #c9a96e"></div>
+            <div class="color-info">
+              <span class="token-path">color.brand.accent</span>
+              <div class="hex">#C9A96E</div>
+              <div class="usage-note">Premium accents, icons, star ratings</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- neutral -->
+      <div class="color-namespace">
+        <h3>neutral</h3>
+        <div class="color-row">
+          <div class="color-card">
+            <div class="color-swatch" style="background: #3d3530"></div>
+            <div class="color-info">
+              <span class="token-path">color.neutral.foreground</span>
+              <div class="hex">#3D3530</div>
+              <div class="usage-note">Body text, headings</div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div class="color-swatch" style="background: #8c7e78"></div>
+            <div class="color-info">
+              <span class="token-path">color.neutral.muted</span>
+              <div class="hex">#8C7E78</div>
+              <div class="usage-note">Secondary text, captions, metadata</div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div
+              class="color-swatch"
+              style="background: #d4cbc5; border: 1px solid #e0e0e0"
+            ></div>
+            <div class="color-info">
+              <span class="token-path">color.neutral.light</span>
+              <div class="hex">#D4CBC5</div>
+              <div class="usage-note">Dividers, borders, disabled states</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- surface -->
+      <div class="color-namespace">
+        <h3>surface</h3>
+        <div class="color-row">
+          <div class="color-card">
+            <div
+              class="color-swatch"
+              style="background: #faf7f2; border: 1px solid #eee"
+            ></div>
+            <div class="color-info">
+              <span class="token-path">color.surface.default</span>
+              <div class="hex">#FAF7F2</div>
+              <div class="usage-note">App background, page surface</div>
+            </div>
+          </div>
+          <div class="color-card">
+            <div
+              class="color-swatch"
+              style="background: #f0ebe3; border: 1px solid #e8e4de"
+            ></div>
+            <div class="color-info">
+              <span class="token-path">color.surface.raised</span>
+              <div class="hex">#F0EBE3</div>
+              <div class="usage-note">Card backgrounds, sidebar panels</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- feedback -->
+      <div class="color-namespace">
+        <h3>feedback</h3>
+        <div class="color-row">
+          <div class="color-card">
+            <div class="color-swatch" style="background: #c0595a"></div>
+            <div class="color-info">
+              <span class="token-path">color.feedback.destructive</span>
+              <div class="hex">#C0595A</div>
+              <div class="usage-note">Error states, destructive actions</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- shadcn aliases -->
+      <div style="margin-top: 32px">
+        <p
+          style="
+            font-size: 12px;
+            font-weight: 600;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 14px;
+          "
+        >
+          shadcn / CSS Variable Aliases
+        </p>
+        <div class="shadcn-grid">
+          <div class="shadcn-item">
+            <div
+              class="shadcn-dot"
+              style="background: #faf7f2; border: 1px solid #ddd"
+            ></div>
+            <div class="shadcn-label">
+              <strong>--background</strong
+              ><span> → color.surface.default · #FAF7F2</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #3d3530"></div>
+            <div class="shadcn-label">
+              <strong>--foreground</strong
+              ><span> → color.neutral.foreground · #3D3530</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div
+              class="shadcn-dot"
+              style="background: #f0ebe3; border: 1px solid #ddd"
+            ></div>
+            <div class="shadcn-label">
+              <strong>--card</strong
+              ><span> → color.surface.raised · #F0EBE3</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #6b3f5e"></div>
+            <div class="shadcn-label">
+              <strong>--primary</strong
+              ><span> → color.brand.primary · #6B3F5E</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div
+              class="shadcn-dot"
+              style="background: #faf7f2; border: 1px solid #ddd"
+            ></div>
+            <div class="shadcn-label">
+              <strong>--primary-foreground</strong
+              ><span> → color.surface.default · #FAF7F2</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div
+              class="shadcn-dot"
+              style="background: #f0ebe3; border: 1px solid #ddd"
+            ></div>
+            <div class="shadcn-label">
+              <strong>--secondary</strong
+              ><span> → color.surface.raised · #F0EBE3</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div
+              class="shadcn-dot"
+              style="background: #f0ebe3; border: 1px solid #ddd"
+            ></div>
+            <div class="shadcn-label">
+              <strong>--muted</strong
+              ><span> → color.surface.raised · #F0EBE3</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #8c7e78"></div>
+            <div class="shadcn-label">
+              <strong>--muted-foreground</strong
+              ><span> → color.neutral.muted · #8C7E78</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #d4a5a8"></div>
+            <div class="shadcn-label">
+              <strong>--accent</strong
+              ><span> → color.brand.primary-tint · #D4A5A8</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #6b3f5e"></div>
+            <div class="shadcn-label">
+              <strong>--accent-foreground</strong
+              ><span> → color.brand.primary · #6B3F5E</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #c0595a"></div>
+            <div class="shadcn-label">
+              <strong>--destructive</strong
+              ><span> → color.feedback.destructive · #C0595A</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #8c7e78"></div>
+            <div class="shadcn-label">
+              <strong>--border</strong
+              ><span> → color.neutral.muted · #8C7E78</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div
+              class="shadcn-dot"
+              style="background: #f0ebe3; border: 1px solid #ddd"
+            ></div>
+            <div class="shadcn-label">
+              <strong>--input</strong
+              ><span> → color.surface.raised · #F0EBE3</span>
+            </div>
+          </div>
+          <div class="shadcn-item">
+            <div class="shadcn-dot" style="background: #6b3f5e"></div>
+            <div class="shadcn-label">
+              <strong>--ring</strong
+              ><span> → color.brand.primary · #6B3F5E</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 2. GRADIENT TOKEN ═════════════════════════════════════════ -->
+    <section>
+      <p class="section-label">Gradient Token</p>
+
+      <div class="gradient-demos">
+        <!-- Hero strip -->
+        <div class="gradient-demo">
+          <div class="demo-label">Hero strip usage</div>
+          <div
+            class="gradient-hero"
+            style="display: flex; align-items: center; padding: 0 40px"
+          >
+            <span
+              style="
+                font-family: 'Fraunces', Georgia, serif;
+                font-size: 28px;
+                font-weight: 300;
+                color: #6b3f5e;
+              "
+              >Your art. Beautifully organized.</span
+            >
+          </div>
+          <span class="token-tag">gradient.signature</span>
+        </div>
+
+        <!-- Card thumbnails -->
+        <div class="gradient-demo">
+          <div class="demo-label">Card thumbnail (design placeholder) × 3</div>
+          <div class="gradient-cards">
+            <div>
+              <div class="gradient-card-thumb"><span>Design Card</span></div>
+              <span class="token-tag">gradient.signature</span>
+            </div>
+            <div>
+              <div class="gradient-card-thumb"><span>Loading State</span></div>
+              <span class="token-tag">gradient.signature</span>
+            </div>
+            <div>
+              <div class="gradient-card-thumb">
+                <span>Generation Placeholder</span>
+              </div>
+              <span class="token-tag">gradient.signature</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Button fill -->
+        <div class="gradient-demo">
+          <div class="demo-label">Button fill (signature wash CTA)</div>
+          <button class="gradient-button">View Collection</button>
+          <br />
+          <span class="token-tag">gradient.signature</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3. TYPOGRAPHY TOKENS ══════════════════════════════════════ -->
+    <section>
+      <p class="section-label">Typography Tokens</p>
+
+      <div class="type-scale">
+        <!-- display -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.display</code>
+            <div class="type-detail">48px · Fraunces 300 · lh 1.15</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Fraunces', Georgia, serif;
+                font-size: 48px;
+                font-weight: 300;
+                color: #3d3530;
+                line-height: 1.15;
+              "
+              >Nail Tech Assistant</span
+            >
+          </div>
+        </div>
+        <!-- h1 -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.h1</code>
+            <div class="type-detail">36px · Fraunces 400 · lh 1.2</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Fraunces', Georgia, serif;
+                font-size: 36px;
+                font-weight: 400;
+                color: #3d3530;
+                line-height: 1.2;
+              "
+              >Nail Tech Assistant</span
+            >
+          </div>
+        </div>
+        <!-- h2 -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.h2</code>
+            <div class="type-detail">28px · Fraunces 400 · lh 1.25</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Fraunces', Georgia, serif;
+                font-size: 28px;
+                font-weight: 400;
+                color: #3d3530;
+                line-height: 1.25;
+              "
+              >Nail Tech Assistant</span
+            >
+          </div>
+        </div>
+        <!-- h3 -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.h3</code>
+            <div class="type-detail">22px · Fraunces 600 · lh 1.3</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Fraunces', Georgia, serif;
+                font-size: 22px;
+                font-weight: 600;
+                color: #3d3530;
+                line-height: 1.3;
+              "
+              >Nail Tech Assistant</span
+            >
+          </div>
+        </div>
+        <!-- h4 -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.h4</code>
+            <div class="type-detail">18px · Fraunces 600 · lh 1.4</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Fraunces', Georgia, serif;
+                font-size: 18px;
+                font-weight: 600;
+                color: #3d3530;
+                line-height: 1.4;
+              "
+              >Your art. Beautifully organized.</span
+            >
+          </div>
+        </div>
+        <!-- body-lg -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.body-lg</code>
+            <div class="type-detail">17px · Inter 400 · lh 1.6</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Inter', sans-serif;
+                font-size: 17px;
+                font-weight: 400;
+                color: #3d3530;
+                line-height: 1.6;
+              "
+              >A studio companion that feels like a gift, not a tool. Track your
+              nail designs, clients, and product inventory all in one
+              place.</span
+            >
+          </div>
+        </div>
+        <!-- base -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.base</code>
+            <div class="type-detail">15px · Inter 400 · lh 1.65</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Inter', sans-serif;
+                font-size: 15px;
+                font-weight: 400;
+                color: #3d3530;
+                line-height: 1.65;
+              "
+              >A studio companion that feels like a gift, not a tool. Track your
+              nail designs, clients, and product inventory all in one
+              place.</span
+            >
+          </div>
+        </div>
+        <!-- body-sm -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.body-sm</code>
+            <div class="type-detail">13px · Inter 400 · lh 1.6</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Inter', sans-serif;
+                font-size: 13px;
+                font-weight: 400;
+                color: #3d3530;
+                line-height: 1.6;
+              "
+              >Secondary text, form helper copy, card metadata, captions for
+              nail art images.</span
+            >
+          </div>
+        </div>
+        <!-- label -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.label</code>
+            <div class="type-detail">12px · Inter 500 · lh 1.5</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Inter', sans-serif;
+                font-size: 12px;
+                font-weight: 500;
+                color: #8c7e78;
+                line-height: 1.5;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+              "
+              >Form Label · Section Header · Tag</span
+            >
+          </div>
+        </div>
+        <!-- caption -->
+        <div class="type-row">
+          <div class="type-meta">
+            <code>typography.font-size.caption</code>
+            <div class="type-detail">11px · Inter 400 · lh 1.4</div>
+          </div>
+          <div class="type-sample">
+            <span
+              style="
+                font-family: 'Inter', sans-serif;
+                font-size: 11px;
+                font-weight: 400;
+                color: #8c7e78;
+                line-height: 1.4;
+              "
+              >Timestamp · PMS 5115 C · 3 days ago · Created by @artist</span
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 4. SPACING TOKENS ═════════════════════════════════════════ -->
+    <section>
+      <p class="section-label">Spacing Tokens</p>
+
+      <div class="spacing-viz">
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 4px; height: 4px"></div>
+          <code>spacing.xs<br />4px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 8px; height: 8px"></div>
+          <code>spacing.sm<br />8px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 12px; height: 12px"></div>
+          <code>spacing.md<br />12px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 16px; height: 16px"></div>
+          <code>spacing.lg<br />16px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 24px; height: 24px"></div>
+          <code>spacing.xl<br />24px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 32px; height: 32px"></div>
+          <code>spacing.2xl<br />32px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 48px; height: 48px"></div>
+          <code>spacing.3xl<br />48px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 64px; height: 64px"></div>
+          <code>spacing.4xl<br />64px</code>
+        </div>
+        <div class="spacing-item">
+          <div class="spacing-box" style="width: 96px; height: 96px"></div>
+          <code>spacing.5xl<br />96px</code>
+        </div>
+      </div>
+
+      <!-- Real-world context: button with spacing.md padding + spacing.xl gap -->
+      <div class="spacing-context">
+        <h4>
+          Real-world: button with <code>spacing.md</code> padding (12px) +
+          <code>spacing.xl</code> gap (24px)
+        </h4>
+        <button class="ctx-button">
+          <div class="icon-placeholder"></div>
+          <span>Add Design</span>
+        </button>
+        <div class="spacing-annotations" style="margin-top: 12px">
+          Padding: <span>spacing.md = 12px</span> &nbsp; Gap between icon &
+          label: <span>spacing.xl = 24px</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 5. RADIUS TOKENS ══════════════════════════════════════════ -->
+    <section>
+      <p class="section-label">Radius Tokens</p>
+
+      <div class="radius-row">
+        <div class="radius-item">
+          <div class="radius-box" style="border-radius: 6px">sm</div>
+          <code>radius.sm · 6px</code>
+        </div>
+        <div class="radius-item">
+          <div class="radius-box" style="border-radius: 10px">md</div>
+          <code>radius.md · 10px</code>
+        </div>
+        <div class="radius-item">
+          <div class="radius-box" style="border-radius: 20px">lg</div>
+          <code>radius.lg · 20px</code>
+        </div>
+        <div class="radius-item">
+          <div class="radius-box" style="border-radius: 28px">xl</div>
+          <code>radius.xl · 28px</code>
+        </div>
+        <div class="radius-item">
+          <div
+            class="radius-box"
+            style="
+              border-radius: 9999px;
+              width: 90px;
+              height: 44px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 11px;
+              color: #6b3f5e;
+              font-weight: 500;
+            "
+          >
+            full
+          </div>
+          <code>radius.full · 9999px</code>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 6. SIZE + BREAKPOINT TOKENS ══════════════════════════════ -->
+    <section>
+      <p class="section-label">Size &amp; Breakpoint Tokens</p>
+
+      <!-- Touch target -->
+      <div class="size-section">
+        <h3>Touch Target</h3>
+        <div class="touch-target-wrap">
+          <div class="touch-target">44×44</div>
+          <p>
+            <code>size.touch-target-min = 44px</code> — minimum interactive area
+            on tablet
+          </p>
+        </div>
+      </div>
+
+      <!-- Container sizes -->
+      <div class="size-section">
+        <h3>Container</h3>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div>
+            <div style="font-size: 11px; color: #888; margin-bottom: 6px">
+              <code>size.container-tablet-landscape = 1180px</code>
+            </div>
+            <div class="container-bar-wrap">
+              <div class="container-bar" style="width: min(100%, 590px)">
+                <div class="container-bar-inner" style="width: 100%"></div>
+                <span class="container-bar-label"
+                  >1180px (landscape, scaled 50%)</span
+                >
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: #888; margin-bottom: 6px">
+              <code>size.container-tablet-portrait = 820px</code>
+            </div>
+            <div class="container-bar-wrap">
+              <div class="container-bar" style="width: min(100%, 410px)">
+                <div
+                  class="container-bar-inner"
+                  style="
+                    width: 100%;
+                    background: linear-gradient(90deg, #c9a96e, #d4a5a8);
+                  "
+                ></div>
+                <span class="container-bar-label"
+                  >820px (portrait, scaled 50%)</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakpoints -->
+      <div class="size-section">
+        <h3>Breakpoints</h3>
+        <div style="overflow-x: auto">
+          <div
+            style="
+              position: relative;
+              height: 70px;
+              background: #f7f7f7;
+              border-radius: 8px;
+              min-width: 560px;
+            "
+          >
+            <!-- bg fill bars -->
+            <div
+              style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                border-radius: 8px;
+                background: #e8e4de;
+              "
+            ></div>
+            <!-- sm marker: 640/1280 * 100 = 50% -->
+            <div
+              class="bp-marker"
+              style="left: calc(640 / 1280 * 100%); border-color: #6b3f5e"
+            >
+              <span class="bp-name" style="color: #6b3f5e">sm</span>
+              <span class="bp-val">640px</span>
+            </div>
+            <!-- md: 768/1280 = 60% -->
+            <div
+              class="bp-marker"
+              style="left: calc(768 / 1280 * 100%); border-color: #c9a96e"
+            >
+              <span class="bp-name" style="color: #c9a96e">md</span>
+              <span class="bp-val">768px</span>
+            </div>
+            <!-- lg: 1024/1280 = 80% -->
+            <div
+              class="bp-marker"
+              style="left: calc(1024 / 1280 * 100%); border-color: #d4a5a8"
+            >
+              <span class="bp-name" style="color: #9b6f9b">lg</span>
+              <span class="bp-val">1024px</span>
+            </div>
+            <!-- xl: 1280/1280 = 100% -->
+            <div
+              class="bp-marker"
+              style="
+                left: calc(1280 / 1280 * 100% - 40px);
+                border-color: #8c7e78;
+              "
+            >
+              <span class="bp-name" style="color: #8c7e78">xl</span>
+              <span class="bp-val">1280px</span>
+            </div>
+            <!-- label at left -->
+            <div
+              style="
+                position: absolute;
+                bottom: 8px;
+                left: 12px;
+                font-size: 10px;
+                color: #aaa;
+              "
+            >
+              0px
+            </div>
+          </div>
+          <div style="font-size: 11px; color: #aaa; margin-top: 8px">
+            Bar represents 0–1280px. Markers at breakpoint.sm / md / lg / xl.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 7. SHADCN MAPPING TABLE ═══════════════════════════════════ -->
+    <section>
+      <p class="section-label">shadcn CSS Variable Mapping</p>
+      <table class="shadcn-table">
+        <thead>
+          <tr>
+            <th>CSS Variable</th>
+            <th>Token Alias</th>
+            <th>Resolved Hex</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>--background</code></td>
+            <td><code>{color.surface.default}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #faf7f2; border: 1px solid #ddd"
+              ></span
+              >#FAF7F2
+            </td>
+          </tr>
+          <tr>
+            <td><code>--foreground</code></td>
+            <td><code>{color.neutral.foreground}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #3d3530"></span
+              >#3D3530
+            </td>
+          </tr>
+          <tr>
+            <td><code>--card</code></td>
+            <td><code>{color.surface.raised}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #f0ebe3; border: 1px solid #ddd"
+              ></span
+              >#F0EBE3
+            </td>
+          </tr>
+          <tr>
+            <td><code>--card-foreground</code></td>
+            <td><code>{color.neutral.foreground}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #3d3530"></span
+              >#3D3530
+            </td>
+          </tr>
+          <tr>
+            <td><code>--primary</code></td>
+            <td><code>{color.brand.primary}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #6b3f5e"></span
+              >#6B3F5E
+            </td>
+          </tr>
+          <tr>
+            <td><code>--primary-foreground</code></td>
+            <td><code>{color.surface.default}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #faf7f2; border: 1px solid #ddd"
+              ></span
+              >#FAF7F2
+            </td>
+          </tr>
+          <tr>
+            <td><code>--secondary</code></td>
+            <td><code>{color.surface.raised}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #f0ebe3; border: 1px solid #ddd"
+              ></span
+              >#F0EBE3
+            </td>
+          </tr>
+          <tr>
+            <td><code>--secondary-foreground</code></td>
+            <td><code>{color.neutral.foreground}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #3d3530"></span
+              >#3D3530
+            </td>
+          </tr>
+          <tr>
+            <td><code>--muted</code></td>
+            <td><code>{color.surface.raised}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #f0ebe3; border: 1px solid #ddd"
+              ></span
+              >#F0EBE3
+            </td>
+          </tr>
+          <tr>
+            <td><code>--muted-foreground</code></td>
+            <td><code>{color.neutral.muted}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #8c7e78"></span
+              >#8C7E78
+            </td>
+          </tr>
+          <tr>
+            <td><code>--accent</code></td>
+            <td><code>{color.brand.primary-tint}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #d4a5a8"></span
+              >#D4A5A8
+            </td>
+          </tr>
+          <tr>
+            <td><code>--accent-foreground</code></td>
+            <td><code>{color.brand.primary}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #6b3f5e"></span
+              >#6B3F5E
+            </td>
+          </tr>
+          <tr>
+            <td><code>--destructive</code></td>
+            <td><code>{color.feedback.destructive}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #c0595a"></span
+              >#C0595A
+            </td>
+          </tr>
+          <tr>
+            <td><code>--destructive-foreground</code></td>
+            <td><code>{color.surface.default}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #faf7f2; border: 1px solid #ddd"
+              ></span
+              >#FAF7F2
+            </td>
+          </tr>
+          <tr>
+            <td><code>--border</code></td>
+            <td><code>{color.neutral.muted}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #8c7e78"></span
+              >#8C7E78
+            </td>
+          </tr>
+          <tr>
+            <td><code>--input</code></td>
+            <td><code>{color.surface.raised}</code></td>
+            <td>
+              <span
+                class="dot-swatch"
+                style="background: #f0ebe3; border: 1px solid #ddd"
+              ></span
+              >#F0EBE3
+            </td>
+          </tr>
+          <tr>
+            <td><code>--ring</code></td>
+            <td><code>{color.brand.primary}</code></td>
+            <td>
+              <span class="dot-swatch" style="background: #6b3f5e"></span
+              >#6B3F5E
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ═══ 8. RAW tokens.json ════════════════════════════════════════ -->
+    <section>
+      <details>
+        <summary>
+          Raw tokens.json (click to expand — copy for integration)
+        </summary>
+        <pre>
+{
+  "color": {
+    "brand": {
+      "primary":      { "$value": "#6B3F5E", "$type": "color" },
+      "primary-tint": { "$value": "#D4A5A8", "$type": "color" },
+      "accent":       { "$value": "#C9A96E", "$type": "color" }
+    },
+    "neutral": {
+      "foreground": { "$value": "#3D3530", "$type": "color" },
+      "muted":      { "$value": "#8C7E78", "$type": "color" },
+      "light":      { "$value": "#D4CBC5", "$type": "color" }
+    },
+    "surface": {
+      "default": { "$value": "#FAF7F2", "$type": "color" },
+      "raised":  { "$value": "#F0EBE3", "$type": "color" }
+    },
+    "feedback": {
+      "destructive": { "$value": "#C0595A", "$type": "color" }
+    }
+  },
+  "gradient": {
+    "signature": {
+      "$value": "linear-gradient(135deg, #E8D5E0 0%, #C9B4C9 40%, #D4A8B0 70%, #E8C9A0 100%)",
+      "$type": "gradient"
+    }
+  },
+  "typography": {
+    "font-family": {
+      "heading": { "$value": "Fraunces, Georgia, serif", "$type": "fontFamily" },
+      "body":    { "$value": "Inter, -apple-system, BlinkMacSystemFont, sans-serif", "$type": "fontFamily" }
+    },
+    "font-size": {
+      "display": { "$value": "48px", "$type": "dimension" },
+      "h1":      { "$value": "36px", "$type": "dimension" },
+      "h2":      { "$value": "28px", "$type": "dimension" },
+      "h3":      { "$value": "22px", "$type": "dimension" },
+      "h4":      { "$value": "18px", "$type": "dimension" },
+      "body-lg": { "$value": "17px", "$type": "dimension" },
+      "base":    { "$value": "15px", "$type": "dimension" },
+      "body-sm": { "$value": "13px", "$type": "dimension" },
+      "label":   { "$value": "12px", "$type": "dimension" },
+      "caption": { "$value": "11px", "$type": "dimension" }
+    },
+    "font-weight": {
+      "light":    { "$value": 300, "$type": "fontWeight" },
+      "regular":  { "$value": 400, "$type": "fontWeight" },
+      "medium":   { "$value": 500, "$type": "fontWeight" },
+      "semibold": { "$value": 600, "$type": "fontWeight" },
+      "bold":     { "$value": 700, "$type": "fontWeight" }
+    }
+  },
+  "spacing": {
+    "xs":  { "$value": "4px",  "$type": "dimension" },
+    "sm":  { "$value": "8px",  "$type": "dimension" },
+    "md":  { "$value": "12px", "$type": "dimension" },
+    "lg":  { "$value": "16px", "$type": "dimension" },
+    "xl":  { "$value": "24px", "$type": "dimension" },
+    "2xl": { "$value": "32px", "$type": "dimension" },
+    "3xl": { "$value": "48px", "$type": "dimension" },
+    "4xl": { "$value": "64px", "$type": "dimension" },
+    "5xl": { "$value": "96px", "$type": "dimension" }
+  },
+  "radius": {
+    "sm":   { "$value": "6px",    "$type": "dimension" },
+    "md":   { "$value": "10px",   "$type": "dimension" },
+    "lg":   { "$value": "20px",   "$type": "dimension" },
+    "xl":   { "$value": "28px",   "$type": "dimension" },
+    "full": { "$value": "9999px", "$type": "dimension" }
+  },
+  "size": {
+    "touch-target-min":           { "$value": "44px",   "$type": "dimension" },
+    "container-tablet-landscape": { "$value": "1180px", "$type": "dimension" },
+    "container-tablet-portrait":  { "$value": "820px",  "$type": "dimension" }
+  },
+  "breakpoint": {
+    "sm": { "$value": "640px",  "$type": "dimension" },
+    "md": { "$value": "768px",  "$type": "dimension" },
+    "lg": { "$value": "1024px", "$type": "dimension" },
+    "xl": { "$value": "1280px", "$type": "dimension" }
+  },
+  "shadcn": {
+    "background":             { "$value": "{color.surface.default}",    "$type": "color" },
+    "foreground":             { "$value": "{color.neutral.foreground}",  "$type": "color" },
+    "card":                   { "$value": "{color.surface.raised}",     "$type": "color" },
+    "card-foreground":        { "$value": "{color.neutral.foreground}",  "$type": "color" },
+    "primary":                { "$value": "{color.brand.primary}",      "$type": "color" },
+    "primary-foreground":     { "$value": "{color.surface.default}",    "$type": "color" },
+    "secondary":              { "$value": "{color.surface.raised}",     "$type": "color" },
+    "secondary-foreground":   { "$value": "{color.neutral.foreground}",  "$type": "color" },
+    "muted":                  { "$value": "{color.surface.raised}",     "$type": "color" },
+    "muted-foreground":       { "$value": "{color.neutral.muted}",      "$type": "color" },
+    "accent":                 { "$value": "{color.brand.primary-tint}", "$type": "color" },
+    "accent-foreground":      { "$value": "{color.brand.primary}",      "$type": "color" },
+    "destructive":            { "$value": "{color.feedback.destructive}","$type": "color" },
+    "destructive-foreground": { "$value": "{color.surface.default}",    "$type": "color" },
+    "border":                 { "$value": "{color.neutral.muted}",      "$type": "color" },
+    "input":                  { "$value": "{color.surface.raised}",     "$type": "color" },
+    "ring":                   { "$value": "{color.brand.primary}",      "$type": "color" }
+  }
+}</pre
+        >
+      </details>
+    </section>
+  </body>
+</html>
