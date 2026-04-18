@@ -1,0 +1,56 @@
+{
+  "name": "nail-tech-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node node_modules/next/dist/bin/next dev --turbopack",
+    "build": "node node_modules/next/dist/bin/next build",
+    "start": "node node_modules/next/dist/bin/next start",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "lint": "node node_modules/eslint/bin/eslint.js .",
+    "format": "node node_modules/prettier/bin/prettier.cjs --write .",
+    "test": "node node_modules/vitest/vitest.mjs run",
+    "test:e2e": "node node_modules/@playwright/test/cli.js test",
+    "prepare": "node node_modules/husky/bin.js",
+    "lint-staged": "node node_modules/lint-staged/bin/lint-staged.js"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,tsx,jsx,json,md,yml,yaml,css}": [
+      "prettier --check"
+    ],
+    "*.{js,mjs,cjs,ts,tsx,jsx}": [
+      "eslint --max-warnings=0 --no-warn-ignored"
+    ]
+  },
+  "dependencies": {
+    "next": "15.1.11",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.54.0",
+    "@tailwindcss/postcss": "^4.1.13",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitest/ui": "^3.2.4",
+    "eslint": "^9.31.0",
+    "eslint-config-next": "15.1.11",
+    "eslint-plugin-import": "^2.32.0",
+    "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
+    "lint-staged": "^16.1.2",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.37.0",
+    "vitest": "^3.2.4",
+    "yaml": "^2.8.1"
+  }
+}

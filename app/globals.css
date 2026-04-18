@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+:root {
+  --color-primary: #6b3f5e;
+  --color-primary-tint: #d4a5a8;
+  --color-accent: #c9a96e;
+  --color-neutral-fg: #3d3530;
+  --color-neutral-muted: #8c7e78;
+  --color-surface: #faf7f2;
+  --color-surface-raised: #f0ebe3;
+  --color-destructive: #c0595a;
+  --gradient-signature: linear-gradient(
+    135deg,
+    #e8d5e0 0%,
+    #c9b4c9 40%,
+    #d4a8b0 70%,
+    #e8c9a0 100%
+  );
+  --background: #faf7f2;
+  --foreground: #3d3530;
+  --card: #f0ebe3;
+  --card-foreground: #3d3530;
+  --primary: #6b3f5e;
+  --primary-foreground: #faf7f2;
+  --secondary: #f0ebe3;
+  --secondary-foreground: #3d3530;
+  --muted: #f0ebe3;
+  --muted-foreground: #8c7e78;
+  --accent: #d4a5a8;
+  --accent-foreground: #6b3f5e;
+  --destructive: #c0595a;
+  --destructive-foreground: #faf7f2;
+  --border: #8c7e78;
+  --input: #f0ebe3;
+  --ring: #6b3f5e;
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-tablet-landscape: 73.75rem;
+  --container-tablet-landscape: 1180px;
+  --container-tablet-portrait: 820px;
+  --touch-target-min: 44px;
+}
+
+@theme inline {
+  --color-brand-primary: var(--color-primary);
+  --color-brand-primary-tint: var(--color-primary-tint);
+  --color-brand-accent: var(--color-accent);
+  --color-neutral-foreground: var(--color-neutral-fg);
+  --color-neutral-muted-token: var(--color-neutral-muted);
+  --color-surface-default: var(--color-surface);
+  --color-surface-raised-token: var(--color-surface-raised);
+  --color-feedback-destructive: var(--color-destructive);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-heading-display: var(--font-heading-family);
+  --font-body-copy: var(--font-body-family);
+  --breakpoint-sm: var(--breakpoint-sm);
+  --breakpoint-md: var(--breakpoint-md);
+  --breakpoint-lg: var(--breakpoint-lg);
+  --breakpoint-xl: var(--breakpoint-xl);
+  --breakpoint-tablet-landscape: var(--breakpoint-tablet-landscape);
+  --spacing-touch-target: var(--touch-target-min);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  --font-heading-family: var(--font-heading);
+  --font-body-family: var(--font-body);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgb(212 165 168 / 0.18), transparent 35%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body-family), sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading-family), serif;
+}
