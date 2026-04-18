@@ -10,6 +10,6 @@
 import type { NextRequest } from 'next/server';
 
 export function hasSessionCookie(req: NextRequest): boolean {
-  void req;
-  throw new Error('TODO(a4.implement): hasSessionCookie not yet implemented');
+  const value = req.cookies.get('session')?.value;
+  return typeof value === 'string' && value.length > 0;
 }
