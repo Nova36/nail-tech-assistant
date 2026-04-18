@@ -1,4 +1,7 @@
-// STUB — Codex implements in step 3. Export signature only.
+import { getAuth } from 'firebase-admin/auth';
+
+import { createServerFirebaseAdmin } from './server';
+
 import type { NextRequest } from 'next/server';
 
 export interface Session {
@@ -6,7 +9,29 @@ export interface Session {
   email: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function getSession(req: NextRequest): Promise<Session | null> {
-  throw new Error('NOT IMPLEMENTED');
+  const sessionCookie = req.cookies.get('session')?.value;
+
+  if (!sessionCookie) {
+    return null;
+  }
+
+  try {
+    const app = createServerFirebaseAdmin();
+    const decodedClaims = await getAuth(app).verifySessionCookie(
+      sessionCookie,
+      true
+    );
+
+    if (!decodedClaims.email) {
+      return null;
+    }
+
+    return {
+      uid: decodedClaims.uid,
+      email: decodedClaims.email,
+    };
+  } catch {
+    return null;
+  }
 }

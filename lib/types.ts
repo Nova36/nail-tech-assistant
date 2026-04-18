@@ -1,4 +1,3 @@
-// STUB — Codex implements in step 3. Export signature only. Zero `any` enforced.
 export type NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval';
 
 export interface AuthUser {
