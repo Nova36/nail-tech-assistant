@@ -6,7 +6,7 @@
 
 - Nail Tech Assistant is a greenfield, single-user web app built as a Mother's Day 2026 gift for one working nail technician. (Source: product-discovery-brief; product-brief; project-profile.yaml)
 - The app bridges a workflow gap between collecting inspiration and showing a concrete nail-design preview on a hand. (Source: product-discovery-brief Problem Statement; product-brief Problem)
-- The end-to-end v1 promise is simple and specific: Pinterest login, reference selection, optional prompt, AI generation, five-nail preview, shape switching, saving, and later reopen/regenerate. (Source: product-brief P0 features; design-discussion Section 1)
+- The end-to-end v1 promise is simple and specific: Pinterest browse, reference selection, optional prompt, AI generation, five-nail preview, shape switching, saving, and later reopen/regenerate. (Source: product-brief P0 features; design-discussion Section 1)
 - The project is not framed as a startup MVP or a public product launch.
 - It is framed as a polished, personal, actually usable tool for the user's wife. (Source: design-discussion Section 1)
 - That framing changes planning priorities.
@@ -33,7 +33,7 @@
 - The user accepted that chat refinement is desirable but not load-bearing for the first shipping line, so the plan isolates it as Slice 7 and keeps P0 completion at Slice 6 plus Slice 8. (Source: product-discovery-brief MVP Scope; product-brief P1; vertical-plan Sections 2 and 6)
 - The user resolved several design questions during kickoff that materially shaped this outline:
 - Pinterest dev app registration is not yet done and is a user-owned prerequisite. (Source: kickoff-decisions #1)
-- Local OAuth development should use ngrok or equivalent tunnel support. (Source: kickoff-decisions #2)
+- Local development no longer depends on Pinterest OAuth callbacks because the integration now uses a static token. (Source: sign-off.md #17)
 - Gemini quality is still unvalidated and must be tested in a one-day spike before the production AI slice is treated as safe. (Source: kickoff-decisions #3)
 - Multi-reference handling is one primary reference plus ordered secondary style cues. (Source: kickoff-decisions #4)
 - Text prompt instructions can override reference visuals when they conflict. (Source: kickoff-decisions #5)
@@ -47,20 +47,20 @@
 ### Key Decisions Locked
 
 - Single-user allowlisted auth using one allowed email. (Source: product-brief P0 #1; horizontal-plan Auth)
-- Pinterest OAuth is core, not optional. (Source: product-discovery-brief Key Decisions Made; design-discussion Section 2)
+- Pinterest remains core, but its integration path is a static access token rather than OAuth. (Source: sign-off.md #17)
 - Web app only for v1, tablet-first and phone-compatible. (Source: product-discovery-brief Technical Constraints; product-brief Scope Boundaries)
-- Stack is Next.js 15 App Router, React 19, TypeScript, Tailwind, shadcn/ui, Vercel, Supabase, Pinterest API v5, and Gemini 2.5 Flash Image as the initial provider target. (Source: product-discovery-brief Technical Constraints; project-profile.yaml)
+- Stack is Next.js 15 App Router, React 19, TypeScript, Tailwind, shadcn/ui, Vercel, Firebase, Pinterest API v5, and Firebase AI Logic as the initial provider path to Gemini 2.5 Flash Image. (Source: product-discovery-brief Technical Constraints; project-profile.yaml; sign-off.md #15-#16)
 - 2D five-nail visualization ships in v1; 3D is deferred. (Source: product-discovery-brief Key Decisions Made; product-brief P2)
 - V1 uses one uniform design across all five nails; per-nail variation is deferred. (Source: product-discovery-brief Key Decisions Made; product-brief Scope Boundaries)
 - Designs retain their inputs and can be regenerated later. (Source: kickoff-decisions #7; horizontal-plan Design lifecycle)
-- RLS stays in place even in single-user mode. (Source: horizontal-plan Persistence RLS policies; design-discussion Sections 2 and 3)
+- Security Rules stay in place even in single-user mode. (Source: horizontal-plan Persistence Security Rules; design-discussion Sections 2 and 3)
 - Landscape-first tablet optimization is the layout baseline. (Source: kickoff-decisions #9; horizontal-plan UI primitives)
 - Chat refinement is P1/stretch, not part of the minimum P0 ship line. (Source: product-brief P1; vertical-plan Moldability Notes)
 
 ### Overall Implementation Strategy
 
 - The implementation strategy is a thin foundation pass followed by vertical slices, not a long horizontal platform sprint. (Source: design-discussion Section 3; vertical-plan Section 1)
-- Slice order is deliberate: establish the authenticated shell first, de-risk Gemini second, expose Pinterest OAuth friction third, then complete the inspiration-to-saved-design flow in sequence. (Source: vertical-plan Sections 1 and 2)
+- Slice order is deliberate: establish the authenticated shell first, de-risk Gemini second, expose Pinterest token-path friction third, then complete the inspiration-to-saved-design flow in sequence. (Source: vertical-plan Sections 1 and 2)
 - Horizontal concerns such as persistence, auth, integrations, server actions, and testing are carried slice by slice instead of being "finished" up front. (Source: horizontal-plan Layer Inventory; vertical-plan Overlay Diagram)
 - The plan explicitly protects a provider boundary for generation and a renderer boundary for visualization so future provider pivots, 3D swaps, and per-nail variation remain possible without inflating v1 scope. (Source: design-discussion Section 3; horizontal-plan External Integrations and Core Domain)
 - P0 shipping line is Slice 6 plus Slice 8.
@@ -78,11 +78,11 @@
 
 1. **`package.json`** — define the Next.js 15, React 19, TypeScript, Tailwind, shadcn/ui, Vitest, Playwright, MSW, Husky, and lint/typecheck scripts needed by the baseline scaffold. This file anchors the repo-level toolchain named in `project-profile.yaml`.
 2. **`tsconfig.json`** — lock TypeScript compiler behavior for the App Router codebase and test directories. The plan needs typecheck to be a required gate from Slice 0 onward. (Source: hive.config.yaml quality_gates)
-3. **`next.config.ts`** — establish the Next.js runtime surface and any image-domain handling required for later Supabase-delivered assets. This is scaffold-level now, not full image optimization policy.
+3. **`next.config.ts`** — establish the Next.js runtime surface and any image-domain handling required for later Firebase-delivered assets. This is scaffold-level now, not full image optimization policy.
 4. **`tailwind.config.ts`** — define tablet-first breakpoints and any touch-size tokens implied by the horizontal plan UI foundation. (Source: horizontal-plan UI primitives)
 5. **`eslint.config.js`** — provide linting required by the CI gates. (Source: project-profile.yaml code_quality; hive.config.yaml quality_gates)
 6. **`.prettierrc`** — provide formatting consistency for the greenfield repo.
-7. **`.env.example`** — document all required env vars: `PINTEREST_CLIENT_ID`, `PINTEREST_CLIENT_SECRET`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `ALLOWED_EMAIL`. (Source: horizontal-plan Environment configuration)
+7. **`.env.example`** — document all required env vars: `PINTEREST_APP_ID`, `PINTEREST_ACCESS_TOKEN`, Firebase client/admin config vars, `APP_URL`, `ALLOWED_EMAIL`. (Source: horizontal-plan Environment configuration)
 8. **`.github/workflows/ci.yml`** — run `typecheck`, `lint`, and unit tests on PRs, matching the required gates. (Source: horizontal-plan Infrastructure; hive.config.yaml quality_gates)
 9. **`.husky/pre-commit`** — enforce local quality checks aligned with the repo conventions in `project-profile.yaml`.
 10. **`app/layout.tsx`** — create the root App Router layout.
@@ -90,14 +90,14 @@
 12. **`app/(authenticated)/layout.tsx`** — create the authenticated shell wrapper for protected routes.
 13. **`app/(authenticated)/page.tsx`** — implement the initial dashboard placeholder with primary CTA slots for "New design" and "My designs." (Source: horizontal-plan Feature UI)
 14. **`app/api/health/route.ts`** — expose the public health route named in auth middleware exceptions. (Source: horizontal-plan Auth)
-15. **`middleware.ts`** — enforce auth on non-public routes while exempting `/login`, `/api/health`, and the Pinterest callback route. (Source: horizontal-plan Auth)
-16. **`lib/supabase/client.ts`** — create the browser Supabase client.
-17. **`lib/supabase/server.ts`** — create the server-side Supabase client for SSR and route handlers.
-18. **`lib/supabase/middleware.ts`** — centralize SSR cookie/session helpers for auth middleware. (Source: prompt-required manifest example; horizontal-plan Auth)
+15. **`middleware.ts`** — enforce auth on non-public routes while exempting `/login` and `/api/health`. (Source: horizontal-plan Auth)
+16. **`lib/firebase/client.ts`** — create the browser Firebase client.
+17. **`lib/firebase/server.ts`** — create the server-side Firebase Admin surface for SSR and route handlers. [confirm Firebase SDK detail]
+18. **`lib/firebase/middleware.ts`** — centralize auth/session helper glue for middleware. [confirm Firebase SDK detail]
 19. **`lib/auth/allowlist.ts`** — isolate the `ALLOWED_EMAIL` check so the allowlist rule is server-enforced and reusable.
-20. **`lib/env.ts`** — validate runtime env presence early to avoid debugging missing-secret errors later in OAuth or generation slices.
+20. **`lib/env.ts`** — validate runtime env presence early to avoid debugging missing-secret errors later in Pinterest or generation slices.
 21. **`lib/types.ts`** — define shared types for auth/profile/nail-shape enums and early domain contracts. The project profile says structure and naming are still TBD; this file helps prevent drift early without inventing extra architectural layers.
-22. **`supabase/migrations/0001_profiles.sql`** — create `profiles`, wire it to `auth.users`, and apply baseline RLS and any token columns needed by later Pinterest work. (Source: horizontal-plan Persistence)
+22. **`firestore.rules`** and **`firestore.indexes.json`** — create the baseline Firestore security and index surfaces for `profiles` and later collections. (Source: horizontal-plan Persistence)
 23. **`tests/unit/auth/allowlist.test.ts`** — verify that only the configured email is allowed through.
 24. **`tests/e2e/auth.spec.ts`** — validate the login happy path and protected-route redirect.
 25. **`playwright.config.ts`**, **`vitest.config.ts`**, and **`tests/fixtures/`** — establish the baseline harnesses that later slices extend instead of reinventing.
@@ -105,9 +105,9 @@
 ### Interfaces
 
 - `assertAllowedEmail(email: string): { ok: true } | { ok: false; reason: 'not_allowed' }`
-- `createBrowserSupabaseClient(): SupabaseClient`
-- `createServerSupabaseClient(): Promise<SupabaseClient>`
-- `getRequiredEnv(): { APP_URL: string; ALLOWED_EMAIL: string; SUPABASE_URL: string; SUPABASE_ANON_KEY: string; SUPABASE_SERVICE_ROLE_KEY: string }`
+- `createBrowserFirebaseClient(): FirebaseApp`
+- `createServerFirebaseAdmin(): FirebaseAdminApp | Firestore`
+- `getRequiredEnv(): { APP_URL: string; ALLOWED_EMAIL: string; PINTEREST_APP_ID: string; PINTEREST_ACCESS_TOKEN: string; firebaseConfig: [confirm Firebase SDK detail] }`
 - Login submit contract:
   `POST /login` server action or route handler accepts `{ email: string }`
 - Login success output:
@@ -115,20 +115,19 @@
 - Login blocked output:
   `{ status: 'rejected'; message: 'Only the configured email can sign in.' }`
 - Error conditions:
-  missing env vars, malformed email input, Supabase magic-link send failure, session cookie misconfiguration, middleware redirect loops.
+  missing env vars, malformed email input, Firebase email-link send failure, session cookie misconfiguration, middleware redirect loops.
 
 ### Validation
 
 - Verify an unauthenticated visit to `/` redirects to `/login`.
-- Verify the allowed email path produces a magic-link sent state.
-- Verify a non-allowlisted email is rejected before any Supabase send action occurs.
+- Verify the allowed email path produces an email-link sent state.
+- Verify a non-allowlisted email is rejected before any Firebase send action occurs.
 - Verify the authenticated shell loads after session establishment.
 - Verify `/api/health` remains public.
-- Verify middleware does not trap the future Pinterest callback route in an auth loop.
 - Verify CI runs typecheck, lint, and unit tests on PRs.
-- Verify the `profiles` migration applies cleanly in a fresh Supabase project.
+- Verify the baseline Firestore rules/index files load cleanly in a fresh Firebase project or emulator.
 - Silent-break risk:
-  if `profiles.id` is not aligned with `auth.users.id`, later token storage and RLS behavior will drift before Pinterest work even starts.
+  if `profiles.id` is not aligned with Firebase Auth `uid`, later profile access and Security Rules behavior will drift before Pinterest work even starts.
 
 ## Slice 1: Gemini Quality Spike
 
@@ -139,8 +138,8 @@
 ### Changes
 
 1. **`app/spike/gemini/page.tsx`** — create a throwaway manual spike page that accepts an uploaded reference image, optional prompt text, and shows the generated output. This page is not the production UX. (Source: vertical-plan Slice 1)
-2. **`app/api/spike/gemini/route.ts`** — expose a minimal server-side call path so the API key stays off the client.
-3. **`lib/gemini/spike.ts`** — keep a small spike-only prompt builder and request wrapper, separate from the later production `generate.ts` contract.
+2. **`app/api/spike/gemini/route.ts`** — expose a minimal server-side call path so Firebase AI Logic stays off the client boundary used by the spike page.
+3. **`lib/ai/spike.ts`** — keep a small spike-only prompt builder and request wrapper, separate from the later production `generate.ts` contract.
 4. **`tests/fixtures/spike/`** — store representative input references for manual quality review if needed. (Source: vertical-plan Slice 1 verification)
 5. **`state/planning/structured-outline.md`** — this document records the go/no-go gate and the fallback pivot rule rather than assuming Gemini is already proven.
 6. No persistence tables are added for spike output.
@@ -158,7 +157,7 @@
 - Output on failure:
   structured message describing refusal, API failure, or transport failure
 - Error conditions:
-  missing `GEMINI_API_KEY`, unsupported file type, provider refusal, unusable image quality, rate-limit during spike, network failure.
+  missing Firebase AI Logic configuration, unsupported file type, provider refusal, unusable image quality, rate-limit during spike, network failure.
 
 ### Validation
 
@@ -178,36 +177,27 @@
 - Silent-break risk:
   pretty but semantically wrong outputs could look acceptable in a quick glance but fail the actual nail-tech use case.
 
-## Slice 2: Pinterest Login + Browse
+## Slice 2: Pinterest Browse
 
-**Goal:** Connect Pinterest and browse boards and pins. (Source: vertical-plan Slice 2)
-**Depends on:** Slice 0, plus user-owned Pinterest app registration prerequisite
-**Estimated duration:** [data not provided]
+**Goal:** Use the static Pinterest token and browse boards and pins. (Source: vertical-plan Slice 2)
+**Depends on:** Slice 0, plus user-owned Pinterest app setup prerequisite
+**Estimated duration:** 1-2 days, reduced from the earlier 3-day OAuth-shaped assumption in the TPM memo
 
 ### Changes
 
-1. **`app/api/auth/pinterest/start/route.ts`** — build the OAuth start endpoint that redirects to Pinterest authorization.
-2. **`app/api/auth/pinterest/callback/route.ts`** — handle OAuth callback exchange, state validation, token storage, and post-auth redirect. This route is explicitly exempt from normal auth middleware but must still validate its own `state`. (Source: horizontal-plan Auth)
-3. **`app/(authenticated)/pinterest/page.tsx`** — add the first authenticated Pinterest browser surface, or equivalent dashboard subview, for board and pin navigation.
-4. **`app/api/pinterest/boards/route.ts`** — expose the passthrough board list endpoint named in the horizontal plan.
-5. **`app/api/pinterest/boards/[id]/pins/route.ts`** — expose the board pins endpoint named in the horizontal plan.
-6. **`lib/pinterest/oauth.ts`** — encapsulate authorize URL generation, callback exchange, token refresh, and state handling. (Source: prompt-required manifest example; horizontal-plan Pinterest)
-7. **`lib/pinterest/api.ts`** — encapsulate `GET /v5/user_account/boards` and `GET /v5/boards/{board_id}/pins`.
-8. **`lib/pinterest/state.ts`** — isolate state-token generation/validation to keep route handlers thin and testable.
-9. **`supabase/migrations/0001_profiles.sql`** — if Slice 0 did not already include the token columns, ensure it does now; the horizontal plan requires encrypted token state and expiry on `profiles`.
-10. **`components/PinBrowser.tsx`** — render the pin grid browser used after opening a board. (Source: prompt-required manifest example)
-11. **`components/PinterestBoardGrid.tsx`** — render board browsing using the metadata returned by the passthrough endpoints.
-12. **`components/PinterestConnectButton.tsx`** — show connect vs linked state.
-13. **`tests/unit/pinterest/oauth.test.ts`** — verify state generation/validation and authorize URL construction.
-14. **`tests/unit/pinterest/refresh.test.ts`** — verify refresh token behavior.
-15. **`tests/e2e/pinterest-oauth.spec.ts`** — mock the OAuth flow and confirm boards and pins render.
-16. **`tests/integration/pinterest-profile-token.test.ts`** — verify token persistence lines up with the current user profile under RLS rules.
+1. **`app/(authenticated)/pinterest/page.tsx`** — add the first authenticated Pinterest browser surface, or equivalent dashboard subview, for board and pin navigation.
+2. **`app/api/pinterest/boards/route.ts`** — expose the passthrough board list endpoint named in the horizontal plan.
+3. **`app/api/pinterest/boards/[id]/pins/route.ts`** — expose the board pins endpoint named in the horizontal plan.
+4. **`lib/pinterest/api.ts`** — encapsulate `GET /v5/user_account/boards` and `GET /v5/boards/{board_id}/pins` using `PINTEREST_ACCESS_TOKEN`.
+5. **`components/PinBrowser.tsx`** — render the pin grid browser used after opening a board. (Source: prompt-required manifest example)
+6. **`components/PinterestBoardGrid.tsx`** — render board browsing using the metadata returned by the passthrough endpoints.
+7. **`components/PinterestConnectButton.tsx`** — show ready-state guidance even though the app no longer performs an OAuth connect flow.
+8. **`tests/unit/pinterest/api.test.ts`** — verify bearer-token request construction and error mapping.
+9. **`tests/e2e/pinterest-browse.spec.ts`** — mock the browse flow and confirm boards and pins render.
+10. **`tests/integration/pinterest-token-env.test.ts`** — verify token-backed requests fail clearly when env configuration is missing or invalid.
 
 ### Interfaces
 
-- `getPinterestAuthorizeUrl(input: { redirectUri: string; state: string }): string`
-- `exchangePinterestCode(input: { code: string; redirectUri: string }): Promise<{ accessToken: string; refreshToken?: string; expiresAt: string }>`
-- `refreshPinterestToken(input: { refreshToken: string }): Promise<{ accessToken: string; refreshToken?: string; expiresAt: string }>`
 - `listPinterestBoards(userId: string): Promise<PinterestBoard[]>`
 - `listPinterestBoardPins(input: { userId: string; boardId: string }): Promise<PinterestPin[]>`
 - `GET /api/pinterest/boards`
@@ -216,25 +206,18 @@
 - `GET /api/pinterest/boards/[id]/pins`
 - Output:
   `{ pins: PinterestPin[] }`
-- Callback route success output:
-  redirect to authenticated Pinterest browse view
-- Callback route failure output:
-  redirect to an error state with reconnect guidance
 - Error conditions:
-  invalid state token, missing authorization code, expired or missing refresh token, Pinterest API failure, partial board/pin payloads, user profile write failure.
+  missing `PINTEREST_ACCESS_TOKEN`, revoked or expired token, Pinterest API failure, partial board/pin payloads.
 
 ### Validation
 
-- Verify ngrok or equivalent tunnel URL works as the local callback surface, because that is a locked kickoff choice.
-- Verify Vercel preview or production callback URLs also work for non-local testing.
-- Verify Pinterest connect state updates after successful callback.
+- Verify local and Vercel surfaces can browse Pinterest using the configured static token.
+- Verify Pinterest ready-state UI reflects whether token config is present.
 - Verify board list renders for a real linked account.
 - Verify opening a board shows pins.
-- Verify refresh token logic can renew access without forcing a reconnect.
-- Verify the middleware exemption does not inadvertently make other authenticated Pinterest routes public.
-- Verify mocked OAuth Playwright coverage and one real-account smoke test both pass.
+- Verify mocked browse Playwright coverage and one real-token smoke test both pass.
 - Silent-break risk:
-  OAuth may appear successful while token refresh or profile persistence is broken, leading to later failures during reference ingestion.
+  token-backed browse may appear stable until the static token expires or is revoked, leading to later failures during reference ingestion.
 
 ## Slice 3: Reference Collection
 
@@ -244,8 +227,8 @@
 
 ### Changes
 
-1. **`supabase/migrations/0002_references.sql`** — create the `references` table and the `references` storage bucket contract implied by the horizontal plan. (Source: horizontal-plan Persistence)
-2. **`supabase/migrations/0004_secondary_refs.sql`** — create `design_secondary_references` if the selected references are persisted with the design record at creation time. (Source: horizontal-plan Persistence)
+1. **`firestore.rules`** and **`firestore.indexes.json`** — extend collection and index coverage for `references` and ordered secondary references. (Source: horizontal-plan Persistence)
+2. **`lib/firestore/converters/`** — define converters for `references` and `designs` if the repo adopts per-collection converters. [confirm Firebase SDK detail]
 3. **`components/ReferencePanel.tsx`** — show one primary reference, ordered secondary references, and prompt semantics.
 4. **`components/UploadZone.tsx`** — support drag/drop or picker-based photo upload. (Source: prompt-required manifest example; horizontal-plan Feature UI)
 5. **`components/PromptInput.tsx`** — support optional text prompt and explain that text can override visual cues. (Source: kickoff-decisions #5)
@@ -255,7 +238,7 @@
 9. **`app/api/references/upload/route.ts`** — accept multipart uploads for new photo references.
 10. **`app/api/references/pinterest/select/route.ts`** — persist selected Pinterest pins into durable reference records if the UI does not post directly through a server action.
 11. **`app/api/designs/create/route.ts`** — create a draft design record that captures references, prompt, and current nail shape even before generation.
-12. **`supabase/migrations/0003_designs_generations.sql`** — at minimum create the `designs` table if design drafts are saved at this stage. (Source: horizontal-plan Persistence)
+12. **`lib/firestore/converters/designs.ts`** — at minimum define the `designs` document contract if design drafts are saved at this stage. [confirm Firebase SDK detail]
 13. **`tests/unit/references/reference-set.test.ts`** — verify primary/secondary ordering and prompt-override metadata behavior.
 14. **`tests/integration/references-storage.test.ts`** — verify reference rows and storage paths are written under the current user.
 15. **`tests/e2e/reference-assembly.spec.ts`** — verify one primary pin, optional secondary pins, uploads, and prompt entry build the expected reference panel state.
@@ -273,17 +256,17 @@
 - Design create output:
   `{ designId: string; status: 'draft_created' }`
 - Error conditions:
-  no primary reference selected, duplicate secondary ordering, upload storage failure, Pinterest image cache failure, invalid file type, prompt length issues, RLS denial.
+  no primary reference selected, duplicate secondary ordering, upload storage failure, Pinterest image cache failure, invalid file type, prompt length issues, Security Rules denial.
 
 ### Validation
 
 - Verify the UI never allows zero or multiple primary references.
 - Verify secondary references preserve explicit user order.
-- Verify uploaded images and Pinterest images both become rows in the same `references` schema.
+- Verify uploaded images and Pinterest images both become docs in the same `references` collection shape.
 - Verify the prompt is optional and generation can proceed later without it.
 - Verify the prompt helper text communicates that text wins on conflict.
 - Verify a mixed-source reference set is persisted cleanly and reloadable.
-- Verify RLS prevents another user from reading or writing a reference row, even though v1 is single-user by policy.
+- Verify Security Rules prevent another user from reading or writing a reference doc, even though v1 is single-user by policy.
 - Silent-break risk:
   Pinterest and upload paths might drift into incompatible shapes, creating branching bugs in Slice 4.
 
@@ -295,8 +278,8 @@
 
 ### Changes
 
-1. **`supabase/migrations/0003_designs_generations.sql`** — activate the `generations` table and the `designs.latest_generation_id` linkage if not already partially created. (Source: horizontal-plan Persistence)
-2. **`lib/gemini/generate.ts`** — build the production multimodal request layer, transient retry logic, error classification, and provider-boundary abstraction. (Source: prompt-required manifest example; horizontal-plan External integrations)
+1. **`firestore.rules`** and **`firestore.indexes.json`** — activate the `generations` collection contract and any lookup/index support for `designs.latest_generation_id`. (Source: horizontal-plan Persistence)
+2. **`lib/ai/generate.ts`** — build the production multimodal request layer, transient retry logic, error classification, and provider-boundary abstraction on top of Firebase AI Logic. (Source: prompt-required manifest example; horizontal-plan External integrations)
 3. **`lib/designs/lifecycle.ts`** — orchestrate create/generate/update behavior so route handlers stay thin. (Source: prompt-required manifest example; horizontal-plan Core Domain)
 4. **`app/api/designs/generate/route.ts`** — trigger the first generation for a draft design or draft input set.
 5. **`components/GenerateButton.tsx`** — submit generation with a polished pending state and disabled-state logic.
@@ -401,7 +384,7 @@
 8. **`components/DesignNameField.tsx`** — support inline naming.
 9. **`tests/integration/designs-regenerate.test.ts`** — verify stored design inputs produce a valid regenerate request and update the latest generation link.
 10. **`tests/e2e/library-regenerate.spec.ts`** — verify save, reopen, rename, and regenerate end to end.
-11. **`tests/integration/designs-rls.test.ts`** — verify persisted designs and generations remain user-scoped under RLS.
+11. **`tests/integration/designs-rls.test.ts`** — verify persisted designs and generations remain user-scoped under Security Rules.
 
 ### Interfaces
 
@@ -430,7 +413,7 @@
 - Verify regenerate uses the original stored inputs rather than the current transient UI state.
 - Verify the `latest_generation_id` updates after regeneration while old `generations` rows remain available as history.
 - Verify naming is optional and can be added later.
-- Verify RLS protects saved designs, references, and generation rows consistently.
+- Verify Security Rules protect saved designs, references, and generation rows consistently.
 - Silent-break risk:
   regenerate may appear to work while actually using incomplete or mutated input lineage, breaking trust in the save/reopen model.
 
@@ -442,7 +425,7 @@
 
 ### Changes
 
-1. **`supabase/migrations/0005_chat_turns.sql`** — create the `chat_turns` table. (Source: prompt-required manifest example; horizontal-plan Persistence)
+1. **`firestore.rules`** and **`firestore.indexes.json`** — extend coverage for `chat_turns` if P1 ships. (Source: prompt-required manifest example; horizontal-plan Persistence)
 2. **`components/ChatRefinementPanel.tsx`** — render turn history, input, and iteration state. (Source: prompt-required manifest example)
 3. **`app/api/designs/[id]/chat/route.ts`** — accept a chat turn and trigger the next generation.
 4. **`lib/designs/chat-refinement.ts`** — accumulate prior refinement instructions and map them into the next provider request.
@@ -490,10 +473,10 @@
 5. **`styles/globals.css`** — tune spacing, orientation behavior, and tablet ergonomics for landscape-first use.
 6. **`tests/e2e/core-flow.spec.ts`** — run the full P0 path end to end: login, Pinterest browse, reference selection, generate, visualize, save, reopen, regenerate.
 7. **`tests/e2e/tablet-smoke.spec.ts`** — run landscape-tablet focused flow checks.
-8. **`README.md`** — document setup, prerequisites, env vars, and local OAuth tunnel expectations.
+8. **`README.md`** — document setup, prerequisites, env vars, and Firebase/Pinterest token expectations.
 9. **`docs/architecture.md`** — capture the final v1 system seams: auth, Pinterest, references, generation, visualizer, persistence.
-10. **`docs/integrations/pinterest.md`** — record dev app setup and callback requirements.
-11. **`docs/integrations/gemini.md`** — record provider assumptions, retry behavior, and failure handling.
+10. **`docs/integrations/pinterest.md`** — record dev app setup and static-token requirements.
+11. **`docs/integrations/gemini.md`** — record Firebase AI Logic assumptions, retry behavior, and failure handling.
 
 ### Interfaces
 
@@ -526,7 +509,7 @@
 Slice 0 verification:
   Automated: unit tests for allowlist logic; Playwright auth redirect and login sent-state flow
   Manual: confirm authenticated shell loads cleanly and middleware exceptions behave as intended
-  Tools: Vitest, Playwright, Supabase test client
+  Tools: Vitest, Playwright, Firebase emulator or jest-firebase mocks
   Platforms: desktop Chrome for setup sanity; iPadOS Safari/Chrome for basic auth flow smoke
 
 Slice 1 verification:
@@ -536,21 +519,21 @@ Slice 1 verification:
   Platforms: desktop Chrome primarily; optional iPad smoke if reviewing on target device matters
 
 Slice 2 verification:
-  Automated: mocked OAuth tests, board/pin passthrough handler tests, refresh-token tests
-  Manual: real Pinterest account link and browse smoke test
-  Tools: Vitest, Playwright, MSW, Supabase test client
-  Platforms: desktop Chrome for OAuth debugging; iPadOS Chrome/Safari for browse feel
+  Automated: mocked browse tests and board/pin passthrough handler tests
+  Manual: real Pinterest token browse smoke test
+  Tools: Vitest, Playwright, MSW, Firebase emulator or jest-firebase mocks
+  Platforms: desktop Chrome for browse debugging; iPadOS Chrome/Safari for browse feel
 
 Slice 3 verification:
   Automated: reference transform tests, upload path tests, storage-write integration tests, reference panel E2E
   Manual: confirm primary/secondary affordances are obvious and prompt helper text is understandable
-  Tools: Vitest, Playwright, MSW, Supabase test client
+  Tools: Vitest, Playwright, MSW, Firebase emulator or jest-firebase mocks
   Platforms: iPadOS Chrome/Safari primary; iPhone and desktop Chrome secondary
 
 Slice 4 verification:
   Automated: request-builder tests, retry tests, generation happy/error E2E flows, persistence transition integration tests
   Manual: evaluate whether generated outputs remain credible nail-design material
-  Tools: Vitest, Playwright, MSW, Supabase test client
+  Tools: Vitest, Playwright, MSW, Firebase emulator or jest-firebase mocks
   Platforms: desktop Chrome for debugging; iPadOS Chrome/Safari for pending/error UX review
 
 Slice 5 verification:
@@ -560,9 +543,9 @@ Slice 5 verification:
   Platforms: iPadOS Chrome/Safari primary; desktop Chrome secondary
 
 Slice 6 verification:
-  Automated: save/reload/regenerate E2E, design persistence integration coverage, RLS tests on library records
+  Automated: save/reload/regenerate E2E, design persistence integration coverage, Security Rules tests on library records
   Manual: reopen a saved design and confirm it feels like the same workspace state rather than a detached gallery view
-  Tools: Vitest, Playwright, Supabase test client
+  Tools: Vitest, Playwright, Firebase emulator or jest-firebase mocks
   Platforms: iPadOS Chrome/Safari primary; desktop Chrome and iPhone secondary
 
 Slice 7 verification:
@@ -574,7 +557,7 @@ Slice 7 verification:
 Slice 8 verification:
   Automated: full Playwright suite, critical-path reruns, stable snapshot checks for visualizer
   Manual: full tablet walkthrough, phone-usable smoke pass, failure-state wording review
-  Tools: Playwright, Vitest, Supabase test client
+  Tools: Playwright, Vitest, Firebase emulator or jest-firebase mocks
   Platforms: iPadOS Safari/Chrome primary; iPhone and desktop Chrome secondary
 
 ### P0 Coverage Matrix
@@ -582,13 +565,13 @@ Slice 8 verification:
 | P0 Feature | Primary Test Type | Tool | Slice |
 |---|---|---|---|
 | Single-user authentication | E2E + unit | Playwright + Vitest | Slice 0 |
-| Pinterest OAuth + browse | E2E + mocked integration + manual smoke | Playwright + MSW + manual real-account test | Slice 2 |
-| Reference capture from pins/uploads | Integration + E2E | Supabase test client + Playwright | Slice 3 |
+| Pinterest browse | E2E + mocked integration + manual smoke | Playwright + MSW + manual real-token test | Slice 2 |
+| Reference capture from pins/uploads | Integration + E2E | Firebase emulator or jest-firebase mocks + Playwright | Slice 3 |
 | Optional text prompt | Unit + E2E | Vitest + Playwright | Slice 3 and Slice 4 |
 | AI-generated design | Unit + integration + E2E + manual quality review | Vitest + MSW + Playwright + manual review | Slice 4 |
 | 2D nail visualizer | E2E + screenshot regression + manual visual review | Playwright + snapshots + manual review | Slice 5 |
 | Nail shape selection | E2E + screenshot regression | Playwright | Slice 5 |
-| Design library | Integration + E2E | Supabase test client + Playwright | Slice 6 |
+| Design library | Integration + E2E | Firebase emulator or jest-firebase mocks + Playwright | Slice 6 |
 | Tablet-optimized UI | Manual walkthrough + E2E smoke | manual review + Playwright | Slice 8 |
 
 ### Additional Verification Notes
@@ -613,8 +596,8 @@ Slice 8 verification:
 
 ### Error Handling Strategy
 
-- Pinterest OAuth failures:
-  handle invalid state, missing code, callback mismatch, expired tokens, and refresh failures with reconnect guidance rather than generic 500s. (Source: horizontal-plan Auth and Pinterest)
+- Pinterest token failures:
+  handle missing token, revoked token, and browse failures with reconnect-or-replace-token guidance rather than generic 500s. (Source: horizontal-plan Auth and Pinterest)
 - Pinterest board/pin fetch failures:
   surface retryable fetch errors in the browse UI without losing already linked status.
 - Pinterest image cache failures:
@@ -627,28 +610,28 @@ Slice 8 verification:
   treat as retryable once, then fail explicitly.
 - Gemini low-quality output:
   not every low-quality result is a transport failure; the product relies on manual review during Slice 1 and later product judgment rather than only code-level retries. (Source: kickoff-decisions #3; design-discussion Section 4)
-- Supabase connection loss:
+- Firebase connection loss:
   fail mutations atomically where possible, especially around generation rows and storage writes.
-- RLS denial or session loss:
+- Security Rules denial or session loss:
   redirect back to login or show a re-auth-required state, not a generic application error.
 
 ### Migration Plan
 
-- Use versioned SQL migration files under `supabase/migrations/`.
-- Add schema in slice order so persistence follows the same dependency logic as product slices.
-- Proposed migration sequence from the inputs:
-- `0001_profiles.sql` for profile extension, token state, and baseline RLS
-- `0002_references.sql` for normalized references
-- `0003_designs_generations.sql` for designs and generation attempts
-- `0004_secondary_refs.sql` for ordered secondary references
-- `0005_chat_turns.sql` for P1 chat history
-- Keep migrations additive where possible to fit the greenfield schedule and reduce rollback pain. (Source: prompt-required Part 3b guidance; horizontal-plan Persistence)
+- Use `firestore.rules` and `firestore.indexes.json` plus Firestore converters as the schema gate.
+- Add schema support in slice order so persistence follows the same dependency logic as product slices.
+- Proposed sequence from the inputs:
+- baseline `profiles` rules and converters
+- `references` rules and converters
+- `designs` / `generations` rules and converters
+- ordered secondary references under `designs`
+- `chat_turns` support for P1
+- Keep schema changes additive where possible to fit the greenfield schedule and reduce rollback pain. (Source: prompt-required Part 3b guidance; horizontal-plan Persistence)
 
 ### Rollback Plan
 
 - Vercel deploy rollback is the primary application rollback mechanism. (Source: prompt-required Part 3b guidance)
-- Supabase migrations should stay additive so the app can roll forward safely even if an earlier deploy is restored.
-- Generation/provider bugs should be isolated behind the `lib/gemini/generate.ts` boundary so a provider-path fix does not require broad UI rollback.
+- Firestore rules/indexes and converters should stay additive so the app can roll forward safely even if an earlier deploy is restored.
+- Generation/provider bugs should be isolated behind the `lib/ai/generate.ts` boundary so a provider-path fix does not require broad UI rollback.
 - The visualizer should remain separable from generation output so visual regressions can be reverted without ripping out saved designs.
 
 ### Performance Implications
@@ -657,33 +640,32 @@ Slice 8 verification:
 - The product does not need sub-second generation.
 - It does need a pending state polished enough that 10 to 15 second waits feel intentional rather than broken. (Source: product-discovery-brief Technical Constraints)
 - Pinterest browsing performance matters because the main inspiration source is Pinterest.
-- Supabase image delivery should be monitored pragmatically, but the inputs do not yet justify a separate CDN layer in v1. (Source: product-brief Open Question #5; vertical-plan Deferred Items)
+- Firebase image delivery should be monitored pragmatically, but the inputs do not yet justify a separate CDN layer in v1. (Source: product-brief Open Question #5; vertical-plan Deferred Items)
 - Tablet network variability should inform loading-state and retry design because the app is intended for real consultation use on a tablet, not only on desktop broadband. (Source: prompt-required Part 3b guidance; product-brief P0 #9)
 
 ### Documentation Impact
 
-- `README.md` must cover local setup, env vars, Supabase creation, Pinterest dev app registration, Gemini key provisioning, and tunnel expectations.
+- `README.md` must cover local setup, env vars, Firebase project creation, Pinterest dev app registration, Firebase AI Logic provisioning, and token expectations.
 - Architecture notes should capture the slice seams so later story execution does not drift across the Claude/Codex workflow. (Source: hive.config.yaml; design-discussion Section 2)
-- Pinterest setup docs should capture callback URL patterns for local and Vercel surfaces.
-- Gemini setup docs should capture the one-retry policy, failure classification, and provider-decision gate from Slice 1.
+- Pinterest setup docs should capture static-token creation and replacement expectations.
+- Gemini setup docs should capture the Firebase AI Logic path, one-retry policy, failure classification, and provider-decision gate from Slice 1.
 - If chat ships, docs should also note that it is a refinement layer on top of the same design-generation pipeline rather than a parallel system.
 
 ### Security Considerations
 
 - Single-user allowlist must be enforced server-side, not client-side. (Source: product-brief Scope Boundaries; prompt-required Part 3b guidance)
-- Pinterest token state belongs in the `profiles` table and should be encrypted at rest if implemented exactly as the horizontal plan states. (Source: horizontal-plan `profiles` table)
-- RLS must stay on even in single-user mode to avoid accidental future migration pain and to preserve secure defaults. (Source: horizontal-plan RLS policies; design-discussion Section 4)
+- Pinterest token state no longer belongs in the profile record; the app reads one static env token instead. (Source: sign-off.md #17)
+- Security Rules must stay on even in single-user mode to avoid accidental future migration pain and to preserve secure defaults. (Source: horizontal-plan Security Rules; design-discussion Section 4)
 - Storage access should follow the same user-owned path rules as row-level tables.
 - Middleware exemptions should remain narrow:
   `/login`,
-  `/api/health`,
-  Pinterest callback.
+  `/api/health`.
 - The app does not add client-side secret exposure for Pinterest or Gemini because those integrations are server-side boundaries.
 
 ### Cross-Cutting Gaps
 
-- Exact token-encryption implementation detail is not supplied in the inputs. `[data not provided]`
-- Exact storage bucket policy SQL is not supplied in the inputs. `[data not provided]`
+- Exact Firebase auth/session helper detail is not supplied in the inputs. `[confirm Firebase SDK detail]`
+- Exact Firebase rules/index detail beyond the baseline ownership semantics is not supplied in the inputs. `[confirm Firebase SDK detail]`
 - Exact observability or logging stack is not supplied in the inputs. `[data not provided]`
 
 ## Part 4: File Change Manifest
@@ -695,17 +677,15 @@ CREATE:
 `app/`
 
 - `app/layout.tsx` — root layout
-- `app/(auth)/login/page.tsx` — magic-link login
+- `app/(auth)/login/page.tsx` — email-link login
 - `app/(authenticated)/layout.tsx` — authenticated shell
 - `app/(authenticated)/page.tsx` — dashboard / authenticated home
 - `app/(authenticated)/pinterest/page.tsx` — Pinterest browse flow shell
 - `app/(authenticated)/design/new/page.tsx` — new design workspace
 - `app/(authenticated)/design/[id]/page.tsx` — saved design viewer / active design workspace
 - `app/(authenticated)/library/page.tsx` — design library
-- `app/spike/gemini/page.tsx` — throwaway Gemini quality spike page
+- `app/spike/gemini/page.tsx` — throwaway Firebase AI Logic quality spike page
 - `app/api/health/route.ts` — public health endpoint
-- `app/api/auth/pinterest/start/route.ts` — OAuth start
-- `app/api/auth/pinterest/callback/route.ts` — OAuth callback
 - `app/api/pinterest/boards/route.ts` — boards passthrough
 - `app/api/pinterest/boards/[id]/pins/route.ts` — pins passthrough
 - `app/api/references/upload/route.ts` — upload reference ingestion
@@ -752,46 +732,41 @@ CREATE:
 - `lib/env.ts` — env validation
 - `lib/types.ts` — shared domain and DTO types
 - `lib/auth/allowlist.ts` — single-user email gating
-- `lib/supabase/client.ts` — browser client
-- `lib/supabase/server.ts` — server client
-- `lib/supabase/middleware.ts` — session helper glue
-- `lib/pinterest/oauth.ts` — authorize URL, callback exchange, refresh
+- `lib/firebase/client.ts` — browser client
+- `lib/firebase/server.ts` — server client / admin surface [confirm Firebase SDK detail]
+- `lib/firebase/middleware.ts` — session helper glue [confirm Firebase SDK detail]
 - `lib/pinterest/api.ts` — boards and pins fetching
-- `lib/pinterest/state.ts` — OAuth state handling
+- `lib/firestore/converters/` — collection converters [confirm Firebase SDK detail]
 - `lib/references/ingest.ts` — Pinterest and upload ingestion
 - `lib/references/reference-set.ts` — primary/secondary set builder
-- `lib/gemini/spike.ts` — spike-only provider wrapper
-- `lib/gemini/generate.ts` — production multimodal request builder
+- `lib/ai/spike.ts` — spike-only provider wrapper
+- `lib/ai/generate.ts` — production multimodal request builder
 - `lib/generations/errors.ts` — failure classification
 - `lib/designs/lifecycle.ts` — create/save/reload/regenerate orchestration
 - `lib/designs/shape-state.ts` — shape handling
 - `lib/designs/chat-refinement.ts` — P1 turn accumulation
 
-`supabase/migrations/`
+`Firebase config`
 
-- `supabase/migrations/0001_profiles.sql` — profile extension, token state, baseline RLS
-- `supabase/migrations/0002_references.sql` — references table and bucket policy
-- `supabase/migrations/0003_designs_generations.sql` — designs and generations
-- `supabase/migrations/0004_secondary_refs.sql` — ordered secondary references
-- `supabase/migrations/0005_chat_turns.sql` — chat refinement history
+- `firestore.rules` — baseline ownership and access rules
+- `firestore.indexes.json` — Firestore indexes
 
 `tests/`
 
 - `tests/unit/auth/allowlist.test.ts`
-- `tests/unit/pinterest/oauth.test.ts`
-- `tests/unit/pinterest/refresh.test.ts`
+- `tests/unit/pinterest/api.test.ts`
 - `tests/unit/references/reference-set.test.ts`
 - `tests/unit/gemini/request-builder.test.ts`
 - `tests/unit/gemini/retry.test.ts`
 - `tests/unit/designs/shape-state.test.ts`
 - `tests/unit/designs/chat-accumulation.test.ts`
-- `tests/integration/pinterest-profile-token.test.ts`
+- `tests/integration/pinterest-token-env.test.ts`
 - `tests/integration/references-storage.test.ts`
 - `tests/integration/generations-persistence.test.ts`
 - `tests/integration/designs-regenerate.test.ts`
 - `tests/integration/designs-rls.test.ts`
 - `tests/e2e/auth.spec.ts`
-- `tests/e2e/pinterest-oauth.spec.ts`
+- `tests/e2e/pinterest-browse.spec.ts`
 - `tests/e2e/reference-assembly.spec.ts`
 - `tests/e2e/generation-flow.spec.ts`
 - `tests/e2e/visualizer-shapes.spec.ts`
@@ -806,8 +781,8 @@ CREATE:
 `docs/`
 
 - `docs/architecture.md` — architecture notes
-- `docs/integrations/pinterest.md` — Pinterest setup and callback notes
-- `docs/integrations/gemini.md` — Gemini setup and failure policy notes
+- `docs/integrations/pinterest.md` — Pinterest setup and static-token notes
+- `docs/integrations/gemini.md` — Firebase AI Logic setup and failure policy notes
 
 `root config`
 
@@ -844,19 +819,19 @@ Manifest notes:
 
 | # | Risk | Severity | Likelihood | Mitigation | Owner |
 |---|---|---|---|---|---|
-| 1 | Pinterest OAuth friction stalls real integration work | High | Medium | Treat Pinterest app registration as a prerequisite, not a feature; use ngrok-equivalent tunnel from the start; implement callback state validation and refresh-token tests in Slice 2; keep one real-account smoke test early instead of waiting for full E2E. | User for prereq; developer for implementation |
+| 1 | Pinterest token expiration / revocation stalls real integration work | High | Medium | Treat Pinterest app registration and token generation as prerequisites, not features; validate token-backed browse in Slice 2; keep one real-token smoke test early instead of waiting for full E2E. | User for prereq; developer for implementation |
 | 2 | Gemini reference-edit quality is not good enough for nail-design output | High | Medium | Enforce the Slice 1 quality gate before production AI plumbing is treated as committed; test at least five reference types; if quality fails, pivot behind the provider boundary to FLUX.1-kontext or `gpt-image-1` without changing upstream reference-set or downstream visualizer contracts. | Developer |
 | 3 | 3.5-week timeline collapses under integration churn | High | High | Hold the shipping line at Slice 6 plus Slice 8; treat Slice 7 as cuttable; keep Slice 0 thin; avoid speculative layers; resolve biggest unknowns early; preserve polish time instead of backloading every risk. | Developer |
 | 4 | Claude/Codex spec-implementation drift causes rework | High | Medium | Keep each slice contract explicit and testable; centralize shared type contracts in `lib/types.ts`; use the structured outline as the scope anchor; avoid stories that mix multiple external unknowns. | Developer + TPM workflow |
 | 5 | 2D visualizer works technically but looks cheap | High | Medium | Separate visualizer as its own slice; use shape-specific masks; require screenshot regression plus manual tablet review; hold the fidelity bar at stylized-but-recognizable instead of photorealism; defer 3D rather than diluting Slice 5. | Developer |
-| 6 | Single-user shortcuts create v2 migration pain | Medium | Medium | Keep `user_id` on durable rows; enforce RLS now; isolate allowlist logic from data model; avoid client-only auth assumptions; keep provider and renderer boundaries swappable. | Developer |
+| 6 | Single-user shortcuts create v2 migration pain | Medium | Medium | Keep `userId` on durable docs; enforce Security Rules now; isolate allowlist logic from data model; avoid client-only auth assumptions; keep provider and renderer boundaries swappable. | Developer |
 | 7 | Tablet ergonomics remain unsettled too late | Medium | Medium | Lock landscape-first layout now; test on iPad browsers throughout, not only at the end; keep no separate presentation mode in v1 so the main workspace must stay consultation-ready. | Developer |
-| 8 | Supabase storage performance is weaker than expected | Medium | Low | Use Supabase Storage first because the inputs do not justify a broader media layer; validate real image delivery in Slice 4-6; keep image handling isolated enough that CDN work can be added later if needed. | Developer |
+| 8 | Firebase storage performance is weaker than expected | Medium | Low | Use Firebase Cloud Storage first because the inputs do not justify a broader media layer; validate real image delivery in Slice 4-6; keep image handling isolated enough that CDN work can be added later if needed. | Developer |
 | 9 | Chat refinement scope sprawls and steals polish time | Medium | Medium | Keep chat in Slice 7 only; do not let P1 schema or UI contaminate P0 slices more than necessary; cut it immediately if Slice 4-6 consume schedule buffer. | Developer |
 | 10 | Reference ingestion splits into Pinterest-specific and upload-specific code paths | Medium | Medium | Normalize both sources through `references` plus shared ingestion contracts in Slice 3; unit test one-primary plus ordered-secondary behavior independent of source. | Developer |
 | 11 | Generation persistence becomes inconsistent on partial failures | Medium | Medium | Create generation row before provider call; classify failure states; store result path and status atomically where possible; test pending/success/failure transitions explicitly. | Developer |
 | 12 | Regenerate does not truly preserve original design intent | Medium | Medium | Store primary reference, ordered secondary references, prompt text, nail shape, and generation lineage as first-class design data; verify regenerate from saved inputs in Slice 6. | Developer |
-| 13 | User-owned prerequisites slip and block implementation | Medium | Medium | Make Pinterest registration, Gemini key provisioning, Supabase creation, and Vercel wiring visible blockers; document them in README and planning docs; do not pretend Slice 2 or Slice 4 can proceed without them. | User |
+| 13 | User-owned prerequisites slip and block implementation | Medium | Medium | Make Pinterest registration, Firebase creation/configuration, and Vercel wiring visible blockers; document them in README and planning docs; do not pretend Slice 2 or Slice 4 can proceed without them. | User |
 | 14 | AI latency makes the product feel broken during consultations | Medium | Medium | Treat polished pending states as product work; communicate progress clearly; keep failure recovery obvious; do not over-promise generation speed the inputs do not require. | Developer |
 
 ### Detailed High-Severity Mitigations
@@ -864,8 +839,8 @@ Manifest notes:
 Risk 1 detail:
 
 - Do prerequisite setup before implementation PRs depend on it.
-- Keep OAuth logic inside `lib/pinterest/oauth.ts` so callback bugs do not sprawl through UI code.
-- Include refresh-token handling immediately because browsing that only works once is not a real integration.
+- Keep Pinterest token handling inside `lib/pinterest/api.ts` so auth details do not sprawl through UI code.
+- Validate token-backed browse immediately because browsing that only works with one local assumption is not a real integration.
 
 Risk 2 detail:
 
@@ -882,7 +857,7 @@ Risk 3 detail:
 
 Risk 4 detail:
 
-- Use the named routes, tables, and contracts from the H/V plans as the authoritative seam map.
+- Use the named routes, collections, and contracts from the H/V plans as the authoritative seam map.
 - Keep one document per planning task, with explicit locked decisions cited, so downstream story work cannot drift into unstated assumptions.
 - Use tests as contract reinforcement rather than broad exploratory coverage.
 
@@ -900,11 +875,11 @@ Risk 5 detail:
 - Slice 1 → Slice 0
   needs auth shell and runtime env scaffolding before a spike page exists
 - Slice 2 → Slice 0
-  needs auth, Supabase profile persistence, middleware behavior, and deployable surfaces
+  needs auth, Firebase profile persistence, middleware behavior, and deployable surfaces
 - Slice 3 → Slice 2
   Pinterest ingestion depends on Pinterest login and browse working first
 - Slice 3 → Slice 0
-  uploads and durable references still depend on auth, storage, and RLS baseline
+  uploads and durable references still depend on auth, storage, and Security Rules baseline
 - Slice 4 → Slice 3
   generation depends on a normalized reference set
 - Slice 4 → Slice 1
@@ -928,13 +903,13 @@ Risk 5 detail:
 - React 19
 - Tailwind CSS
 - shadcn/ui
-- Supabase Postgres
-- Supabase Auth
-- Supabase Storage
+- Firebase Firestore
+- Firebase Auth
+- Firebase Cloud Storage
+- Firebase AI Logic / `@firebase/ai`
 - Pinterest API v5
-- Google Generative AI / Gemini 2.5 Flash Image
+- Gemini 2.5 Flash Image via Firebase AI Logic
 - Vercel preview and production deploy surfaces
-- ngrok or equivalent dev tunnel
 - Vitest
 - Playwright
 - MSW
@@ -947,8 +922,8 @@ Risk 5 detail:
 
 ### Handoff Dependencies
 
-- Foundation must deliver working auth, env handling, and baseline migrations before Pinterest or reference work starts.
-- Pinterest must deliver linked browse capability before mixed-source reference collection starts.
+- Foundation must deliver working auth, env handling, and baseline Firebase rules/index setup before Pinterest or reference work starts.
+- Pinterest must deliver browse capability before mixed-source reference collection starts.
 - Reference collection must deliver normalized durable references before generation orchestration starts.
 - Generation must deliver persisted outputs before the visualizer can become meaningful.
 - Visualizer must deliver stable saved-view rendering before the library becomes polished.
@@ -968,11 +943,11 @@ Risk 5 detail:
 
 #### Failure Mode 2
 
-- **Failure:** Pinterest OAuth or token refresh takes longer than expected and stalls the main inspiration flow.
-- **Trigger:** App registration is delayed, callback URLs are misconfigured, or refresh semantics are trickier than assumed.
+- **Failure:** Pinterest token setup, expiration, or revocation stalls the main inspiration flow.
+- **Trigger:** App registration is delayed, the static token is missing or revoked, or the env path is misconfigured.
 - **Impact:** The core user-facing source of inspiration is blocked; the app can still demo uploads, but the emotional center of "your Pinterest into a nail preview" is undermined.
-- **Signal:** OAuth works only in one environment; board browsing breaks after initial connect; refresh errors start appearing on later requests; manual smoke tests require reconnects too often.
-- **Our answer:** The plan exposes Pinterest early in Slice 2 and treats app registration as a prerequisite, not a hidden task. The route boundary is narrow, the callback is explicitly exempted from normal middleware, and refresh-token behavior is tested in the same slice. If Pinterest drags, uploads still preserve partial progress, but the plan does not pretend that is a full replacement. (Grounding: kickoff-decisions #1 and #2; vertical-plan Slice 2; horizontal-plan Pinterest)
+- **Signal:** Browse works only in one environment; board browsing breaks once the token changes; manual smoke tests require env replacement unexpectedly often.
+- **Our answer:** The plan exposes Pinterest early in Slice 2 and treats app registration plus token setup as prerequisites, not hidden tasks. The route boundary is narrow, and token-backed browse is tested in the same slice. If Pinterest drags, uploads still preserve partial progress, but the plan does not pretend that is a full replacement. (Grounding: sign-off.md #17; vertical-plan Slice 2; horizontal-plan Pinterest)
 
 #### Failure Mode 3
 
@@ -1014,9 +989,9 @@ Risk 5 detail:
 - **VERIFIED:** Indefinite image retention is acceptable in v1. (Source: kickoff-decisions #11)
 - **VERIFIED:** Stylized-but-recognizable visual fidelity is sufficient for the hand preview. (Source: kickoff-decisions #12)
 - **ASSUMED:** Pinterest app registration completes quickly enough not to materially compress Slice 2. Comfortable to proceed because the kickoff document frames it as same-day user-owned setup, but the completed status is not yet in the inputs. (Source: kickoff-decisions #1)
-- **ASSUMED:** ngrok or equivalent tunnel setup for local OAuth is operationally straightforward. Comfortable to proceed because the route shape is simple and the alternative is preview-only development, but tunnel specifics are not detailed. (Source: kickoff-decisions #2; product-brief Open Question #1)
+- **VERIFIED:** Local development no longer depends on ngrok or equivalent Pinterest OAuth callback tunneling because the integration now uses a static token. (Source: sign-off.md #17)
 - **RISKY:** Gemini 2.5 Flash Image will pass the nail-design quality bar. This is specifically called out as unvalidated and can change the provider implementation plan significantly. (Source: kickoff-decisions #3)
-- **ASSUMED:** Supabase Storage performance is sufficient for v1 image browsing and preview delivery. Comfortable because the inputs treat a broader CDN layer as optional and unassigned, but real behavior is not yet verified. (Source: product-brief Open Question #5; vertical-plan Deferred Items)
+- **ASSUMED:** Firebase Cloud Storage performance is sufficient for v1 image browsing and preview delivery. Comfortable because the inputs treat a broader CDN layer as optional and unassigned, but real behavior is not yet verified. (Source: product-brief Open Question #5; vertical-plan Deferred Items)
 - **ASSUMED:** A single main workspace UI can serve both self-prep and client-facing use without a separate presentation mode. Comfortable because kickoff locked presentation mode out of v1, but this remains a UX pressure point to monitor. (Source: kickoff-decisions #10)
 - **ASSUMED:** The app can remain simple in state management using App Router data flow plus local state. Comfortable because the project profile leaves state management open and no input requires a heavier store. (Source: project-profile.yaml architecture)
 - **RISKY:** The visualizer can achieve enough perceived quality within the available time without custom illustration work beyond masks and layout. (Source: design-discussion Section 4; kickoff-decisions #12)
@@ -1029,7 +1004,7 @@ Risk 5 detail:
 **Must have:**
 
 - Allowlisted email login and protected routes
-- Pinterest OAuth and board/pin browsing
+- Pinterest board/pin browsing via static token
 - One primary reference plus optional secondary references and uploads
 - Optional prompt field
 - AI generation with at least one credible provider path
@@ -1045,7 +1020,7 @@ Risk 5 detail:
 - Stable visual regression coverage for the visualizer
 - Good loading states for Pinterest and generation
 - Narrow but reliable docs for setup and maintenance
-- Real refresh-token handling instead of reconnect-only Pinterest behavior
+- Real token-backed browse behavior instead of reconnect-only Pinterest behavior
 
 **Could cut:**
 
@@ -1059,7 +1034,7 @@ Risk 5 detail:
 
 - We may wish we had defined the exact `DesignDetail` DTO sooner, because save/reopen/regenerate is the main stateful seam and several slices depend on it.
 - We may wish we had decided earlier how much generation history the library should expose, even if only the latest generation is surfaced in v1.
-- We may wish we had documented Pinterest token refresh edge cases immediately after first success, because OAuth bugs are easy to forget once the happy path works.
+- We may wish we had documented Pinterest token replacement steps immediately after first success, because env-token failures are easy to forget once the happy path works.
 - We may wish we had written clearer prompt examples for the wife, because prompt quality could influence perceived model quality even if the plumbing is sound.
 
 ### Where Are We Over-Engineering?
@@ -1067,13 +1042,13 @@ Risk 5 detail:
 - The provider boundary could become over-engineered if it turns into a full strategy layer before the Gemini spike outcome is known.
 - The plan should preserve a swap boundary, not a whole multi-provider orchestration framework in v1. (Grounding: horizontal-plan Gemini boundary; vertical-plan Deferred Items)
 - The `chat_turns` table and associated UI are over-engineering if Slice 7 is cut; that is why they stay entirely inside the P1 slice rather than contaminating earlier migrations more than necessary. (Grounding: product-brief P1; vertical-plan Slice 7)
-- Future-proofing for multi-user can become over-engineering if it creates v1 UX complexity. The correct v1 posture is `user_id` plus RLS in the data layer, not multi-account UI or permission matrices. (Grounding: product-brief Scope Boundaries; horizontal-plan RLS)
+- Future-proofing for multi-user can become over-engineering if it creates v1 UX complexity. The correct v1 posture is `userId` plus Security Rules in the data layer, not multi-account UI or permission matrices. (Grounding: product-brief Scope Boundaries; horizontal-plan Security Rules)
 - Presentation mode would be over-engineering because kickoff already rejected it for v1; the main interface itself must be good enough. (Grounding: kickoff-decisions #10)
 - Deep performance benchmarking would be over-engineering relative to the current constraints; the user experience risk is mostly perceived latency and UI polish, not throughput scale. (Grounding: product-discovery-brief Technical Constraints)
 
 ## Part 8: Decision Points for Sign-Off
 
-1. **[APPROACH]** Single-user allowlist via `ALLOWED_EMAIL` plus server-side checks and RLS on durable records.
+1. **[APPROACH]** Single-user allowlist via `ALLOWED_EMAIL` plus server-side checks and Security Rules on durable records.
    → Affirm / Change direction
 
 2. **[SCOPE]** P1 chat refinement is included in the baseline plan as Slice 7 but is explicitly cuttable if Slice 1-6 or Slice 8 consume schedule buffer.
@@ -1145,14 +1120,14 @@ Risk 5 detail:
 
 ### Shared State Conventions
 
-- Supabase migrations live under `supabase/migrations/`.
+- Firestore rules and indexes live under `firestore.rules` and `firestore.indexes.json`.
 - Shared domain and transport types live under `lib/types.ts`.
-- Auth/session helpers live under `lib/supabase/` and `middleware.ts`.
+- Auth/session helpers live under `lib/firebase/` and `middleware.ts`.
 - Pinterest integration code lives under `lib/pinterest/`.
-- Generation provider code lives under `lib/gemini/`.
+- Generation provider code lives under `lib/ai/`.
 - Reference normalization code lives under `lib/references/`.
 - Design lifecycle orchestration lives under `lib/designs/`.
-- Env vars use the names already specified in the horizontal plan: `PINTEREST_CLIENT_ID`, `PINTEREST_CLIENT_SECRET`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `ALLOWED_EMAIL`.
+- Env vars use the names already specified in the horizontal plan: `PINTEREST_APP_ID`, `PINTEREST_ACCESS_TOKEN`, Firebase client/admin config vars, `APP_URL`, `ALLOWED_EMAIL`.
 - Nail shape enum remains exactly `almond`, `coffin`, `square`, `stiletto`.
 
 ### Handoff Points Between Epics
@@ -1162,7 +1137,7 @@ Risk 5 detail:
 - Epic B can start only after:
   auth shell and profile persistence exist, and user-owned Pinterest app registration is complete.
 - Epic B must deliver:
-  linked Pinterest account state, board browsing, pin browsing, and stable token refresh behavior.
+  token-backed Pinterest browse, board browsing, and pin browsing.
 - Epic C can start reference ingestion only after:
   Epic B can return usable pins from the linked account and Epic A storage/auth baselines exist.
 - Epic C must deliver:
@@ -1189,5 +1164,5 @@ Risk 5 detail:
 ### Input Gaps Tracked for Downstream Work
 
 - Exact slice duration estimates beyond the 1-day Gemini spike are not present in the provided inputs. `[data not provided]`
-- Exact encryption/storage-policy implementation details are not present in the provided inputs. `[data not provided]`
+- Exact Firebase auth/session helper detail and some rules/index implementation details are not present in the provided inputs. `[confirm Firebase SDK detail]`
 - Exact post-spike provider choice is not yet known because Slice 1 is still pending. `[data not provided]`

@@ -26,7 +26,7 @@ Source: `product-discovery-brief.md` Target Users and `product-brief.md` Target 
 
 **Product promise:**
 The v1 promise is a narrow but complete bridge from inspiration to preview:
-Pinterest login,
+Pinterest browse,
 reference selection,
 optional uploads,
 optional text prompt,
@@ -43,7 +43,7 @@ Implementation detail stays in `structured-outline.md` Part 2 Slice 0 through Sl
 - Concrete signals include generating at least three designs in the first week.
 - Concrete signals also include using it during at least one real client appointment within two weeks.
 - Another engagement signal is that she requests new features.
-- Minimum success bar is a polished Mother's Day demo on 2026-05-10 where she can complete Pinterest login, reference selection, generation, hand preview, and save without bugs.
+- Minimum success bar is a polished Mother's Day demo on 2026-05-10 where she can complete Pinterest browse, reference selection, generation, hand preview, and save without bugs.
 Source: `product-discovery-brief.md` Success Metrics and `product-brief.md` Success Metrics.
 
 **Value proposition:**
@@ -78,7 +78,7 @@ Source: `product-brief.md` Scope Boundaries, `product-discovery-brief.md` Deferr
 - The UI is tablet-first and phone-compatible.
 - Tablet orientation is landscape-first.
 - The visualizer target is stylized-but-recognizable, not photorealistic.
-- Pinterest developer app registration, Gemini API key, Supabase project creation, and Vercel setup are real prerequisites owned by the user.
+- Pinterest developer app registration, Firebase project creation/configuration, and Vercel setup are real prerequisites owned by the user.
 Source: `product-brief.md` Constraints and Prerequisites, `product-discovery-brief.md` Technical Constraints, and `kickoff-decisions.md` #1, #3, #9, #12.
 
 **Architecture posture for v1:**
@@ -108,7 +108,7 @@ Source: `sign-off.md` decisions #2, #10, and #14.
 
 ## Epic A: Foundation + Auth
 
-**Goal:** Establish a thin, production-shaped foundation where the allowed user can sign in, reach a protected shell, and rely on env, migrations, and test scaffolding that later epics build on.
+**Goal:** Establish a thin, production-shaped foundation where the allowed user can sign in, reach a protected shell, and rely on env, Firebase rules/index setup, and test scaffolding that later epics build on.
 **Slices covered:** Slice 0 (reference `structured-outline.md` Part 2 Slice 0 for implementation detail)
 **Depends on:** Epic none
 **Estimated duration:** [data not provided]
@@ -122,8 +122,8 @@ I want to sign in with only my allowed email,
 so that the app stays scoped to me and avoids multi-user complexity in v1.
 
 Acceptance criteria:
-- **Given** I am on `/login` and I enter the configured allowed email, **when** I submit the login form, **then** the app triggers the magic-link flow and shows a sent-state confirmation.
-- **Given** I am on `/login` and I enter an email that does not match `ALLOWED_EMAIL`, **when** I submit, **then** the app rejects the request before any Supabase send action occurs and explains that only the configured email can sign in.
+- **Given** I am on `/login` and I enter the configured allowed email, **when** I submit the login form, **then** the app triggers the Firebase email-link flow and shows a sent-state confirmation.
+- **Given** I am on `/login` and I enter an email that does not match `ALLOWED_EMAIL`, **when** I submit, **then** the app rejects the request before any Firebase send action occurs and explains that only the configured email can sign in.
 - **Given** I try to bypass the login UI and access an authenticated route directly while unauthenticated, **when** the request reaches the app, **then** middleware redirects me to `/login` and does not expose protected content.
 
 **US-A-2: Protected authenticated shell**
@@ -134,7 +134,7 @@ so that later Pinterest, design, and library flows all have a protected home bas
 Acceptance criteria:
 - **Given** I have a valid session, **when** I visit `/`, **then** I land in the authenticated shell and see the baseline dashboard placeholder with primary workflow entry points.
 - **Given** my session expires or becomes invalid, **when** I attempt to load a protected page, **then** the app redirects me back to login or a re-auth state instead of showing a generic application error.
-- **Given** a public route such as `/api/health` or the future Pinterest callback route is requested, **when** middleware evaluates the request, **then** those exceptions remain reachable without causing an auth loop.
+- **Given** a public route such as `/api/health` is requested, **when** middleware evaluates the request, **then** that exception remains reachable without causing an auth loop.
 
 **US-A-3: Safe project baseline**
 As the project owner,
@@ -142,16 +142,16 @@ I want env validation, migrations, and baseline tests in place,
 so that later epics can move fast without hidden setup drift.
 
 Acceptance criteria:
-- **Given** a fresh environment missing required secrets, **when** the app boots or relevant server code runs, **then** env validation fails early with a clear configuration error rather than a downstream OAuth or generation failure.
-- **Given** a fresh Supabase project, **when** baseline migrations are applied, **then** the `profiles` schema and RLS baseline come up cleanly in a way that matches the auth model.
+- **Given** a fresh environment missing required secrets, **when** the app boots or relevant server code runs, **then** env validation fails early with a clear configuration error rather than a downstream Pinterest or generation failure.
+- **Given** a fresh Firebase project, **when** baseline rules and indexes are applied, **then** the `profiles` schema and Security Rules baseline come up cleanly in a way that matches the auth model.
 - **Given** a pull request or local change set, **when** the baseline checks run, **then** `typecheck`, `lint`, and unit tests execute as the required foundation gate.
 
 ### Scope
 
-- IN: Next.js scaffold, App Router shell, Supabase SSR helpers, allowlisted email login, middleware protection, env validation, baseline `profiles` migration, CI/test harness, public health route, login sent-state UX.
+- IN: Next.js scaffold, App Router shell, Firebase client/admin helpers, allowlisted email login, middleware protection, env validation, baseline `profiles` rules/index setup, CI/test harness, public health route, login sent-state UX.
 - IN: Shared shell primitives and route structure that later epics extend rather than replace.
 - IN: Baseline type, env, and migration conventions that keep downstream slices aligned with the structured outline.
-- OUT (handled by another epic): Pinterest OAuth and browse in Epic B.
+- OUT (handled by another epic): Pinterest browse in Epic B.
 - OUT (handled by another epic): Reference capture, uploads, and draft design creation in Epic C.
 - OUT (handled by another epic): Visualizer, library, and regenerate in Epic D.
 - OUT (handled by another epic): Tablet polish and final docs hardening in Epic F.
@@ -160,25 +160,25 @@ Acceptance criteria:
 
 ### Functional Requirements
 
-- FR-A-1: The app must support email magic-link login for a single allowlisted user.
+- FR-A-1: The app must support Firebase email-link login for a single allowlisted user.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and Part 9 Shared State Conventions.
 
 - FR-A-2: Server-side allowlist enforcement must reject non-authorized emails before auth side effects occur.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and Part 3b Security Considerations.
 
-- FR-A-3: All non-public routes must be protected by middleware while preserving narrow exceptions for login, health, and Pinterest callback handling.
+- FR-A-3: All non-public routes must be protected by middleware while preserving narrow exceptions for login and health handling.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and Part 3b Security Considerations.
 
 - FR-A-4: The authenticated user must land in a protected shell that later epics can extend without changing the auth contract.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and Part 9 Handoff Points Between Epics.
 
-- FR-A-5: Required environment variables and baseline migrations must be validated early enough to prevent hidden downstream failures.
+- FR-A-5: Required environment variables and baseline Firebase rules/index setup must be validated early enough to prevent hidden downstream failures.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and Part 3b Migration Plan.
 
 - FR-A-6: The project must include baseline CI and local test harnesses capable of supporting the P0 verification plan.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and Part 3 Verification Plan.
 
-- FR-A-7: The `profiles` persistence model must align with `auth.users.id` so downstream Pinterest token state and RLS contracts do not drift.
+- FR-A-7: The `profiles` persistence model must align with Firebase Auth `uid` so downstream profile access and Security Rules contracts do not drift.
 Reference build detail: `structured-outline.md` Part 2 Slice 0 and `horizontal-plan.md` Auth Schema / Auth Linkage.
 
 - FR-A-8: The dashboard shell must expose a stable home for the eventual "New design" and "My designs" flows even if those routes are placeholders at this stage.
@@ -187,9 +187,9 @@ Reference build detail: `structured-outline.md` Part 2 Slice 0 and `vertical-pla
 ### Non-Functional Requirements
 
 - Performance: Auth redirects and shell loading should feel immediate relative to generation latency; no special performance target is stated beyond keeping the foundation thin. Source: `structured-outline.md` Part 3b Performance Implications and Part 2 Slice 0.
-- Security: Allowlist must be enforced server-side; RLS remains on in single-user mode; middleware exemptions stay narrow. Source: `structured-outline.md` Part 3b Security Considerations.
+- Security: Allowlist must be enforced server-side; Security Rules remain on in single-user mode; middleware exemptions stay narrow. Source: `structured-outline.md` Part 3b Security Considerations.
 - UX: Login must support a sent-state, the shell must expose clear next actions, and touch-friendly primitives begin here because tablet-first is a product requirement. Source: `horizontal-plan.md` UI Primitives and `kickoff-decisions.md` #9.
-- Reliability: Missing env vars, malformed email input, Supabase send failures, and session loss must fail clearly rather than leaking into ambiguous app states. Source: `structured-outline.md` Part 2 Slice 0 Validation and Part 3b Error Handling Strategy.
+- Reliability: Missing env vars, malformed email input, Firebase send failures, and session loss must fail clearly rather than leaking into ambiguous app states. Source: `structured-outline.md` Part 2 Slice 0 Validation and Part 3b Error Handling Strategy.
 
 **Epic A source anchor note:**
 The epic remains intentionally thin.
@@ -199,11 +199,11 @@ Source: `vertical-plan.md` Slice 0 and `structured-outline.md` Risk #3 detail.
 
 ### Acceptance at Epic Completion
 
-Epic A is complete when the allowlisted user can request a magic link, establish a session, land in the protected shell, and traverse baseline protected routes without auth loops; a non-allowlisted email is blocked before Supabase auth send behavior occurs; and the project has the env, migration, and test scaffolding that Slice 2 onward relies on. This corresponds to the vertical plan's Slice 0 WHAT WORKS statement: the user can log in with the allowed email, land in the authenticated shell, and run a passing auth-focused baseline test path. Epic completion is confirmed by `tests/e2e/auth.spec.ts`, the allowlist unit test, and a clean baseline migration run as referenced in `structured-outline.md` Part 2 Slice 0.
+Epic A is complete when the allowlisted user can request an email link, establish a session, land in the protected shell, and traverse baseline protected routes without auth loops; a non-allowlisted email is blocked before Firebase auth send behavior occurs; and the project has the env, rules/index, and test scaffolding that Slice 2 onward relies on. This corresponds to the vertical plan's Slice 0 WHAT WORKS statement: the user can log in with the allowed email, land in the authenticated shell, and run a passing auth-focused baseline test path. Epic completion is confirmed by `tests/e2e/auth.spec.ts`, the allowlist unit test, and a clean baseline rules/index run as referenced in `structured-outline.md` Part 2 Slice 0.
 
 ### Dependencies
 
-- External: Supabase Auth, Supabase Postgres, Vercel deploy/build surface, and the required env vars `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, and `ALLOWED_EMAIL`.
+- External: Firebase Auth, Firestore, Cloud Storage, Vercel deploy/build surface, and the required env vars `APP_URL`, `ALLOWED_EMAIL`, `PINTEREST_APP_ID`, `PINTEREST_ACCESS_TOKEN`, and Firebase config vars.
 - Internal: None by dependency table; this epic establishes working login, protected shell, env validation, baseline migrations, and test harness per `structured-outline.md` Part 9 Handoff Points.
 - Internal: This epic also establishes the shared conventions later epics inherit for route protection, env handling, and user-scoped persistence.
 
@@ -211,33 +211,33 @@ Epic A is complete when the allowlisted user can request a magic link, establish
 
 - Risk #3: 3.5-week timeline collapses if Slice 0 becomes a platform sprint instead of a thin foundation.
 - Risk #4: Spec-implementation drift can start at the seam level if shared contracts are vague in foundation work.
-- Risk #6: Single-user shortcuts can create future migration pain if `user_id` and RLS are skipped.
-- Risk #13: User-owned prerequisites such as Supabase and Vercel setup can still block the first implementation PR.
+- Risk #6: Single-user shortcuts can create future migration pain if `userId` and Security Rules are skipped.
+- Risk #13: User-owned prerequisites such as Firebase and Vercel setup can still block the first implementation PR.
 
 ### Open Items for This Epic
 
 - Exact duration estimate beyond `[data not provided]` is not present in the inputs.
-- Exact token-encryption implementation detail for future Pinterest state is not yet specified in the inputs, though the epic must leave room for it.
+- Exact Firebase auth/session helper detail is not yet specified in the inputs. `[confirm Firebase SDK detail]`
 
 ## Epic B: Pinterest Integration
 
-**Goal:** Let the authenticated user connect Pinterest, browse boards, open a board, and view pins through a refresh-capable, callback-safe integration.
+**Goal:** Let the authenticated user browse boards, open a board, and view pins through a static-token Pinterest integration.
 **Slices covered:** Slice 2 (reference `structured-outline.md` Part 2 Slice 2 for implementation detail)
 **Depends on:** Epic A (from `structured-outline.md` Part 9 dependency table)
-**Estimated duration:** [data not provided]
+**Estimated duration:** 1-2 days, reduced from the earlier OAuth-shaped assumption
 **Owner:** Solo developer (project owner)
 
 ### User Stories
 
-**US-B-1: Connect Pinterest account**
+**US-B-1: Use the configured Pinterest account**
 As the nail technician,
-I want to connect my Pinterest account,
+I want the app to use the configured Pinterest account,
 so that the app can use my real inspiration source instead of a fake or upload-only flow.
 
 Acceptance criteria:
-- **Given** I am logged into the app and my Pinterest account is not yet linked, **when** I press the connect button, **then** the app starts the Pinterest OAuth flow and returns me to an authenticated Pinterest browse view on success.
-- **Given** the callback returns with an invalid or missing `state` parameter, **when** the callback route processes the request, **then** the app blocks the link flow and shows reconnect guidance instead of treating the account as linked.
-- **Given** I am not authenticated in the app, **when** I attempt to initiate Pinterest linking through a protected route, **then** the app blocks access through the auth shell rather than linking Pinterest into an unauthenticated context.
+- **Given** I am logged into the app and the Pinterest env token is configured, **when** I open the Pinterest surface, **then** the app uses that token and shows an authenticated browse view without a user OAuth step.
+- **Given** the token is missing, revoked, or invalid, **when** the browse route processes the request, **then** the app blocks the flow and shows token-replacement guidance instead of treating Pinterest as available.
+- **Given** I am not authenticated in the app, **when** I attempt to reach Pinterest browse through a protected route, **then** the app blocks access through the auth shell rather than loading Pinterest into an unauthenticated context.
 
 **US-B-2: Browse boards and pins**
 As the nail technician,
@@ -245,25 +245,25 @@ I want to browse my boards and open a board's pin grid,
 so that I can find real inspiration inside the app.
 
 Acceptance criteria:
-- **Given** my Pinterest account is linked and token state is valid, **when** I open the Pinterest browse area, **then** I see my boards rendered in a board grid.
+- **Given** the configured Pinterest token is valid, **when** I open the Pinterest browse area, **then** I see boards rendered in a board grid.
 - **Given** I select a board from the board grid, **when** the app fetches pins for that board, **then** I see the pin grid for that board.
-- **Given** Pinterest returns a fetch failure or expired access token, **when** I try to load boards or pins, **then** the app either refreshes the token or shows a retryable browse error without silently losing my linked status.
+- **Given** Pinterest returns a fetch failure or the static access token is revoked, **when** I try to load boards or pins, **then** the app shows a retryable browse error with token-replacement guidance rather than pretending the integration is still healthy.
 
-**US-B-3: Persist stable Pinterest auth state**
+**US-B-3: Keep Pinterest access stable through env configuration**
 As the project owner,
-I want Pinterest token state persisted on the user profile with refresh behavior,
-so that browsing remains stable after the first successful connect.
+I want Pinterest access to come from static env configuration,
+so that browsing remains stable without OAuth, callback, or refresh complexity.
 
 Acceptance criteria:
-- **Given** the OAuth callback succeeds, **when** the app persists token data, **then** the current user's profile holds the Pinterest auth state needed for later board and pin fetches.
-- **Given** an access token expires but a refresh token is still valid, **when** a later Pinterest request occurs, **then** the integration refreshes the token and continues without forcing a reconnect.
-- **Given** token persistence fails or cannot be refreshed, **when** a later Pinterest action occurs, **then** the app surfaces reconnect guidance rather than pretending the account is still fully linked.
+- **Given** the env token is valid, **when** a Pinterest request occurs, **then** the integration sends it as a bearer token and boards/pins load without per-user token lookup.
+- **Given** the env token expires or is revoked, **when** a later Pinterest request occurs, **then** the integration fails clearly and surfaces replace-the-token guidance rather than pretending access still works.
+- **Given** the app is using one project-owner token for development/demo, **when** the integration fetches boards and pins, **then** later slices can consume that data without any profile-stored token state.
 
 ### Scope
 
-- IN: OAuth start route, OAuth callback route, state validation, token exchange, token refresh behavior, board list, board pin list, connect/linked UI, mocked and manual browse verification.
-- IN: Profile-level Pinterest token persistence and expiry handling needed for later selection and ingestion work.
-- IN: Callback-safe deployment posture across local tunnel and Vercel surfaces.
+- IN: Static-token Pinterest API access, board list, board pin list, ready-state UI, and mocked and manual browse verification.
+- IN: Env-level Pinterest token handling needed for later selection and ingestion work.
+- IN: Deployment posture across local and Vercel surfaces without callback handling.
 - OUT (handled by another epic): Persisting selected pins into the shared `references` model and combining them with uploads in Epic C.
 - OUT (handled by another epic): AI generation, visualizer, library, and regenerate in Epics C and D.
 - OUT (handled by another epic): Final loading-state and error-state polish in Epic F.
@@ -272,13 +272,13 @@ Acceptance criteria:
 
 ### Functional Requirements
 
-- FR-B-1: The app must initiate Pinterest OAuth from an authenticated context and handle the callback on a middleware-exempt route that validates `state`.
+- FR-B-1: The app must read Pinterest access from `PINTEREST_ACCESS_TOKEN` in an authenticated context and expose board/pin browse without an OAuth callback flow.
 Reference build detail: `structured-outline.md` Part 2 Slice 2 and Part 3b Security Considerations.
 
-- FR-B-2: The app must persist Pinterest auth state on the current user's profile so later browsing requests have durable token context.
+- FR-B-2: The app must keep Pinterest access outside the user profile record and use env-backed bearer-token requests for later browsing calls.
 Reference build detail: `structured-outline.md` Part 2 Slice 2 and `horizontal-plan.md` Persistence `profiles`.
 
-- FR-B-3: The integration must support refresh-token behavior rather than reconnect-only browsing.
+- FR-B-3: The integration must fail clearly when the static token expires or is revoked rather than inventing refresh behavior that does not exist in the amended plan.
 Reference build detail: `structured-outline.md` Part 2 Slice 2 and `horizontal-plan.md` External Integrations Pinterest API v5.
 
 - FR-B-4: The app must expose board and board-pin browse surfaces sufficient for user navigation and later pin selection.
@@ -290,15 +290,15 @@ Reference build detail: `structured-outline.md` Part 3b Error Handling Strategy 
 - FR-B-6: Pinterest browse routes must return enough board and pin data for the UI to render browser grids and support later selection semantics.
 Reference build detail: `structured-outline.md` Part 2 Slice 2 and `horizontal-plan.md` External Integrations Pinterest board / pin requirements.
 
-- FR-B-7: Selected local and preview callback strategies must remain compatible with the locked tunnel-based development decision.
-Reference build detail: `kickoff-decisions.md` #2 and `structured-outline.md` Part 6 External Dependencies.
+- FR-B-7: The integration must document `PINTEREST_APP_ID` and `PINTEREST_ACCESS_TOKEN` clearly enough that token setup and replacement remain operationally simple.
+Reference build detail: `sign-off.md` #17 and `structured-outline.md` Part 6 External Dependencies.
 
 ### Non-Functional Requirements
 
 - Performance: Board and pin browsing should feel responsive because Pinterest is the main inspiration source, even though no hard millisecond target is defined. Source: `structured-outline.md` Part 3b Performance Implications.
-- Security: Callback route must validate `state`; token state belongs on the profile; middleware exemptions remain limited to login, health, and callback. Source: `structured-outline.md` Part 3b Security Considerations.
-- UX: The connect button must clearly communicate connect versus linked state, and browse flows must remain touch-friendly on tablet. Source: `horizontal-plan.md` Feature UI and UI Primitives.
-- Reliability: Refresh-token handling must exist; callback mismatch, invalid state, missing code, token refresh failure, and partial Pinterest payloads must fail with reconnect or retry guidance. Source: `structured-outline.md` Part 3b Error Handling Strategy and Slice 2 Validation.
+- Security: The Pinterest token stays in env configuration rather than the profile record; middleware exemptions remain limited to login and health. Source: `structured-outline.md` Part 3b Security Considerations.
+- UX: The Pinterest ready-state UI must clearly communicate whether token-backed browse is available, and browse flows must remain touch-friendly on tablet. Source: `horizontal-plan.md` Feature UI and UI Primitives.
+- Reliability: Missing token, revoked token, and partial Pinterest payloads must fail with reconnect-or-replace-token guidance. Source: `structured-outline.md` Part 3b Error Handling Strategy and Slice 2 Validation.
 
 **Epic B source anchor note:**
 This epic is intentionally browse-only.
@@ -308,17 +308,17 @@ Source: `vertical-plan.md` Slice 2 NOT YET and Moldability Note #5.
 
 ### Acceptance at Epic Completion
 
-Epic B is complete when the authenticated user can connect Pinterest, return from OAuth through a validated callback, see her boards, open a board, and view its pin grid with stable refresh-token behavior. This maps directly to the vertical plan's Slice 2 WHAT WORKS statement: authenticate to Pinterest, see boards, open one board, and view its pin grid. Epic completion is verified through mocked OAuth Playwright coverage, refresh-token tests, and one real-account smoke test as called for in `structured-outline.md` Part 2 Slice 2 and Part 3 Verification Plan.
+Epic B is complete when the authenticated user can open Pinterest browse, see boards, open a board, and view its pin grid through the configured static token. This maps directly to the vertical plan's Slice 2 WHAT WORKS statement: see boards, open one board, and view its pin grid using the configured static Pinterest token. Epic completion is verified through mocked browse Playwright coverage and one real-token smoke test as called for in `structured-outline.md` Part 2 Slice 2 and Part 3 Verification Plan.
 
 ### Dependencies
 
-- External: Pinterest API v5, registered Pinterest developer app, valid callback URLs, ngrok or equivalent tunnel for local development, Vercel preview or production surface for callback testing.
+- External: Pinterest API v5, registered Pinterest developer app, valid `PINTEREST_APP_ID`, `PINTEREST_ACCESS_TOKEN`, and local/Vercel surfaces for browse testing.
 - Internal: Epic A must have delivered auth shell, profile persistence, middleware behavior, env validation, and deployable surfaces per `structured-outline.md` Part 9 Handoff Points.
-- Internal: The `profiles` schema from Epic A must already support the token fields Epic B needs to exercise.
+- Internal: Epic A must already expose env validation and authenticated routing that Epic B reuses.
 
 ### Risks Applicable
 
-- Risk #1: Pinterest OAuth friction can stall real integration work.
+- Risk #1: Pinterest token expiration or revocation can stall real integration work.
 - Risk #3: Timeline pressure can increase if external integration churn lands late.
 - Risk #4: Contract drift in routes and token semantics can cause rework.
 - Risk #7: Tablet ergonomics could remain unsettled if browse UX is deferred too long.
@@ -328,8 +328,7 @@ Epic B is complete when the authenticated user can connect Pinterest, return fro
 ### Open Items for This Epic
 
 - Pinterest developer app registration is described as "user will register today," but completed status is not recorded in the provided inputs. `[data not provided]`
-- Exact token-encryption implementation detail is not specified in the inputs. `[data not provided]`
-- Exact duration estimate is not specified in the inputs. `[data not provided]`
+- Exact token replacement workflow beyond the env vars is not specified in the inputs. `[data not provided]`
 
 ## Epic C: Reference Collection + AI Generation Pipeline
 
@@ -368,7 +367,7 @@ so that later save, reopen, and regenerate semantics rest on stored inputs rathe
 
 Acceptance criteria:
 - **Given** I have assembled a valid reference set and selected a shape, **when** the app creates the design, **then** it stores a durable design record with primary reference, ordered secondary references, prompt, and shape.
-- **Given** the design create request fails under RLS or persistence issues, **when** I attempt to continue to generation, **then** the app blocks the transition and reports the save failure instead of leaving a ghost design state.
+- **Given** the design create request fails under Security Rules or persistence issues, **when** I attempt to continue to generation, **then** the app blocks the transition and reports the save failure instead of leaving a ghost design state.
 - **Given** an unauthorized or mismatched user context, **when** a design create mutation executes, **then** the write is denied by user-scoped rules rather than creating a cross-user record.
 
 **US-C-4: Generate a nail-design image**
@@ -436,8 +435,8 @@ Reference build detail: `horizontal-plan.md` API / Server Actions Data Contract 
 
 ### Non-Functional Requirements
 
-- Performance: Gemini latency will dominate; the requirement is a polished pending state that makes 10 to 15 second waits feel intentional, not sub-second output. Source: `structured-outline.md` Part 3b Performance Implications and `product-discovery-brief.md` Technical Constraints.
-- Security: All reference, design, and generation writes stay user-scoped under RLS; provider secrets stay server-side; durable storage access follows user-owned path rules. Source: `structured-outline.md` Part 3b Security Considerations.
+- Performance: Firebase AI Logic latency will dominate; the requirement is a polished pending state that makes 10 to 15 second waits feel intentional, not sub-second output. Source: `structured-outline.md` Part 3b Performance Implications and `product-discovery-brief.md` Technical Constraints.
+- Security: All reference, design, and generation writes stay user-scoped under Security Rules; provider secrets stay server-side; durable storage access follows user-owned path rules. Source: `structured-outline.md` Part 3b Security Considerations.
 - UX: The reference panel must make primary versus secondary roles obvious, prompt helper text must explain override semantics, and generation states must feel clear on tablet. Source: `horizontal-plan.md` Feature UI and `kickoff-decisions.md` #4, #5, #9.
 - Reliability: Cache failures, upload failures, missing primary reference, transient provider errors, refusal states, storage failures, and stale design records must fail deterministically and not create misleading saved state. Source: `structured-outline.md` Part 2 Slice 3, Slice 4, and Part 3b Error Handling Strategy.
 
@@ -453,8 +452,8 @@ Epic C is complete when the authenticated user can assemble a mixed-source refer
 
 ### Dependencies
 
-- External: Pinterest image availability for selected pins, Supabase Storage for `references` and `generations`, Gemini 2.5 Flash Image or the provider approved by the Slice 1 decision gate, and the required generation env credentials.
-- Internal: Epic A must have delivered auth, env, migration, and storage baseline; Epic B must have delivered usable pins from a linked Pinterest account; the Slice 1 provider decision gate must be passed before production generation is committed. Source: `structured-outline.md` Part 9 dependency table and handoff points.
+- External: Pinterest image availability for selected pins, Firebase Cloud Storage for `references` and `generations`, Firebase AI Logic / Gemini 2.5 Flash Image or the provider approved by the Slice 1 decision gate, and the required generation env credentials.
+- Internal: Epic A must have delivered auth, env, rules/index, and storage baseline; Epic B must have delivered usable pins from the configured Pinterest account; the Slice 1 provider decision gate must be passed before production generation is committed. Source: `structured-outline.md` Part 9 dependency table and handoff points.
 - Internal: Epic C also depends on the narrow route and domain contracts established earlier so that Pinterest-specific and upload-specific paths do not fork into incompatible lifecycle logic.
 
 ### Risks Applicable
@@ -462,7 +461,7 @@ Epic C is complete when the authenticated user can assemble a mixed-source refer
 - Risk #2: Gemini reference-edit quality may not be good enough for nail-design output.
 - Risk #3: Timeline pressure intensifies if reference and generation plumbing churn together.
 - Risk #4: Contract drift across design lifecycle seams can create rework.
-- Risk #8: Supabase storage performance may be weaker than expected for reference or generation images.
+- Risk #8: Firebase storage performance may be weaker than expected for reference or generation images.
 - Risk #10: Reference ingestion can split into Pinterest-specific and upload-specific paths if not normalized.
 - Risk #11: Generation persistence can become inconsistent on partial failures.
 - Risk #12: Regenerate trust can be damaged if the durable design record does not fully preserve intent.
@@ -472,7 +471,7 @@ Epic C is complete when the authenticated user can assemble a mixed-source refer
 
 - Exact post-spike provider choice is not yet known because Slice 1 is still pending. `[data not provided]`
 - Exact duration estimate for Slice 3 plus Slice 4 is not present in the inputs. `[data not provided]`
-- Exact storage-policy SQL and token-encryption specifics are not fully specified in the inputs. `[data not provided]`
+- Exact Firebase rules/index detail and token replacement specifics are not fully specified in the inputs. `[confirm Firebase SDK detail]`
 
 ## Epic D: Visualizer + Library
 
@@ -563,7 +562,7 @@ Reference build detail: `structured-outline.md` Part 3 Verification Plan Slice 6
 ### Non-Functional Requirements
 
 - Performance: Visualizer rendering and shape switching should feel immediate relative to generation; no new generation request should be triggered for shape changes. Source: `structured-outline.md` Part 2 Slice 5 Validation and Part 3b Performance Implications.
-- Security: Saved designs, references, generations, and shape updates remain protected by RLS and authenticated routing. Source: `structured-outline.md` Part 3b Security Considerations.
+- Security: Saved designs, references, generations, and shape updates remain protected by Security Rules and authenticated routing. Source: `structured-outline.md` Part 3b Security Considerations.
 - UX: The preview must be stylized-but-recognizable, landscape-friendly, and convincing enough for consultation without a separate presentation mode. Source: `kickoff-decisions.md` #9, #10, #12 and `structured-outline.md` Part 2 Slice 5.
 - Reliability: Missing generation images, invalid shape values, stale references, design-not-found conditions, and regenerate lineage mismatches must fail safely and visibly. Source: `structured-outline.md` Part 2 Slice 5, Slice 6, and Part 3b Error Handling Strategy.
 
@@ -575,11 +574,11 @@ Source: `kickoff-decisions.md` #12 and `structured-outline.md` Risk #5 detail.
 
 ### Acceptance at Epic Completion
 
-Epic D is complete when a generated design can be viewed on a five-nail hand, switched live across the four supported shapes, saved into a browsable library, reopened later, and regenerated from the same stored inputs to produce a new latest result. This corresponds to the vertical plan's Slice 5 WHAT WORKS statement and Slice 6 WHAT WORKS statement together: view the generated image mapped across five nails, switch shapes live, then name, revisit, reopen, and regenerate from the same stored inputs. Epic completion is verified by the visualizer shape Playwright test, screenshot-regression coverage, the save-reload-regenerate Playwright flow, and the RLS-focused integration tests called out in `structured-outline.md` Part 2 Slice 5 and Slice 6.
+Epic D is complete when a generated design can be viewed on a five-nail hand, switched live across the four supported shapes, saved into a browsable library, reopened later, and regenerated from the same stored inputs to produce a new latest result. This corresponds to the vertical plan's Slice 5 WHAT WORKS statement and Slice 6 WHAT WORKS statement together: view the generated image mapped across five nails, switch shapes live, then name, revisit, reopen, and regenerate from the same stored inputs. Epic completion is verified by the visualizer shape Playwright test, screenshot-regression coverage, the save-reload-regenerate Playwright flow, and the Security Rules-focused integration tests called out in `structured-outline.md` Part 2 Slice 5 and Slice 6.
 
 ### Dependencies
 
-- External: Supabase Storage image delivery for generation outputs and references.
+- External: Firebase Cloud Storage image delivery for generation outputs and references.
 - Internal: Epic C must deliver real generated outputs, stable design records, latest-generation linkage, and durable input preservation before visualizer and library semantics can be trusted. Source: `structured-outline.md` Part 9 Handoff Points Between Epics.
 - Internal: Epic D also depends on the stored-shape contract that starts in Epic C's design record and becomes visible here.
 
@@ -588,7 +587,7 @@ Epic D is complete when a generated design can be viewed on a five-nail hand, sw
 - Risk #3: Timeline slips can consume the polish budget if visualizer and library work land too late.
 - Risk #5: The 2D visualizer may work technically but still look cheap.
 - Risk #6: Shortcuts in durable design modeling can create future migration pain.
-- Risk #8: Supabase image delivery may underperform for the preview and library.
+- Risk #8: Firebase image delivery may underperform for the preview and library.
 - Risk #12: Regenerate may fail semantically if stored design intent is incomplete.
 - Risk #14: If generation waits already feel slow, reopen/regenerate flows need especially clear loading states.
 
@@ -659,7 +658,7 @@ Reference build detail: `structured-outline.md` Part 2 Slice 7 Validation.
 ### Non-Functional Requirements
 
 - Performance: Chat-triggered generation inherits the same generation latency expectations and therefore needs clear iteration progress feedback. Source: `structured-outline.md` Part 3b Performance Implications.
-- Security: Chat turns and resulting generations remain user-scoped under the same auth and RLS model as saved designs. Source: `structured-outline.md` Part 3b Security Considerations.
+- Security: Chat turns and resulting generations remain user-scoped under the same auth and Security Rules model as saved designs. Source: `structured-outline.md` Part 3b Security Considerations.
 - UX: The panel must be understandable on a landscape-first tablet and must not create confusion about which image is current. Source: `structured-outline.md` Part 2 Slice 7 Validation and `horizontal-plan.md` P1 Chat Flow.
 - Reliability: Empty messages, turn-order corruption, generation failure after turn persistence, and prompt accumulation sprawl must be handled explicitly. Source: `structured-outline.md` Part 2 Slice 7 and Part 3b Error Handling Strategy.
 
@@ -718,7 +717,7 @@ so that delays or failures do not make the app feel broken during consultations.
 
 Acceptance criteria:
 - **Given** Pinterest browse, generation, or library content is loading, **when** the relevant screen renders, **then** the UI presents polished placeholders or pending states rather than blank or jarring transitions.
-- **Given** a common failure such as callback mismatch, token refresh failure, provider refusal, rate limit, or missing saved design occurs, **when** the app surfaces the problem, **then** it provides a clear message and a recovery action instead of a generic error.
+- **Given** a common failure such as missing or revoked Pinterest token, provider refusal, rate limit, or missing saved design occurs, **when** the app surfaces the problem, **then** it provides a clear message and a recovery action instead of a generic error.
 - **Given** earlier epics leave unresolved rough edges, **when** the final polish pass runs, **then** the work must harden the real shipping path rather than expanding scope or adding new product capability.
 
 **US-F-3: Leave behind maintainable project documentation**
@@ -727,8 +726,8 @@ I want setup and architecture docs that reflect the real v1 system seams,
 so that the project remains understandable and maintainable after the gift handoff.
 
 Acceptance criteria:
-- **Given** a fresh environment, **when** a maintainer follows the setup docs, **then** the docs cover required env vars, user-owned prerequisites, local tunnel expectations, and the core P0 flow surfaces.
-- **Given** Pinterest or Gemini integration behavior needs review later, **when** the maintainer reads the integration docs, **then** callback requirements, retry behavior, provider assumptions, and failure handling are documented.
+- **Given** a fresh environment, **when** a maintainer follows the setup docs, **then** the docs cover required env vars, user-owned prerequisites, Firebase setup, and the core P0 flow surfaces.
+- **Given** Pinterest or Gemini integration behavior needs review later, **when** the maintainer reads the integration docs, **then** static-token requirements, retry behavior, provider assumptions, and failure handling are documented.
 - **Given** implementation drift has occurred from the planning assumptions, **when** architecture docs are produced, **then** they describe the final v1 seams and not an obsolete aspirational design.
 
 ### Scope
@@ -751,7 +750,7 @@ Reference build detail: `structured-outline.md` Part 2 Slice 8 and Part 3b Error
 - FR-F-3: The full P0 path must be exercised by end-to-end verification and a manual tablet walkthrough.
 Reference build detail: `structured-outline.md` Part 3 Verification Plan and `vertical-plan.md` Slice 8 WHAT WORKS.
 
-- FR-F-4: Project documentation must cover setup, prerequisites, env vars, OAuth tunnel usage, provider assumptions, and the final v1 system seams.
+- FR-F-4: Project documentation must cover setup, prerequisites, env vars, static-token usage, provider assumptions, and the final v1 system seams.
 Reference build detail: `structured-outline.md` Part 3b Documentation Impact and Part 2 Slice 8.
 
 - FR-F-5: Epic F must not add new product scope; it hardens what already ships.
@@ -802,12 +801,12 @@ Epic F is complete when the full P0 flow can be run end to end in landscape tabl
 The shared data model is defined in `structured-outline.md` Part 2 Slice 0 through Slice 7 and summarized horizontally in `horizontal-plan.md` Persistence.
 This PRD references that model rather than restating implementation detail exhaustively.
 
-**Table-by-table responsibility split:**
-- `profiles`: Extends `auth.users` with durable app identity fields plus Pinterest token state and expiry. Epic A establishes the table and auth linkage; Epic B starts exercising token persistence and refresh behavior.
+**Collection-by-collection responsibility split:**
+- `profiles`: Extends Firebase Auth with durable app identity fields. Epic A establishes the collection and auth linkage.
 - `references`: Normalizes both Pinterest-derived and uploaded images into one source-agnostic record shape. Epic C is responsible for activating this contract.
 - `designs`: Holds the durable design entity including primary reference, prompt, shape, and the current latest-generation linkage. Epic C creates the initial draft behavior; Epic D finishes the save/reopen/regenerate semantics.
 - `generations`: Stores every generation attempt with request payload, result path, response metadata, status, and failure state. Epic C activates the lifecycle; Epic D depends on it for regenerate and history trust.
-- `design_secondary_references`: Preserves ordered non-primary references. Epic C owns the rule that one primary exists while ordered secondary cues remain durable.
+- `design_secondary_references`: Preserves ordered non-primary references as a subcollection or ordered array under `designs`. Epic C owns the rule that one primary exists while ordered secondary cues remain durable.
 - `chat_turns`: Stores ordered refinement turns linked to a design and generation lineage. Epic E owns this table and keeps it isolated from P0 requirements.
 
 **Storage-bucket split:**
@@ -816,20 +815,20 @@ This PRD references that model rather than restating implementation detail exhau
 Implementation detail remains in `structured-outline.md` Part 2 Slice 3 through Slice 7 and Part 3b Migration Plan.
 
 **Shared conventions:**
-- Migrations live under `supabase/migrations/`.
+- Firestore rules and indexes live under `firestore.rules` and `firestore.indexes.json`.
 - Shared types live under `lib/types.ts`.
-- Auth helpers live under `lib/supabase/` and `middleware.ts`.
+- Auth helpers live under `lib/firebase/` and `middleware.ts`.
 - Pinterest logic lives under `lib/pinterest/`.
-- Generation provider logic lives under `lib/gemini/`.
+- Generation provider logic lives under `lib/ai/`.
 - Reference normalization logic lives under `lib/references/`.
 - Design lifecycle orchestration lives under `lib/designs/`.
-- Required env vars are `PINTEREST_CLIENT_ID`, `PINTEREST_CLIENT_SECRET`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, and `ALLOWED_EMAIL`.
+- Required env vars are `PINTEREST_APP_ID`, `PINTEREST_ACCESS_TOKEN`, Firebase config vars, `APP_URL`, and `ALLOWED_EMAIL`.
 - Nail shape enum is exactly `almond`, `coffin`, `square`, `stiletto`.
 Source: `structured-outline.md` Part 9 Shared State Conventions.
 
 **Cross-epic integration contracts:**
-- Epic A outputs working login, protected shell, env validation, baseline migrations, and test harness; Epic B cannot start without that baseline.
-- Epic B outputs linked Pinterest state, board browsing, pin browsing, and token refresh behavior; Epic C consumes usable pins from that integration.
+- Epic A outputs working login, protected shell, env validation, baseline Firebase rules/index setup, and test harness; Epic B cannot start without that baseline.
+- Epic B outputs token-backed Pinterest browse plus board/pin browsing; Epic C consumes usable pins from that integration.
 - Epic C outputs normalized references, durable design drafts, generation orchestration, and persisted generation outputs; Epic D consumes that data to make visualizer, library, and regenerate meaningful.
 - Epic D outputs trustworthy saved-design lineage and regenerate behavior; Epic E can only start once that lineage is stable.
 - Epic F hardens the actual shipping path rather than inventing a parallel one; it depends on the real outputs from Epic D and optionally Epic E.
@@ -837,23 +836,23 @@ Source: `structured-outline.md` Part 9 Handoff Points Between Epics and Part 6 H
 
 **Error-handling contract across epics:**
 - Auth failures redirect to login or reject clearly.
-- Pinterest callback and browse failures offer reconnect or retry guidance without losing linked-state clarity.
+- Pinterest token and browse failures offer reconnect or replace-token guidance without losing browse-state clarity.
 - Reference-ingestion failures must not silently create unusable references.
 - Generation failures must classify refusal, rate-limit, network, and unknown states; one silent retry is allowed before an adjust-inputs surface.
 - Regenerate and chat failures must preserve trust in saved-design lineage and avoid orphaned states.
 Source: `structured-outline.md` Part 3b Error Handling Strategy.
 
 **Migration and rollback contract across epics:**
-- Migrations are versioned SQL files applied in slice order.
-- The expected sequence is `0001_profiles.sql`, `0002_references.sql`, `0003_designs_generations.sql`, `0004_secondary_refs.sql`, and `0005_chat_turns.sql` if chat ships.
-- Migrations should remain additive where possible to reduce rollback pain in the short schedule.
+- Firestore rules, indexes, and converters are applied in slice order.
+- The expected sequence is baseline `profiles`, then `references`, then `designs` / `generations`, then ordered secondary references, and `chat_turns` if chat ships.
+- Schema changes should remain additive where possible to reduce rollback pain in the short schedule.
 - Application rollback primarily relies on Vercel deploy rollback, with provider bugs isolated behind the generation boundary and visual regressions isolated behind the visualizer boundary.
 Source: `structured-outline.md` Part 3b Migration Plan and Rollback Plan.
 
 **Verification contract across epics:**
 - Unit tests cover allowlist logic, request builders, retry logic, reference transforms, shape state, and chat accumulation where applicable.
-- Mocked integration tests cover Pinterest and Gemini boundaries.
-- Supabase integration tests cover RLS, storage interactions, and save/reload/regenerate semantics.
+- Mocked integration tests cover Pinterest and Firebase AI Logic boundaries.
+- Firebase integration tests cover Security Rules, storage interactions, and save/reload/regenerate semantics.
 - Playwright covers auth, Pinterest browse, reference assembly, generation, shape switching, save/reload/regenerate, optional chat, and final core-flow smoke.
 - Manual tablet review remains mandatory because tablet ergonomics are a product requirement, not just responsive cleanup.
 Source: `structured-outline.md` Part 3 Verification Plan and `horizontal-plan.md` Testing Infrastructure.
@@ -862,8 +861,8 @@ Source: `structured-outline.md` Part 3 Verification Plan and `horizontal-plan.md
 V1 promises a single active user and no sign-up flow.
 That simplicity must not mutate into schema shortcuts that block later growth.
 The preserved future-facing contract is:
-durable rows keep `user_id`,
-RLS stays enabled,
+durable docs keep `userId`,
+Security Rules stay enabled,
 allowlist logic is isolated from the persistence model,
 and provider and renderer boundaries remain swappable.
 No v1 UI or workflow should pretend to be multi-user, but no v1 data decision should make later multi-user support disproportionately painful.
@@ -871,8 +870,8 @@ Source: `product-brief.md` Scope Boundaries, `kickoff-decisions.md` #1, and `str
 
 **Shared assumptions that release planning must keep visible:**
 - Pinterest app registration is assumed to complete quickly, but the inputs do not record completion.
-- ngrok or equivalent tunnel setup is assumed operationally straightforward, but implementation detail is not provided.
-- Supabase Storage performance is assumed sufficient for v1, but the inputs do not guarantee it.
+- Firebase auth/session helper details are not fully specified, but the planning boundary is.
+- Firebase Cloud Storage performance is assumed sufficient for v1, but the inputs do not guarantee it.
 - Gemini quality is explicitly risky rather than assumed.
 - The visualizer can reach the stylized-but-recognizable bar without custom illustration beyond masks and layout, but that remains a risk rather than a certainty.
 Source: `structured-outline.md` Part 7 What Assumptions Are We Making?
@@ -900,7 +899,7 @@ Source: `sign-off.md` decisions #2 and #10, `vertical-plan.md` Moldability Notes
 
 **Definition of Done for Mother's Day demo:**
 - The primary user can log in with the allowlisted email and reach the authenticated shell.
-- She can connect Pinterest and browse boards and pins from her real account.
+- She can browse Pinterest boards and pins from the configured real account.
 - She can select one primary reference, optionally add secondary references and/or uploads, and optionally add a prompt.
 - She can generate a design and either receive a stored output or a guided recovery state.
 - She can preview the result on a five-nail hand and switch shapes live.
@@ -912,7 +911,7 @@ This specifically means the primary user can execute the path represented by US-
 **Demo script outline:**
 1. Start on the login screen and show that only the allowed email can enter the flow.
 2. Enter with the allowed email and land in the authenticated shell.
-3. Open Pinterest integration, confirm linked state or link the account, then browse boards.
+3. Open Pinterest integration, confirm token-backed ready state, then browse boards.
 4. Open a board and show the pin grid.
 5. Choose one pin as the primary reference and add one or more secondary pins or uploaded images.
 6. Add an optional prompt that intentionally nudges the style, such as a color or finish change.
@@ -950,11 +949,11 @@ Source: `sign-off.md` decisions #2, #10, and #14 and `structured-outline.md` Par
 
 **Verification mapping for the release gate:**
 - Slice 0 proof comes from auth E2E and allowlist unit coverage.
-- Slice 2 proof comes from mocked OAuth coverage plus a real-account smoke test.
+- Slice 2 proof comes from mocked browse coverage plus a real-token smoke test.
 - Slice 3 proof comes from reference transform, storage-write, and reference-panel flow coverage.
 - Slice 4 proof comes from request-builder, retry, persistence-transition, and generation happy/error flows.
 - Slice 5 proof comes from shape-switch E2E plus screenshot regression.
-- Slice 6 proof comes from save/reload/regenerate E2E plus RLS integration tests.
+- Slice 6 proof comes from save/reload/regenerate E2E plus Security Rules integration tests.
 - Slice 8 proof comes from the full Playwright suite and manual tablet walkthrough.
 Source: `structured-outline.md` Part 3 Verification Plan.
 
@@ -984,7 +983,7 @@ Compact restatement:
 All 14 structured-outline decisions affirmed 2026-04-17.
 
 Those affirmed decisions include:
-- Single-user allowlist via `ALLOWED_EMAIL` with server-side checks and RLS.
+- Single-user allowlist via `ALLOWED_EMAIL` with server-side checks and Security Rules.
 - P1 chat included in baseline planning but cuttable if schedule slips.
 - Gemini viability gated in Slice 1 with pivot behind the provider boundary if it fails.
 - Landscape-first tablet layout.
@@ -1005,4 +1004,4 @@ Tracked gaps still present in provided inputs:
 - Pinterest developer app registration completion is not recorded. `[data not provided]`
 - Exact post-spike provider choice is not yet known because Slice 1 is pending. `[data not provided]`
 - Exact slice duration estimates beyond the one-day Gemini spike are not present. `[data not provided]`
-- Exact token-encryption and storage-policy implementation details are not specified in the inputs. `[data not provided]`
+- Exact Firebase auth/session helper detail and some rules/index implementation details are not specified in the inputs. `[confirm Firebase SDK detail]`

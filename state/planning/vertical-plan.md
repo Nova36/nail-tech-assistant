@@ -3,9 +3,9 @@
 ## 1. Slicing Strategy
 
 1. The slice order follows the TPM memo’s principle: foundation first, then de-risk the largest unknown, then complete the user flow from inspiration to saved design.
-2. The thinnest first working increment is an authenticated empty app, because every later slice assumes protected routes, Supabase wiring, and a deployable shell.
+2. The thinnest first working increment is an authenticated empty app, because every later slice assumes protected routes, Firebase wiring, and a deployable shell.
 3. The highest-risk unknown is Gemini quality, so the next increment is a deliberate spike before the production generation pipeline is built.
-4. The Pinterest browse flow comes before reference ingestion because it is the main inspiration source and it exposes OAuth friction early.
+4. The Pinterest browse flow comes before reference ingestion because it is the main inspiration source and it exposes token-path friction early.
 5. Reference collection is split out from generation so the team can validate “what goes into the prompt” separately from “how the provider responds.”
 6. Raw image generation lands before the visualizer because the generated image itself is the first meaningful AI success condition.
 7. The visualizer becomes its own slice because it is a distinct UX/rendering concern and the product’s main wow moment.
@@ -49,15 +49,15 @@ BUILDS ON: none
 WHAT WORKS AFTER THIS STEP: Log in with the allowed email, land in the authenticated shell, and run a passing auth-focused baseline test path.
 
 LAYERS TOUCHED
-- Infrastructure: Vercel app scaffold, Supabase project wiring, env handling, GitHub PR checks, dev/build conventions.
-- Persistence: `profiles` table, initial RLS, baseline migration workflow, storage/bucket scaffolding only if required by app bootstrap.
-- Auth: email magic-link login, `ALLOWED_EMAIL` enforcement, Supabase SSR helpers, route middleware, callback exemptions.
+- Infrastructure: Vercel app scaffold, Firebase project wiring, env handling, GitHub PR checks, dev/build conventions.
+- Persistence: `profiles` collection, initial Security Rules, baseline Firestore/index/rules workflow, storage/bucket scaffolding only if required by app bootstrap.
+- Auth: email-link login, `ALLOWED_EMAIL` enforcement, Firebase client/admin helpers, route middleware, and no Pinterest callback exemption.
 - UI Primitives: shared shell, header, canvas frame, touch-sized tokens sufficient for the empty authenticated app.
 - Feature UI: `/login` page, authenticated home shell, basic dashboard placeholder.
 - Testing: Vitest harness, Playwright harness, initial auth acceptance coverage.
 
 NOT YET
-- Pinterest OAuth.
+- Pinterest browse.
 - Pinterest boards or pins.
 - Uploads.
 - Reference ingestion.
@@ -84,7 +84,7 @@ BUILDS ON: Slice 0
 WHAT WORKS AFTER THIS STEP: Upload a reference image plus optional text on a throwaway spike page, submit, inspect Gemini output, and make a go/no-go provider decision.
 
 LAYERS TOUCHED
-- Infrastructure: Gemini API key availability in runtime env.
+- Infrastructure: Firebase AI Logic availability in runtime env.
 - Core Domain: minimal prompt builder only for spike evaluation.
 - API / Server Actions: minimal spike-only invocation path if needed by the page.
 - Feature UI: throwaway `/spike/gemini` page for manual upload-and-generate review.
@@ -104,24 +104,24 @@ VERIFIED BY
 - Manual quality review across 5+ reference types.
 - Explicit provider decision recorded from spike outcome.
 
-COMMIT REPRESENTS: `spike: Gemini reference-guided nail generation — DECIDE`
+COMMIT REPRESENTS: `spike: Firebase AI Logic reference-guided nail generation — DECIDE`
 
-### Slice 2 — Pinterest Login + Browse
+### Slice 2 — Pinterest Browse
 
-Goal: Connect Pinterest and browse boards and pins.
+Goal: Use the static Pinterest token and browse boards and pins.
 
 BUILDS ON: Slice 0
 
-WHAT WORKS AFTER THIS STEP: Authenticate to Pinterest, see boards, open one board, and view its pin grid.
+WHAT WORKS AFTER THIS STEP: See boards, open one board, and view its pin grid using the configured static Pinterest token.
 
 LAYERS TOUCHED
-- Infrastructure: callback-ready Vercel preview/dev tunnel usage for OAuth testing.
-- Persistence: Pinterest token fields on `profiles`; `references` table may be scaffolded but is not yet functionally used.
-- Auth: callback-route exception remains valid with state-parameter validation.
-- External Integrations: authorize URL, callback exchange, refresh token handling, boards fetch, board pins fetch.
-- API / Server Actions: `/api/auth/pinterest/start`, `/api/auth/pinterest/callback`, `/api/pinterest/boards`, `/api/pinterest/boards/[id]/pins`.
-- Feature UI: Pinterest connect button, linked-state UI, board browser grid, pin browser grid.
-- Testing: Playwright mocked OAuth flow, real-account smoke test, refresh-token behavior test.
+- Infrastructure: env-based Pinterest token setup and preview/dev testing surfaces.
+- Persistence: `references` collection may be scaffolded but is not yet functionally used.
+- Auth: normal authenticated-route protection remains; no callback-route exception is needed.
+- External Integrations: static bearer-token handling, boards fetch, board pins fetch.
+- API / Server Actions: `/api/pinterest/boards`, `/api/pinterest/boards/[id]/pins`.
+- Feature UI: Pinterest ready-state UI, board browser grid, pin browser grid.
+- Testing: Playwright mocked browse flow and real-token smoke test.
 
 NOT YET
 - Pin selection into a reference set.
@@ -135,10 +135,9 @@ NOT YET
 
 VERIFIED BY
 - Playwright with Pinterest API mocked.
-- Manual smoke with a real Pinterest account.
-- Token refresh test.
+- Manual smoke with the configured static token.
 
-COMMIT REPRESENTS: `feat: Pinterest OAuth + browse`
+COMMIT REPRESENTS: `feat: Pinterest static-token browse`
 
 ### Slice 3 — Reference Collection
 
@@ -149,12 +148,12 @@ BUILDS ON: Slice 2
 WHAT WORKS AFTER THIS STEP: Choose one primary Pinterest pin, add secondary pins and/or uploads, and see the assembled reference panel in the app.
 
 LAYERS TOUCHED
-- Persistence: `references` table fully active, `references` storage bucket active, `design_secondary_references` may be needed for durable ordering if designs are created at this stage.
+- Persistence: `references` collection fully active, `references` storage bucket active, `design_secondary_references` may be needed as a subcollection or ordered array if designs are created at this stage.
 - External Integrations: Pinterest image fetch/cache path now used for selected pins.
 - Core Domain: `ingestPinterestPin(pinId)`, `ingestUpload(file)`, reference set builder, primary/secondary ordering rules.
 - API / Server Actions: `selectPinterestPin(pinId)`, `uploadReference(file)`, `createDesign(input)` if the reference set is persisted as a design immediately.
 - Feature UI: primary/secondary pin selection affordances, upload tile, reference set panel, optional prompt input with override helper.
-- Testing: reference transform tests, Supabase integration coverage for RLS/storage, Playwright pick-and-build flow.
+- Testing: reference transform tests, Firebase integration coverage for Security Rules/storage, Playwright pick-and-build flow.
 
 NOT YET
 - Provider generation call.
@@ -166,7 +165,7 @@ NOT YET
 
 VERIFIED BY
 - Vitest reference transform tests.
-- Supabase integration test covering RLS plus storage.
+- Firebase integration test covering Security Rules plus storage.
 - Playwright reference pick/build flow.
 
 COMMIT REPRESENTS: `feat: reference collection (Pinterest pins + uploads)`
@@ -180,8 +179,8 @@ BUILDS ON: Slice 3 and the provider decision from Slice 1
 WHAT WORKS AFTER THIS STEP: Press generate, wait through a polished pending state, and receive a stored generated nail-design image or a guided error state.
 
 LAYERS TOUCHED
-- Persistence: `generations` table active, `generations` storage bucket active, `designs.latest_generation_id` linkage begins mattering.
-- External Integrations: production Gemini request assembly, transient-error retry once, refusal/rate-limit/network classification.
+- Persistence: `generations` collection active, `generations` storage bucket active, `designs.latest_generation_id` linkage begins mattering.
+- External Integrations: production Firebase AI Logic request assembly, transient-error retry once, refusal/rate-limit/network classification.
 - Core Domain: `generateDesign(referenceSetId, promptText, nailShape)` orchestration, pending/success/failure status updates, result storage.
 - API / Server Actions: generation-triggering action via `createDesign(input)` and/or `regenerateDesign(designId)` surface as needed for the initial run.
 - Feature UI: generate button, progress state, error surface, raw image preview.
@@ -241,7 +240,7 @@ LAYERS TOUCHED
 - Core Domain: save/reload/regenerate lifecycle behavior now fully active.
 - API / Server Actions: `saveDesign(designId, name?)`, `regenerateDesign(designId)`.
 - Feature UI: design library grid, saved design viewer, inline naming, regenerate button.
-- Testing: RLS integration for saved assets, Playwright save-reload-regenerate flow.
+- Testing: Security Rules integration for saved assets, Playwright save-reload-regenerate flow.
 
 NOT YET
 - Chat refinement.
@@ -249,7 +248,7 @@ NOT YET
 
 VERIFIED BY
 - Playwright save-reload-regenerate flow.
-- RLS-focused integration test.
+- Security Rules-focused integration test.
 
 COMMIT REPRESENTS: `feat: design library + regenerate`
 
@@ -307,16 +306,16 @@ VERTICAL SLICE OVERLAY
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 Layer / Slice              │ S0 Found. │ S1 Gemini Spike │ S2 Pinterest │ S3 References │ S4 Generate │ S5 Visualizer │ S6 Library │ S7 Chat │ S8 Polish
 ───────────────────────────┼───────────┼─────────────────┼──────────────┼───────────────┼─────────────┼───────────────┼────────────┼─────────┼──────────
-Infrastructure             │ auth env   │ Gemini key      │ callback env │ reuse          │ reuse        │ reuse          │ reuse       │ reuse    │ final fit
-Persistence                │ profiles   │ [not persisted] │ profile token │ references     │ generations   │ shape visible   │ saved links │ chat_turns│ harden
-Auth                       │ full       │ reuse           │ callback path │ reuse           │ reuse         │ reuse           │ reuse       │ reuse    │ audit
-External: Pinterest        │ [none]     │ [none]          │ OAuth+browse  │ ingest images   │ reuse inputs  │ [none]          │ reuse       │ [none]   │ harden
-External: Gemini           │ [none]     │ spike test      │ [none]        │ [none]          │ prod pipeline │ reuse output    │ regenerate   │ turn regen│ harden
+Infrastructure             │ auth env   │ AI Logic cfg    │ token env     │ reuse          │ reuse        │ reuse          │ reuse       │ reuse    │ final fit
+Persistence                │ profiles   │ [not persisted] │ [reuse]       │ references     │ generations   │ shape visible   │ saved links │ chat_turns│ harden
+Auth                       │ full       │ reuse           │ reuse         │ reuse           │ reuse         │ reuse           │ reuse       │ reuse    │ audit
+External: Pinterest        │ [none]     │ [none]          │ token+browse  │ ingest images   │ reuse inputs  │ [none]          │ reuse       │ [none]   │ harden
+External: AI Logic         │ [none]     │ spike test      │ [none]        │ [none]          │ prod pipeline │ reuse output    │ regenerate   │ turn regen│ harden
 Core Domain                │ scaffold   │ prompt sketch   │ [minimal]     │ ref builder     │ orchestrator  │ reuse           │ lifecycle    │ chat acc.│ fit/finish
 API / Server Actions       │ login      │ spike entry     │ auth+boards    │ select/upload   │ generate      │ reuse           │ save/regens  │ send turn│ harden
 UI Primitives              │ shell      │ reuse           │ browse states  │ upload/panel    │ pending/error │ masks/selectors │ reuse        │ reuse    │ polish
 Feature UI                 │ login/home │ spike page      │ connect+browse │ ref assembly    │ raw preview   │ hand viewer     │ library      │ chat     │ tablet pass
-Testing                    │ auth base  │ manual review   │ OAuth mocks    │ RLS/storage     │ MSW+retry     │ snapshots       │ flow tests   │ turn tests│ full suite
+Testing                    │ auth base  │ manual review   │ browse mocks   │ rules/storage   │ MSW+retry     │ snapshots       │ flow tests   │ turn tests│ full suite
 ───────────────────────────┴───────────┴─────────────────┴──────────────┴───────────────┴─────────────┴───────────────┴────────────┴─────────┴──────────
 ```
 
@@ -341,7 +340,7 @@ Testing                    │ auth base  │ manual review   │ OAuth mocks   
 
 1. Slice 0 risk: auth and middleware scaffolding can sprawl if foundation work stops being “thin” and turns into a platform sprint.
 2. Slice 1 risk: Gemini may produce attractive images that still do not read as usable nail designs, forcing a provider pivot.
-3. Slice 2 risk: Pinterest app registration, callback behavior, or token refresh quirks can stall the first real inspiration flow.
+3. Slice 2 risk: Pinterest token expiration or revocation can stall the first real inspiration flow.
 4. Slice 3 risk: reference ingestion can fragment into Pinterest-vs-upload branching instead of one normalized record path.
 5. Slice 4 risk: provider failures and retry rules can leave generation states inconsistent if status updates and storage writes are not coordinated.
 6. Slice 5 risk: the 2D hand can technically work while still feeling visually cheap if masks or scaling look stretched.
@@ -357,7 +356,7 @@ Testing                    │ auth base  │ manual review   │ OAuth mocks   
 2. Slice 8 cannot be dropped entirely, but its depth can expand or contract based on schedule because it is primarily fit-and-finish work.
 3. Slice 6 can shrink to the minimum saved-design reopen/regenerate flow if naming or library presentation detail becomes expensive.
 4. Slice 5 should not move ahead of Slice 4 because the visualizer needs a real generated image to prove value.
-5. Slice 3 should not merge backward into Slice 2 unless schedule pressure is extreme; keeping browsing separate from reference ingestion reduces debugging scope.
+5. Slice 3 should not merge backward into Slice 2 unless schedule pressure is extreme; keeping token-backed browsing separate from reference ingestion reduces debugging scope.
 6. Slice 1 must stay before production AI work, regardless of whether it is called “Slice 1” or “Slice 0.5.”
 7. Slice 2 can start only after the user-owned Pinterest app registration prerequisite is satisfied.
 8. If Gemini quality fails in Slice 1, the overall slice order still mostly holds, but Slice 4’s provider implementation changes behind the preserved generation boundary.

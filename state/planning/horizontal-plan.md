@@ -2,26 +2,26 @@
 
 ## 1. Layer Inventory
 
-1. Infrastructure: Hosts the Next.js app, provisions Supabase, stores secrets, and provides CI plus callback-ready deploy surfaces.
-2. Deployment surfaces: Vercel preview/production deploys and a local dev tunnel support Pinterest OAuth callback testing.
-3. Environment configuration: Holds Pinterest OAuth, Gemini, Supabase, app URL, and allowed-email values.
-4. Persistence: Stores identity, references, designs, generations, and later chat turns under RLS.
-5. `profiles` table: Extends `auth.users` with email and encrypted Pinterest token state.
-6. `references` table: Normalizes Pinterest and uploaded images into one reference record shape.
-7. `designs` table: Stores the durable design record, shape choice, prompt, and current generation linkage.
-8. `generations` table: Stores each generation attempt, request payload, result path, metadata, and failure state.
-9. `design_secondary_references` + `chat_turns`: Preserve ordered secondary references and later chat history.
-10. Storage buckets + migrations: Persist references and outputs while evolving schema via versioned SQL.
-11. Auth: Admits only the allowed email, sets SSR cookies, and protects non-public routes.
-12. External integrations: Connect Pinterest for inspiration sourcing and Gemini for generation.
-13. Pinterest OAuth + API: Handles authorize URL generation, callback exchange, refresh, boards, pins, and image fetch/cache.
-14. Gemini generation boundary: Builds multimodal requests, retries once on transient failure, and leaves room for a future fallback provider.
+1. Infrastructure: Hosts the Next.js app, provisions Firebase, stores secrets, and provides CI plus deploy surfaces for local and hosted testing.
+2. Deployment surfaces: Vercel preview/production deploys and local development support Firebase Auth email-link flows plus Pinterest API testing.
+3. Environment configuration: Holds Pinterest static-token, Firebase, app URL, and allowed-email values.
+4. Persistence (Firebase Firestore): Stores identity, references, designs, generations, and later chat turns under Security Rules.
+5. `profiles` collection: Extends Firebase Auth identity with durable app email metadata.
+6. `references` collection: Normalizes Pinterest and uploaded images into one reference record shape.
+7. `designs` collection: Stores the durable design record, shape choice, prompt, and current generation linkage.
+8. `generations` collection: Stores each generation attempt, request payload, result path, metadata, and failure state.
+9. `design_secondary_references` + `chat_turns`: Preserve ordered secondary references via subcollection or ordered array maps, plus later chat history.
+10. Storage buckets + rules: Persist references and outputs while enforcing schema and access through Firestore converters, indexes, and rules files.
+11. Auth: Admits only the allowed email, completes Firebase email-link sign-in, and protects non-public routes.
+12. External integrations: Connect Pinterest for inspiration sourcing and Firebase AI Logic for generation.
+13. Pinterest API: Reads a static bearer token, fetches boards and pins, and caches selected images for durable use.
+14. Firebase AI Logic boundary: Builds multimodal requests, retries once on transient failure, and leaves room for a future fallback provider.
 15. Core domain: Turns raw integrations and persistence into ingestion, reference selection, generation orchestration, and design lifecycle behavior.
 16. Reference ingestion + set builder: Ingest Pinterest pins or uploads, enforce one primary reference, preserve ordered secondary cues, and honor prompt override behavior.
 17. Design lifecycle services: Create, save, reload, and regenerate designs while preserving original inputs.
 18. API / Server Actions: Expose route handlers and mutations used by the UI.
 19. UI Primitives + Feature UI: Deliver the shell, touch-friendly states, reference-selection flow, visualizer, library, and optional chat.
-20. Testing infrastructure: Verifies unit logic, mocked integrations, RLS-safe integrations, critical E2E flows, and visualizer regressions.
+20. Testing infrastructure: Verifies unit logic, mocked integrations, Security Rules-safe integrations, critical E2E flows, and visualizer regressions.
 
 ## 2. Per-Layer Requirements
 
@@ -29,100 +29,100 @@
 
 INFRASTRUCTURE SURFACES
 - Runtime: Next.js 15 App Router on Vercel.
-- Backend services: Supabase Postgres, Auth, Storage.
+- Backend services: Firebase Firestore, Auth, Cloud Storage, and Firebase AI Logic.
 - Source control: GitHub repository with CI checks.
-- Local callback support: ngrok or equivalent tunnel.
-- Preview callback support: Vercel preview deploys usable for Pinterest callback testing.
+- Local auth support: Firebase email-link auth plus local Pinterest API testing.
+- Preview support: Vercel preview deploys usable for auth and Pinterest browse verification.
 
 ENVIRONMENT VARIABLES
-- Required keys: `PINTEREST_CLIENT_ID`, `PINTEREST_CLIENT_SECRET`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `ALLOWED_EMAIL`.
+- Required keys: `PINTEREST_APP_ID`, `PINTEREST_ACCESS_TOKEN`, Firebase client/admin config vars, `APP_URL`, `ALLOWED_EMAIL`.
 
 DEPLOYMENT REQUIREMENTS
 - Vercel project must build a Next.js 15 App Router application.
-- Preview deploys must exist early because Pinterest callback testing may happen against deployed URLs.
-- Production deploy must expose the same login, Pinterest callback, and generation surfaces used in local development.
+- Preview deploys must exist early because Firebase Auth and Pinterest browse should be verified against deployed URLs.
+- Production deploy must expose the same login and generation surfaces used in local development.
 
 CI / CHECKS
 - PR checks required by memo: `typecheck`, `lint`, `unit tests`.
 - Check set exists from Slice 0 onward because it is part of foundation infrastructure.
 
 LOCAL DEVELOPMENT
-- Tunnel-based callback strategy is required by locked kickoff decisions.
-- Local development must support Pinterest OAuth callback validation through the tunnel URL.
+- Local development must support Firebase email-link sign-in plus Pinterest API testing without an OAuth callback dependency.
 
-### Persistence
+### Persistence (Firebase Firestore)
 
 PERSISTENCE SURFACES
-- Postgres tables: `profiles`, `references`, `designs`, `generations`, `design_secondary_references`, `chat_turns`.
+- Firestore collections: `profiles`, `references`, `designs`, `generations`, `chat_turns`.
+- Nested persistence for secondary references: `design_secondary_references` as a design subcollection or ordered array of maps on `designs`.
 - Storage buckets: `references`, `generations`.
-- Migration path: Supabase CLI with versioned SQL files.
+- Schema path: Firestore converters in code plus `firestore.rules` and `firestore.indexes.json`.
 
-TABLE: `profiles`
-- Purpose: Extend `auth.users` with app-specific profile and Pinterest auth state.
-- Columns required by memo: `id` PK = `auth.users.id`, `email`, `pinterest_token_encrypted`, `pinterest_token_expires_at`, `created_at`.
-- Change note: token refresh support implies update access to token and expiry fields.
+COLLECTION: `profiles`
+- Purpose: Extend Firebase Auth users with app-specific profile data.
+- Fields required by memo: document ID = `request.auth.uid`, `email`, `createdAt`.
+- Change note: Pinterest token state is removed from persisted profile data because the app now reads one static env token.
 
-TABLE: `references`
+COLLECTION: `references`
 - Purpose: Normalize both Pinterest-derived and uploaded reference images.
-- Columns required by memo: `id`, `user_id` FK, `source` (`pinterest` or `upload`), `source_url`, `storage_path`, `pinterest_pin_id` nullable, `created_at`.
+- Fields required by memo: `id`, `userId`, `source` (`pinterest` or `upload`), `sourceUrl`, `storagePath`, `pinterestPinId` nullable, `createdAt`.
 
-TABLE: `designs`
+COLLECTION: `designs`
 - Purpose: Durable saved design entity for create/save/reload/regenerate flows.
-- Columns required by memo: `id`, `user_id` FK, `name` nullable, `primary_reference_id` FK, `prompt_text` nullable, `nail_shape` (`almond`, `coffin`, `square`, `stiletto`), `latest_generation_id` FK, `created_at`, `updated_at`.
+- Fields required by memo: `id`, `userId`, `name` nullable, `primaryReferenceId`, `promptText` nullable, `nailShape` (`almond`, `coffin`, `square`, `stiletto`), `latestGenerationId`, `createdAt`, `updatedAt`.
 - Functional requirement from locked decisions: the record must preserve enough inputs to support regenerate-from-saved-design in v1.
 
-TABLE: `generations`
+COLLECTION: `generations`
 - Purpose: Store every generation attempt, not just the latest result.
-- Columns required by memo: `id`, `design_id` FK, `request_json`, `result_storage_path`, `gemini_response_metadata`, `status` (`pending`, `success`, `failure`), `error_message` nullable, `created_at`.
+- Fields required by memo: `id`, `designId`, `requestJson`, `resultStoragePath`, `providerResponseMetadata`, `status` (`pending`, `success`, `failure`), `errorMessage` nullable, `createdAt`.
 
-TABLE: `design_secondary_references`
-- Purpose: Ordered join table for non-primary references.
-- Columns required by memo: `design_id` FK, `reference_id` FK, `order_index`.
+SUBCOLLECTION / ORDERED ARRAY: `design_secondary_references`
+- Purpose: Ordered non-primary references scoped under a design.
+- Fields required by memo: `referenceId`, `orderIndex`, or equivalent ordered map shape preserved under each design document.
 
-TABLE: `chat_turns`
+COLLECTION / SUBCOLLECTION: `chat_turns`
 - Purpose: P1 conversation history attached to a design and a generation lineage.
-- Columns required by memo: `id`, `design_id` FK, `user_message`, `generation_id` FK, `order_index`, `created_at`.
+- Fields required by memo: `id`, `designId`, `userMessage`, `generationId`, `orderIndex`, `createdAt`.
 
-RLS POLICIES
-- Every row with `user_id` must match `auth.uid()`.
+SECURITY RULES
+- Every document with `userId` must match `request.auth.uid`.
 - Profile access must be scoped to the current authenticated user.
 - Saved designs, references, generations, and later chat turns must not cross user boundaries even though v1 is single-user.
-- Storage access must follow the same per-user ownership rule because references and generations live in Supabase Storage.
+- Storage access must follow the same per-user ownership rule because references and generations live in Firebase Cloud Storage.
 
 STORAGE BUCKETS
 - `references`: stores uploads and cached Pinterest images.
 - `generations`: stores Gemini output images.
 - Persistence layer must support fetch by saved path because UI layers depend on image URLs.
 
-MIGRATIONS
-- Supabase CLI with versioned SQL files is the specified migration strategy.
-- Schema evolution must preserve the v1-to-v2 optionality called out in discovery and product docs.
+SCHEMA EVOLUTION
+- Firestore has no SQL migration layer in the relational sense.
+- Schema evolution lives in Firestore converters, indexes, and Security Rules while preserving the v1-to-v2 optionality called out in discovery and product docs.
 
 ### Auth
 
 AUTH SURFACES
-- Supabase Auth with email magic links.
+- Firebase Auth with email-link sign-in.
 - Single-user allowlist using `ALLOWED_EMAIL`.
-- Supabase SSR session helpers with cookie handling.
+- Firebase client SDK plus `firebase-admin` server SDK helpers with cookie/session handling. [confirm Firebase SDK detail]
 - Middleware protection for non-public routes.
 
 LOGIN FLOW REQUIREMENTS
 - `/login` page must accept email input.
 - Submit action must reject any email not equal to the allowed email.
-- Allowed email path must trigger Supabase magic-link send behavior.
-- UI must support a “magic link sent” state.
+- Allowed email path must trigger Firebase email-link send behavior.
+- UI must support an “email link sent” state.
 
 SESSION REQUIREMENTS
-- Session cookies are handled by Supabase SSR helpers.
+- Session cookies are handled by Firebase client/admin auth helpers. [confirm Firebase SDK detail]
 - Authenticated home page must be reachable after login in Slice 0.
-- Middleware must guard all routes except `/login`, `/api/health`, and the Pinterest OAuth callback route.
+- Middleware must guard all routes except `/login` and `/api/health`.
 
 CALLBACK EXCEPTION REQUIREMENTS
-- Pinterest callback route is exempt from normal middleware auth enforcement.
-- Callback route still must validate its own `state` parameter per memo.
+- Pinterest callback-route exceptions are removed because the integration no longer uses OAuth callbacks.
+- Firebase email-link completion still must preserve the allowlist and authenticated route contract. [confirm Firebase SDK detail]
 
 SCHEMA / AUTH LINKAGE
-- `profiles.id` must align to `auth.users.id`.
+- `profiles.id` must align to Firebase Auth `uid`.
 - `profiles.email` exists so app-level allowlist and durable user metadata stay queryable.
 
 ### External Integrations
@@ -130,17 +130,15 @@ SCHEMA / AUTH LINKAGE
 #### Pinterest API v5
 
 PINTEREST FLOWS
-- OAuth 2.0 authorize URL generation.
-- OAuth callback token exchange.
-- Refresh token handling.
+- Static bearer-token access via `PINTEREST_ACCESS_TOKEN`.
 - `GET /v5/user_account/boards`
 - `GET /v5/boards/{board_id}/pins`
-- Image fetch from selected pin URLs and cache into Supabase Storage.
+- Image fetch from selected pin URLs and cache into Firebase Cloud Storage.
 
 TOKEN HANDLING
-- Access token state belongs on `profiles`.
-- Expiry tracking belongs on `profiles`.
-- Refresh logic must exist because the memo includes refresh token handling explicitly.
+- Access token comes from `PINTEREST_ACCESS_TOKEN`.
+- `PINTEREST_APP_ID` is tracked for app identity and setup docs.
+- No profile-stored token, callback exchange, or refresh logic exists in the amended plan.
 
 BOARD / PIN DATA REQUIREMENTS
 - Integration boundary must return enough board data to render a board browser.
@@ -150,7 +148,7 @@ BOARD / PIN DATA REQUIREMENTS
 IMAGE CACHE REQUIREMENTS
 - Pinterest-sourced reference images are not only browsed; selected pins must be copied into the app’s `references` bucket for durable use in generation.
 
-#### Gemini 2.5 Flash Image
+#### Firebase AI Logic
 
 GENERATION INPUTS
 - Primary image input.
@@ -170,19 +168,19 @@ FAILURE SURFACE
 - Locked kickoff decision refines this to: one silent auto-retry, then surface an error with “adjust inputs” guidance.
 
 BOUNDARY REQUIREMENT
-- Generation service should preserve a provider boundary because the fallback provider slot must remain possible even though it is not built in v1.
+- Generation service should preserve a provider boundary in `lib/ai/generate.ts` because the fallback provider slot must remain possible even though it is not built in v1.
 
 ### Core Domain
 
 REFERENCE INGESTION
 - `ingestPinterestPin(pinId)`
 - Fetch pin metadata/image through Pinterest integration.
-- Copy image into Supabase Storage `references`.
+- Copy image into Firebase Cloud Storage `references`.
 - Create a `references` record with `source = 'pinterest'`.
 
 UPLOAD INGESTION
 - `ingestUpload(file)`
-- Store uploaded file in Supabase Storage `references`.
+- Store uploaded file in Firebase Cloud Storage `references`.
 - Create a `references` record with `source = 'upload'`.
 
 REFERENCE SET BUILDER
@@ -218,8 +216,6 @@ P1 CHAT REFINEMENT
 
 ROUTES / ACTIONS
 - `/login` page submit action for allowlisted email login.
-- `/api/auth/pinterest/start`
-- `/api/auth/pinterest/callback`
 - `selectPinterestPin(pinId)`
 - `uploadReference(file)`
 - `createDesign(input)`
@@ -230,8 +226,8 @@ ROUTES / ACTIONS
 - P1: `sendChatTurn(designId, message)`
 
 AUTH REQUIREMENTS
-- All authenticated actions must execute in a user-scoped context compatible with RLS.
-- Public exceptions stay limited to `/login`, `/api/health`, and Pinterest callback behavior.
+- All authenticated actions must execute in a user-scoped context compatible with Firebase Security Rules.
+- Public exceptions stay limited to `/login` and `/api/health`.
 
 DATA CONTRACT REQUIREMENTS
 - Board/pin route handlers are passthrough-style integration surfaces for UI browsing.
@@ -307,16 +303,16 @@ UNIT TESTS
 
 MOCKED INTEGRATION TESTS
 - MSW for Pinterest endpoints.
-- MSW for Gemini API behavior including success and failure.
+- MSW for Firebase AI Logic behavior including success and failure.
 
-SUPABASE INTEGRATION TESTS
-- Authenticated vs unauthenticated behavior under RLS.
+FIREBASE INTEGRATION TESTS
+- Authenticated vs unauthenticated behavior under Security Rules.
 - Storage interactions for references and generations.
 - Save/reload/regenerate flows tied to persisted records.
 
 E2E TESTS
 - Playwright auth flow.
-- Pinterest OAuth mock flow.
+- Pinterest static-token browse mock flow.
 - Generation happy path.
 - Save/reload flow.
 - Shape switching.
@@ -332,21 +328,21 @@ FIXTURES
 
 ## 3. Cross-Layer Dependencies
 
-1. Infrastructure env configuration supplies Pinterest, Gemini, Supabase, app URL, and allowlist values used by Auth and External integrations.
-2. Vercel preview/prod deploys plus the local tunnel are prerequisites for Pinterest OAuth callback testing.
-3. Supabase availability is a prerequisite for Auth, Persistence, Storage-backed ingestion, and design saving.
-4. `profiles` persistence is coupled to Supabase Auth because the profile key equals `auth.users.id`.
-5. Auth depends on Persistence for profile storage and RLS to keep app data user-scoped.
-6. Pinterest OAuth depends on callback configuration, authenticated identity, and token storage on `profiles`.
-7. Pinterest browsing and selected-pin ingestion depend on refresh-capable token handling plus `references` bucket writes.
+1. Infrastructure env configuration supplies Pinterest, Firebase, app URL, and allowlist values used by Auth and External integrations.
+2. Vercel preview/prod deploys plus local development are prerequisites for Firebase auth and Pinterest browse testing.
+3. Firebase availability is a prerequisite for Auth, Persistence, Storage-backed ingestion, and design saving.
+4. `profiles` persistence is coupled to Firebase Auth because the profile key equals the authenticated `uid`.
+5. Auth depends on Persistence for profile storage and Security Rules to keep app data user-scoped.
+6. Pinterest browsing depends on `PINTEREST_ACCESS_TOKEN` plus authenticated identity for app-level gating.
+7. Pinterest browsing and selected-pin ingestion depend on static-token access plus `references` bucket writes.
 8. Upload ingestion depends on authenticated storage writes and the same `references` schema used by Pinterest ingestion.
 9. Reference set building depends on normalized `references` rows and feeds `createDesign` plus generation orchestration.
 10. Design creation and regenerate depend on durable storage of primary reference, ordered secondary references, prompt, and shape.
-11. Gemini generation depends on env credentials, normalized reference inputs, `generations` persistence, and output storage.
+11. Firebase AI Logic generation depends on Firebase config, normalized reference inputs, `generations` persistence, and output storage.
 12. Raw preview, visualizer, and shape switching all depend on generated image availability plus the design’s `nail_shape` state.
 13. Design library depends on `designs.latest_generation_id`, associated generation outputs, and naming support.
 14. Chat refinement depends on the full generation pipeline plus `chat_turns` persistence.
-15. Testing spans all layers: mocks cover integrations, integration tests cover Supabase contracts, E2E covers the core flow, and snapshots cover shape regressions.
+15. Testing spans all layers: mocks cover integrations, integration tests cover Firebase contracts, E2E covers the core flow, and snapshots cover shape regressions.
 
 ## 4. Layer Map Diagram
 
@@ -355,27 +351,27 @@ HORIZONTAL LAYER MAP
 ────────────────────────────────────────────────────────────────────────────────────────────────────────
 Layer / Area                │ Auth + Access      │ References + Inputs      │ Generation + Output       │ Persistence + QA
 ────────────────────────────┼────────────────────┼──────────────────────────┼───────────────────────────┼────────────────────────────
-Infrastructure             │ env, Vercel, CI    │ dev tunnel, previews     │ Gemini key, app URL       │ GitHub checks, deploy path
-Persistence                │ profiles, RLS      │ references, join table   │ designs, generations      │ chat_turns, buckets, SQL
-Auth                       │ magic link         │ allowlist gating         │ SSR sessions              │ middleware exceptions
-External: Pinterest        │ OAuth + refresh    │ boards, pins, image pull │ cached reference images   │ token expiry on profile
-External: Gemini           │ [data not provided]│ multimodal inputs        │ retry, refusal, output    │ response metadata
+Infrastructure             │ env, Vercel, CI    │ local auth, previews     │ Firebase config, app URL  │ GitHub checks, deploy path
+Persistence                │ profiles, rules    │ references, ordered refs │ designs, generations      │ chat_turns, buckets, indexes
+Auth                       │ email link         │ allowlist gating         │ session helpers           │ middleware exceptions
+External: Pinterest        │ static token       │ boards, pins, image pull │ cached reference images   │ env-token management
+External: AI Logic         │ [data not provided]│ multimodal inputs        │ retry, refusal, output    │ response metadata
 Core Domain                │ user-scoped flows  │ ingest + reference set   │ generate + regenerate     │ save + reload semantics
-API / Server Actions       │ login, callback    │ board/pin routes, upload │ create/save/regenerate    │ chat turn action
+API / Server Actions       │ login              │ board/pin routes, upload │ create/save/regenerate    │ chat turn action
 UI Primitives              │ shell, header      │ loading + touch tokens   │ toasts, pending states    │ tablet-first layout
 Feature UI                 │ login, dashboard   │ boards, pins, upload     │ preview, visualizer       │ library, chat panel
-Testing                    │ auth E2E           │ ingestion/unit coverage  │ provider mocks + retries  │ RLS tests, snapshots
+Testing                    │ auth E2E           │ ingestion/unit coverage  │ provider mocks + retries  │ rules tests, snapshots
 ────────────────────────────┴────────────────────┴──────────────────────────┴───────────────────────────┴────────────────────────────
 ```
 
 ## 5. Scope Summary
 
 1. Total architectural layers represented in the memo-level map: 10 major layers.
-2. Total concrete persistence tables specified: 6; storage buckets: 2; named route handlers/actions for P0 plus P1: 10.
+2. Total concrete persistence collections/structures specified: 6; storage buckets: 2; named route handlers/actions for P0 plus P1: 8.
 3. New vs modified: this is greenfield, so the plan is almost entirely new-build work.
 4. Broadest layers: Persistence, Core Domain, API/Server Actions, and Feature UI because each must carry the full end-to-end flow.
 5. Largest user-facing layer: Feature UI, spanning login, Pinterest browse, uploads, reference curation, generation, visualizer, library, and optional chat.
-6. Riskiest external layer: External integrations, split between Pinterest OAuth friction and Gemini output quality.
+6. Riskiest external layer: External integrations, split between Pinterest token stability and Firebase AI Logic output quality.
 7. Riskiest internal layer: Core Domain, where reference priority, retry logic, saved-design lineage, and later chat accumulation meet.
 8. The map stays within the memo’s v1 boundaries: single-user auth, Pinterest plus uploads, Gemini-only generation, 2D uniform five-nail visualizer, design library, tablet-first UI, optional P1 chat.
 9. Deferred items stay outside executable scope except where a boundary must be preserved, most notably fallback-provider optionality and future multi-user compatibility.
