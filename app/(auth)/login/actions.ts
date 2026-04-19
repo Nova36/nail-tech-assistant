@@ -1,7 +1,7 @@
 'use server';
 
-import { assertAllowedEmail } from '../../../lib/auth/allowlist';
-import { env } from '../../../lib/env';
+import { assertAllowedEmail } from '@/lib/auth/allowlist';
+import { env } from '@/lib/env';
 
 export type LoginActionState =
   | { status: 'idle' }
@@ -57,7 +57,7 @@ export async function loginAction(
   try {
     const { getAuth, sendSignInLinkToEmail } = await import('firebase/auth');
     const { createBrowserFirebaseClient } =
-      await import('../../../lib/firebase/client');
+      await import('@/lib/firebase/client');
     const app = createBrowserFirebaseClient();
     const auth = getAuth(app);
 
