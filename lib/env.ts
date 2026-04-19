@@ -45,7 +45,44 @@ const envSchema = z.object({
   PINTEREST_ACCESS_TOKEN: requiredString,
 });
 
+/**
+ * If FIREBASE_SERVICE_ACCOUNT_JSON is set (a single JSON blob from the Firebase
+ * Console "Generate new private key" download), derive the three admin-side
+ * env vars from it. Explicit split vars take precedence if the user set them.
+ *
+ * This lets Vercel/hosting config use one environment variable instead of three
+ * — avoids the PEM-newline-escaping trap on FIREBASE_PRIVATE_KEY.
+ */
+function hydrateFromServiceAccountJson(source: NodeJS.ProcessEnv): void {
+  const blob = source.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  if (!blob) return;
+
+  try {
+    const parsed = JSON.parse(blob) as Partial<{
+      project_id: string;
+      client_email: string;
+      private_key: string;
+    }>;
+
+    if (!source.FIREBASE_PROJECT_ID && parsed.project_id) {
+      source.FIREBASE_PROJECT_ID = parsed.project_id;
+    }
+    if (!source.FIREBASE_CLIENT_EMAIL && parsed.client_email) {
+      source.FIREBASE_CLIENT_EMAIL = parsed.client_email;
+    }
+    if (!source.FIREBASE_PRIVATE_KEY && parsed.private_key) {
+      source.FIREBASE_PRIVATE_KEY = parsed.private_key;
+    }
+  } catch {
+    // Parse failed — zod validation below will surface the missing split vars
+    // with a precise error message. Do not throw here; keep a single error
+    // surface.
+  }
+}
+
 export function getEnv(): Env {
+  hydrateFromServiceAccountJson(process.env);
+
   const parsed = envSchema.safeParse(process.env);
 
   if (!parsed.success) {

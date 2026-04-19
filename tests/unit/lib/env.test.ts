@@ -116,3 +116,111 @@ describe('lib/env — module-load validation (AC#1)', () => {
     expect(typeof mod.env.PINTEREST_ACCESS_TOKEN).toBe('string');
   });
 });
+
+describe('lib/env — FIREBASE_SERVICE_ACCOUNT_JSON blob hydration', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const BASE_NON_ADMIN = {
+    NEXT_PUBLIC_FIREBASE_API_KEY: 'test-api-key',
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'test.firebaseapp.com',
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'test-project',
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'test.appspot.com',
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '123456789',
+    NEXT_PUBLIC_FIREBASE_APP_ID: '1:123456789:web:abc123',
+    ALLOWED_EMAIL: 'allowed@example.com',
+    APP_URL: 'https://nail-tech.example.com',
+    PINTEREST_ACCESS_TOKEN: 'ptest_token_abc123',
+  } as const;
+
+  const SERVICE_ACCOUNT_JSON = JSON.stringify({
+    type: 'service_account',
+    project_id: 'json-derived-project',
+    client_email: 'json-sa@json-derived.iam.gserviceaccount.com',
+    private_key:
+      '-----BEGIN RSA PRIVATE KEY-----\nfromjson\n-----END RSA PRIVATE KEY-----',
+  });
+
+  it('derives PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY from JSON blob when split vars are absent', async () => {
+    for (const [k, v] of Object.entries(BASE_NON_ADMIN)) {
+      vi.stubEnv(k, v);
+    }
+    vi.stubEnv('FIREBASE_SERVICE_ACCOUNT_JSON', SERVICE_ACCOUNT_JSON);
+    // Ensure split vars are NOT set
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_PROJECT_ID;
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_CLIENT_EMAIL;
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_PRIVATE_KEY;
+
+    const mod = await import('../../../lib/env');
+    expect(mod.env.FIREBASE_PROJECT_ID).toBe('json-derived-project');
+    expect(mod.env.FIREBASE_CLIENT_EMAIL).toBe(
+      'json-sa@json-derived.iam.gserviceaccount.com'
+    );
+    expect(mod.env.FIREBASE_PRIVATE_KEY).toContain('BEGIN RSA PRIVATE KEY');
+  });
+
+  it('explicit split vars take precedence over JSON blob', async () => {
+    for (const [k, v] of Object.entries(BASE_NON_ADMIN)) {
+      vi.stubEnv(k, v);
+    }
+    vi.stubEnv('FIREBASE_SERVICE_ACCOUNT_JSON', SERVICE_ACCOUNT_JSON);
+    vi.stubEnv('FIREBASE_PROJECT_ID', 'explicit-project');
+    vi.stubEnv(
+      'FIREBASE_CLIENT_EMAIL',
+      'explicit-sa@explicit.iam.gserviceaccount.com'
+    );
+    vi.stubEnv(
+      'FIREBASE_PRIVATE_KEY',
+      '-----BEGIN RSA PRIVATE KEY-----\nexplicit\n-----END RSA PRIVATE KEY-----'
+    );
+
+    const mod = await import('../../../lib/env');
+    expect(mod.env.FIREBASE_PROJECT_ID).toBe('explicit-project');
+    expect(mod.env.FIREBASE_CLIENT_EMAIL).toBe(
+      'explicit-sa@explicit.iam.gserviceaccount.com'
+    );
+    expect(mod.env.FIREBASE_PRIVATE_KEY).toContain('explicit');
+  });
+
+  it('malformed JSON blob does NOT crash hydration; missing-var error surfaces from zod', async () => {
+    for (const [k, v] of Object.entries(BASE_NON_ADMIN)) {
+      vi.stubEnv(k, v);
+    }
+    vi.stubEnv('FIREBASE_SERVICE_ACCOUNT_JSON', 'not-valid-json{{{');
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_PROJECT_ID;
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_CLIENT_EMAIL;
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_PRIVATE_KEY;
+
+    await expect(import('../../../lib/env')).rejects.toThrow(
+      'FIREBASE_PROJECT_ID'
+    );
+  });
+
+  it('empty JSON blob is treated as absent — missing-var error still surfaces', async () => {
+    for (const [k, v] of Object.entries(BASE_NON_ADMIN)) {
+      vi.stubEnv(k, v);
+    }
+    vi.stubEnv('FIREBASE_SERVICE_ACCOUNT_JSON', '   ');
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_PROJECT_ID;
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_CLIENT_EMAIL;
+    delete (process.env as Record<string, string | undefined>)
+      .FIREBASE_PRIVATE_KEY;
+
+    await expect(import('../../../lib/env')).rejects.toThrow(
+      'FIREBASE_PROJECT_ID'
+    );
+  });
+});
