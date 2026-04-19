@@ -97,3 +97,52 @@ describe('lib/firebase/session — getSession (AC#4)', () => {
     expect(result?.email).toBe('allowed@example.com');
   });
 });
+
+describe('lib/firebase/session — getSessionFromCookieString (string API)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockVerifySessionCookie.mockReset();
+    process.env.FIREBASE_PROJECT_ID = 'test-project';
+    process.env.FIREBASE_CLIENT_EMAIL = 'sa@test.iam.gserviceaccount.com';
+    process.env.FIREBASE_PRIVATE_KEY =
+      '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----';
+  });
+
+  it('returns null for undefined', async () => {
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    await expect(getSessionFromCookieString(undefined)).resolves.toBeNull();
+  });
+
+  it('returns null for empty string', async () => {
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    await expect(getSessionFromCookieString('')).resolves.toBeNull();
+  });
+
+  it('returns null for null', async () => {
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    await expect(getSessionFromCookieString(null)).resolves.toBeNull();
+  });
+
+  it('returns Session for a valid cookie string', async () => {
+    mockVerifySessionCookie.mockResolvedValue({
+      uid: 'direct-uid',
+      email: 'direct@example.com',
+    });
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    const result = await getSessionFromCookieString('valid-cookie');
+    expect(result).toEqual({ uid: 'direct-uid', email: 'direct@example.com' });
+  });
+
+  it('returns null when verifySessionCookie throws', async () => {
+    mockVerifySessionCookie.mockRejectedValue(new Error('expired'));
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    await expect(
+      getSessionFromCookieString('expired-cookie')
+    ).resolves.toBeNull();
+  });
+});

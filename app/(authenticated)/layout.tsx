@@ -1,9 +1,8 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { NextRequest } from 'next/server';
 
-import { getSession } from '@/lib/firebase/session';
+import { getSessionFromCookieString } from '@/lib/firebase/session';
 
 export const runtime = 'nodejs';
 
@@ -55,18 +54,6 @@ function BrandMark() {
   );
 }
 
-async function buildSessionRequest(): Promise<NextRequest> {
-  const cookieStore = await cookies();
-  const request = new NextRequest('http://localhost/');
-  const sessionCookie = cookieStore.get('session')?.value;
-
-  if (sessionCookie) {
-    request.cookies.set('session', sessionCookie);
-  }
-
-  return request;
-}
-
 function Header() {
   return (
     <header className="border-b border-[color:rgb(212_203_197_/_0.7)] bg-background/90 backdrop-blur-sm">
@@ -102,7 +89,10 @@ function Footer() {
 export default async function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps) {
-  const session = await getSession(await buildSessionRequest());
+  const cookieStore = await cookies();
+  const session = await getSessionFromCookieString(
+    cookieStore.get('session')?.value
+  );
 
   if (!session) {
     redirect('/login');

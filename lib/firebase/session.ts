@@ -9,9 +9,9 @@ export interface Session {
   email: string;
 }
 
-export async function getSession(req: NextRequest): Promise<Session | null> {
-  const sessionCookie = req.cookies.get('session')?.value;
-
+export async function getSessionFromCookieString(
+  sessionCookie: string | undefined | null
+): Promise<Session | null> {
   if (!sessionCookie) {
     return null;
   }
@@ -34,4 +34,8 @@ export async function getSession(req: NextRequest): Promise<Session | null> {
   } catch {
     return null;
   }
+}
+
+export async function getSession(req: NextRequest): Promise<Session | null> {
+  return getSessionFromCookieString(req.cookies.get('session')?.value);
 }
