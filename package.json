@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "node node_modules/next/dist/bin/next dev --turbopack",
+    "dev:e2e": "node node_modules/next/dist/bin/next dev",
     "build": "node node_modules/next/dist/bin/next build",
     "start": "node node_modules/next/dist/bin/next start",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",

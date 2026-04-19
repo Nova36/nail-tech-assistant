@@ -1,33 +1,27 @@
 /**
- * A4 — tests/e2e/auth.spec.ts
+ * Epic A — tests/e2e/auth.spec.ts
  *
- * Canonical Epic A auth integration e2e. Complements (does NOT replace)
- * tests/e2e/login.spec.ts from A3 — they test different slices:
- *   - login.spec.ts: /login form behavior (UI sent/rejected states).
- *   - auth.spec.ts: middleware redirect, /api/health public access, and
- *     the placeholder for the full email-link round-trip + session-expiry
- *     + direct-POST bypass tests (gated on the Firebase Auth emulator,
- *     which is NOT wired into playwright.config.ts yet).
+ * Canonical auth integration e2e. Complements (does NOT replace)
+ * tests/e2e/login.spec.ts — they test different slices:
+ *   - login.spec.ts: /login form behavior (sent + rejected UI states).
+ *   - auth.spec.ts: middleware redirect, /api/health public access,
+ *     and session-rejection behavior on invalid cookies.
  *
- * Cookie name adaptation: A2's session helper uses `'session'` (not
- * `'__session'`). Scenarios that set a cookie use `'session'`.
+ * Emulator wiring: playwright.config.ts webServer wraps `pnpm dev` in
+ * `firebase emulators:exec --only auth,firestore`, so the app talks to
+ * local Auth + Firestore emulators. The authenticated layout's
+ * `verifySessionCookie` call hits the emulator; any invalid cookie
+ * (malformed, expired, revoked) rejects identically from the user's POV.
  *
- * In CI without a running dev server + Firebase emulator, scenarios 3/4/5
- * are SKIPPED via `test.skip(...)` with TODO markers. Scenarios 1 + 2 are
- * the realistic red-phase signals; they assert the middleware redirect
- * and the public /api/health endpoint, both of which only need A4's
- * middleware + health route to exist.
+ * Cookie name: A2's session helper reads `'session'` (not `'__session'`).
  */
 import { test, expect } from '@playwright/test';
 
-test.describe('auth integration — middleware, health, deferred emulator cases', () => {
+test.describe('auth integration — middleware, health, session-reject', () => {
   test('AC#1: unauthenticated visit to `/` → redirects to /login', async ({
     page,
   }) => {
     await page.goto('/');
-    // URL should become /login, optionally with `?from=/`. Both forms
-    // are acceptable because the tester does not constrain the exact
-    // query-string contract beyond the unit-level middleware test.
     await expect(page).toHaveURL(/\/login(\?|$|\/)/);
   });
 
@@ -42,42 +36,48 @@ test.describe('auth integration — middleware, health, deferred emulator cases'
     expect(typeof body.ts).toBe('number');
   });
 
-  test('AC#3 (DEFERRED): email-link happy-path round-trip lands on authenticated shell', async () => {
+  test('AC#4: invalid/expired session cookie → authenticated layout rejects, redirect to /login', async ({
+    page,
+    context,
+  }) => {
+    // A malformed cookie value is indistinguishable from an expired/revoked
+    // one from the app's perspective — both route through
+    // verifySessionCookie's catch path in getSessionFromCookieString, which
+    // returns null, which triggers redirect('/login') in the layout.
+    await context.addCookies([
+      {
+        name: 'session',
+        value: 'invalid-fake-session-token',
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'Lax',
+      },
+    ]);
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/login(\?|$|\/)/);
+  });
+
+  test('AC#3 (DEFERRED): full email-link happy-path through /login/finish to authenticated shell', async () => {
     test.skip(
       true,
-      'TODO(a4.e2e): requires Firebase Auth emulator for sign-in-link round-trip. ' +
-        'A4 does not yet wire the emulator into playwright.config.ts webServer. ' +
-        'Unskip this test in the epic that adds emulator support.'
+      'Requires /login/finish route + /api/auth/session endpoint to exchange ' +
+        'the ID token for a session cookie. Those routes are a separate ' +
+        'story — not part of A3 (stops at sent-state) or A4 (middleware + ' +
+        'shell). Emulator fixture helpers already exist at ' +
+        'tests/e2e/fixtures/emulator.ts (clearAuthEmulatorAccounts, ' +
+        'getLatestOobLink) — ready to consume once /login/finish ships.'
     );
   });
 
-  test('AC#4 (DEFERRED): session-expiry → stale `session` cookie redirected back to /login', async () => {
+  test('AC#5 (DEFERRED): direct-POST bypass of the login server action', async () => {
     test.skip(
       true,
-      'TODO(a4.e2e): the app/(authenticated)/layout.tsx verification calls ' +
-        'firebase-admin `verifySessionCookie`, which requires a real Firebase ' +
-        'project (or emulator) to produce a predictable "expired/revoked" ' +
-        'rejection. Out of scope for A4 CI; unskip with the emulator.'
-    );
-    // When implemented, this test should:
-    //   await page.context().addCookies([{
-    //     name: 'session', value: 'expired-fake-token',
-    //     domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax',
-    //   }]);
-    //   await page.goto('/');
-    //   await expect(page).toHaveURL(/\/login/);
-  });
-
-  test('AC#5 (DEFERRED): direct-POST bypass against the login server action is rejected', async () => {
-    test.skip(
-      true,
-      'TODO(a4.e2e): Next 15 server actions are POSTed to an opaque ' +
-        'endpoint chosen by the framework, so asserting a direct POST ' +
-        'bypass from Playwright requires either (a) emulator-gated ' +
-        'plumbing or (b) a dedicated API route wrapper. Unit test at ' +
-        'tests/unit/auth/login-action.test.ts already covers the ' +
-        'invariant (FR-A-2: sendSignInLinkToEmail never called on reject); ' +
-        'this e2e placeholder is retained for the eventual emulator setup.'
+      'Next 15 server actions POST to an opaque framework-chosen endpoint ' +
+        '(Next-Action header + encrypted action ID). Playwright cannot target ' +
+        'it stably. Unit test at tests/unit/auth/login-action.test.ts already ' +
+        'asserts the FR-A-2 invariant (sendSignInLinkToEmail NOT called on ' +
+        'rejection) by invoking the action export directly — same code gate.'
     );
   });
 });

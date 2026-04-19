@@ -35,8 +35,12 @@ test.describe('/login — email-link sign-in form', () => {
     // Sent state is a UI swap, not a navigation — URL should still be /login.
     await expect(page).toHaveURL(/\/login(\/|$|\?)/);
 
-    // Target the verbatim success language from the story / research brief.
-    await expect(page.getByText(/check your (inbox|email)/i)).toBeVisible();
+    // Target the sent-state heading specifically — "Check your email for a
+    // secure sign-in link..." also matches the regex as a body paragraph,
+    // which would be a strict-mode-violation for getByText.
+    await expect(
+      page.getByRole('heading', { name: /check your (inbox|email)/i })
+    ).toBeVisible();
   });
 
   test('AC#2 reject path: disallowed email → inline error visible, URL stays /login, no success text', async ({
@@ -56,7 +60,9 @@ test.describe('/login — email-link sign-in form', () => {
       page.getByText(/only the configured email can sign in\./i)
     ).toBeVisible();
 
-    // Make sure the sent-state didn't render.
-    await expect(page.getByText(/check your (inbox|email)/i)).toHaveCount(0);
+    // Make sure the sent-state heading didn't render.
+    await expect(
+      page.getByRole('heading', { name: /check your (inbox|email)/i })
+    ).toHaveCount(0);
   });
 });

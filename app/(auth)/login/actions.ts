@@ -55,11 +55,25 @@ export async function loginAction(
   }
 
   try {
-    const { getAuth, sendSignInLinkToEmail } = await import('firebase/auth');
+    const { getAuth, sendSignInLinkToEmail, connectAuthEmulator } =
+      await import('firebase/auth');
     const { createBrowserFirebaseClient } =
       await import('@/lib/firebase/client');
     const app = createBrowserFirebaseClient();
     const auth = getAuth(app);
+
+    const emulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+    if (emulatorHost) {
+      try {
+        connectAuthEmulator(auth, `http://${emulatorHost}`, {
+          disableWarnings: true,
+        });
+      } catch {
+        // Already connected on a prior request — connectAuthEmulator throws
+        // if the auth instance is reused after first configuration. Safe to
+        // ignore; the existing connection remains valid.
+      }
+    }
 
     await sendSignInLinkToEmail(auth, email, {
       url: `${env.APP_URL}/login/finish`,

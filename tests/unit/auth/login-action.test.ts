@@ -57,10 +57,12 @@ const sendSignInLinkToEmail = vi.fn(
   }
 );
 const getAuth = vi.fn(() => fakeAuth);
+const connectAuthEmulator = vi.fn();
 
 vi.mock('firebase/auth', () => ({
   getAuth,
   sendSignInLinkToEmail,
+  connectAuthEmulator,
 }));
 
 vi.mock('@/lib/firebase/client', () => ({
@@ -96,6 +98,7 @@ describe('app/(auth)/login/actions — loginAction', () => {
     }
     sendSignInLinkToEmail.mockClear();
     getAuth.mockClear();
+    connectAuthEmulator.mockClear();
     (sendSignInLinkToEmail as Mock).mockResolvedValue(undefined);
   });
 
@@ -153,5 +156,39 @@ describe('app/(auth)/login/actions — loginAction', () => {
       reason: 'invalid_format',
     });
     expect(sendSignInLinkToEmail).not.toHaveBeenCalled();
+  });
+
+  it('emulator mode: FIREBASE_AUTH_EMULATOR_HOST set → connectAuthEmulator called before sendSignInLinkToEmail', async () => {
+    vi.stubEnv('FIREBASE_AUTH_EMULATOR_HOST', '127.0.0.1:9099');
+    const { loginAction } = await loadLoginAction();
+    await loginAction(fd(ALLOWED));
+
+    expect(connectAuthEmulator).toHaveBeenCalledTimes(1);
+    const [authArg, urlArg, optsArg] = connectAuthEmulator.mock.calls[0]!;
+    expect(authArg).toBe(fakeAuth);
+    expect(urlArg).toBe('http://127.0.0.1:9099');
+    expect(optsArg).toEqual({ disableWarnings: true });
+    expect(sendSignInLinkToEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('emulator mode: connectAuthEmulator throwing (already connected) does NOT break the action', async () => {
+    vi.stubEnv('FIREBASE_AUTH_EMULATOR_HOST', '127.0.0.1:9099');
+    connectAuthEmulator.mockImplementationOnce(() => {
+      throw new Error('auth/emulator-config-failed');
+    });
+    const { loginAction } = await loadLoginAction();
+    const result = await loginAction(fd(ALLOWED));
+
+    expect(result).toEqual({ status: 'sent' });
+    expect(sendSignInLinkToEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('no emulator env → connectAuthEmulator is NOT called', async () => {
+    // BASE_ENV does not include FIREBASE_AUTH_EMULATOR_HOST; default path.
+    const { loginAction } = await loadLoginAction();
+    await loginAction(fd(ALLOWED));
+
+    expect(connectAuthEmulator).not.toHaveBeenCalled();
+    expect(sendSignInLinkToEmail).toHaveBeenCalledTimes(1);
   });
 });
