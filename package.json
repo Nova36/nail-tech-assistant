@@ -14,6 +14,7 @@
     "lint": "node node_modules/eslint/bin/eslint.js .",
     "format": "node node_modules/prettier/bin/prettier.cjs --write .",
     "test": "node node_modules/vitest/vitest.mjs run",
+    "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.config.rules.ts'",
     "test:e2e": "node node_modules/@playwright/test/cli.js test",
     "prepare": "node node_modules/husky/bin.js",
     "lint-staged": "node node_modules/lint-staged/bin/lint-staged.js"
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@firebase/rules-unit-testing": "^5.0.0",
     "@playwright/test": "^1.54.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@testing-library/react": "^16.3.0",
@@ -47,6 +49,7 @@
     "eslint": "^9.31.0",
     "eslint-config-next": "15.1.11",
     "eslint-plugin-import": "^2.32.0",
+    "firebase-tools": "^15.15.0",
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "lint-staged": "^16.1.2",

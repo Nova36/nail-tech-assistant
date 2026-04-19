@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Owner-only access to /profiles/{uid} — uid matches Firebase Auth uid (FR-A-7, Risk #6).
+    match /profiles/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Default deny for all other paths — later epics add narrow rules for their own collections.
+    // Convention note: Firestore Security Rules are additive (OR). Default is deny; the explicit
+    // `if false` below is defensive — it ensures any accidental permissive rule in a later epic
+    // must OPT IN rather than inherit a silent allow.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
