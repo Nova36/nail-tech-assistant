@@ -81,7 +81,14 @@ export async function loginAction(
     });
 
     return { status: 'sent' };
-  } catch {
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[loginAction] sendSignInLinkToEmail failed', {
+      code,
+      message,
+      continueUrl: `${env.APP_URL}/login/finish`,
+    });
     return {
       status: 'rejected',
       message: 'Could not send the sign-in link. Please try again.',
