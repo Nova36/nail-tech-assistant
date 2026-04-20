@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { hasSessionCookie } from './lib/auth/session-guard';
 
-const PUBLIC_EXACT = new Set(['/login', '/api/health']);
+const PUBLIC_EXACT = new Set(['/login', '/api/health', '/api/auth/session']);
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
@@ -38,6 +38,6 @@ export function middleware(req: NextRequest): NextResponse {
 
 export const config = {
   matcher: [
-    '/((?!login$|login/|api/health$|_next/|favicon\\.ico$|robots\\.txt$).*)',
+    '/((?!login$|login/|api/health$|api/auth/session$|_next/|favicon\\.ico$|robots\\.txt$).*)',
   ],
 };
