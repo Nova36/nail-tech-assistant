@@ -1,0 +1,515 @@
+id: b4-pinterest-token-remediation-views
+epic: epic-b-pinterest-integration
+title: 'Upgrade S2/S3 token-verify placeholders to styled 401/403 page-level views + shared terse copy module + error.tsx scoping'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [b3-pinterest-pin-grid]
+renditions: 6 # 3 per view (401 + 403) per architect MAJOR-2
+
+wireframes:
+  touchpoint_1_status: APPROVED
+  approved_at: '2026-04-20'
+  approved_by: don
+  views:
+    TokenInvalidView:
+      approved_rendition: state/wireframes/epic-b-pinterest-integration/b4-token-invalid-view/v2.html
+      rationale: 'v2 — Balanced (30/30). max-w-xl container, 40px glyph, medium step spacing. v1 read as debug-tool-tight; v3 as public-landing-page-big. Pair-consistent with 403 v2.'
+      comparison_doc: state/wireframes/epic-b-pinterest-integration/b4-token-invalid-view/COMPARISON.md
+      glyph: 'disconnected-link — two broken chain rings with rupture ticks (stroke-only SVG, stroke: var(--muted-foreground), stroke-width: 1.5, fill: none, aria-hidden=true)'
+      step_counter_border: var(--primary) # Mulberry Dusk — 401 distinction
+      step_counter_numerals: var(--primary) # Mulberry Dusk (AA 6.90:1 on parchment)
+    InsufficientScopeView:
+      approved_rendition: state/wireframes/epic-b-pinterest-integration/b4-insufficient-scope-view/v2.html
+      rationale: 'v2 — Balanced (30/30). Pair-consistent with 401 v2 — the two views share a mental model, visual asymmetry would feel unintentional.'
+      comparison_doc: state/wireframes/epic-b-pinterest-integration/b4-insufficient-scope-view/COMPARISON.md
+      glyph: 'key-ring with empty slot — ring + 2 present keys + dashed loop at where the missing key would hang'
+      glyph_substitution_note: "Interpreted the base-template 'key-ring with missing key' concept as 'empty slot with dashed loop' rather than drawing both present+missing keys, which would have been visually busy at 32-48px. Approved 2026-04-20 by Don."
+      step_counter_border: var(--accent) # Champagne Gold — 403 distinction (the one color pop)
+      step_counter_numerals: var(--primary) # Mulberry Dusk (same as 401; AA compliance)
+  references:
+    - state/wireframes/epic-b-pinterest-integration/_base-template.md
+    - state/wireframes/epic-b-pinterest-integration/_animations-spec.md
+    - state/wireframes/epic-b-pinterest-integration/_a11y-spec.md
+  implementation_notes: |
+    - Layout is IDENTICAL across 401 vs 403 — only icon, heading accent word, step-counter border color, and step-2 copy differ.
+    - Motion: .b4-mount-fade (240ms opacity 0→1 + 6px translateY). NO shimmer on remediation content. Shimmer on loading sliver (TokenRemediationLoadingSkeleton) that precedes, per _animations-spec.md §5c + §6c.
+    - Use updated brand tokens: --destructive is now #B04848.
+    - role="status" + aria-live="polite" + aria-labelledby on the section wrapper (NOT the h1) per _a11y-spec.md §2 b4 sections.
+    - "Open Pinterest Dashboard" link uses .link-action with :focus-visible parity on underline-grow (keyboard accessibility).
+    - data-component annotations: TokenInvalidView, InsufficientScopeView, RemediationSteps, with data-role on the SVG glyphs.
+    - Copy is single-source-of-truth in lib/pinterest/token-replacement-copy.ts per the story description — wireframes embed it for layout only.
+escalations_addressed:
+  - trigger: ui:major
+    severity: major
+    placement: pre-exec
+    raised_by: ui-designer
+    addressed_by: 'ui-design step (between research and test-spec) produces wireframe renditions for both TokenInvalidView (401) and InsufficientScopeView (403) per references/wireframe-protocol.md Touchpoint 1; story is not finalized until Don approves the renditions; approved wireframes embedded in the wireframes: block. Also enforces architect MAJOR-1 (page-level branch, NOT error.tsx) and MAJOR-2 (distinct 401 vs 403 views with distinct copy).'
+  - trigger: ui:animations
+    severity: minor
+    placement: pre-exec
+    raised_by: 'tpm + ui-designer'
+    addressed_by: 'sidecar at execute — operator-facing remediation views may benefit from a quiet entrance transition; not blocking'
+
+description: |
+  Vertical Slice 4 of Epic B. Adds the architect-mandated page-level render
+  branches that make US-B-1 deliverable: when `verifyPinterestToken()` returns
+  `invalid_token` (401), both `/pinterest` and `/pinterest/[boardId]` render
+  `TokenInvalidView` as a first-class page state. When it returns
+  `insufficient_scope` (403), both routes render `InsufficientScopeView` with
+  distinct re-scope copy. The shared `lib/pinterest/token-replacement-copy.ts`
+  module is the single source of truth for the terse, wife-test-readable
+  remediation copy referencing the Pinterest developer dashboard and direct
+  Vercel env update steps.
+
+  `error.tsx` is scoped EXPLICITLY to unexpected failures + retry — it does NOT
+  catch token-invalid or insufficient-scope (architect MAJOR-1).
+
+  The 401 and 403 branches are SEPARATE views with distinct remediation paths
+  (architect MAJOR-2): 401 → "rotate the env token"; 403 → "re-issue the env
+  token with the correct read scopes". Lumping them would silently regress the
+  operator UX architect review fixed.
+
+  US-B-1 (token health gating): satisfied at end of slice.
+  US-B-3 implicit completion: the operator-facing replace-the-token path
+  required by US-B-3 acceptance criteria lands in this slice (the env contract
+  itself was satisfied in B1).
+
+  UI work: new `TokenInvalidView` and `InsufficientScopeView` (server-renderable
+  per horizontal plan), plus `error.tsx`. Pinterest UI has no pre-supplied
+  wireframe — `ui-design` step produces a brief BEFORE `test-spec`.
+
+acceptance_criteria:
+  - 'Given the configured Pinterest token is invalid, missing, or revoked (Pinterest returns 401), when an authenticated user opens `/pinterest`, then the page renders `TokenInvalidView` as a page-level branch — NOT through `error.tsx` — with terse copy referencing the Pinterest dashboard and direct Vercel env update steps.'
+  - 'Given the configured Pinterest token is valid but lacks the required read scopes (Pinterest returns 403), when an authenticated user opens `/pinterest`, then the page renders `InsufficientScopeView` as a page-level branch with distinct re-scope copy (different from the 401 rotate-token copy).'
+  - 'Given the configured token state, when an authenticated user opens `/pinterest/[boardId]`, then the same 401 → `TokenInvalidView` and 403 → `InsufficientScopeView` page-level branches render (NOT through `error.tsx`).'
+  - 'Given a Pinterest fetch throws an unexpected error (e.g., 500, malformed JSON, fetch reject without normalized error class), when the request lands inside the route segment, then `error.tsx` renders with a retry control — NOT `TokenInvalidView` or `InsufficientScopeView`.'
+  - 'Given a non-technical operator reads the 401 copy, when they follow the steps verbatim, then they can rotate the token in the Pinterest dashboard and update the Vercel env without external clarification (wife-test bar).'
+  - 'Given a non-technical operator reads the 403 copy, when they follow the steps verbatim, then they can re-issue a token with the correct read scopes in the Pinterest dashboard and update the Vercel env.'
+  - 'Given the shared `lib/pinterest/token-replacement-copy.ts` module is updated, when both `TokenInvalidView` and `InsufficientScopeView` consume it, then the dashboard reference and Vercel-env-update primitives stay consistent across both views.'
+  - 'Given B2 and B3 already shipped browse paths, when this slice ships, then the healthy-token browse paths still render correctly (no regression).'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Operator-readability bar — what's the current Vercel env update UX?
+      Confirm the exact dashboard navigation (Project → Settings → Environment
+      Variables) so the copy can name the path verbatim. Same for the
+      Pinterest dev dashboard token rotation flow + scope re-issue flow.
+      Use `firecrawl` against Vercel docs and Pinterest dev portal docs.
+      (2) Server-renderable view components — confirm both `TokenInvalidView`
+      and `InsufficientScopeView` can render with zero client-side JS (no
+      React state, no event handlers needed); they should be plain server
+      components per horizontal plan layer 5.
+      (3) `error.tsx` retry semantics in Next 15 — confirm the `reset()`
+      callback signature and how a "Try again" button wires to it. Verify
+      `error.tsx` does NOT swallow `notFound()` (B3's not-found contract must
+      stay intact).
+      Read `lib/pinterest/{client,errors}.ts` from B1, `app/(authenticated)/pinterest/page.tsx`
+      from B2, `app/(authenticated)/pinterest/[boardId]/page.tsx` from B3.
+    agent: researcher
+  - id: ui-design
+    description: |
+      RUNS AT PLANNING TIME (per `references/wireframe-protocol.md` Touchpoint 1)
+      — story is not finalized for execute until the wireframes are approved.
+      Satisfies the `ui:major` escalation.
+
+      Produce **3 wireframe renditions** covering both `TokenInvalidView` (401)
+      and `InsufficientScopeView` (403) at:
+        - `state/wireframes/epic-b-pinterest-integration/b4-pinterest-token-remediation-views/v1.png`
+        - `state/wireframes/epic-b-pinterest-integration/b4-pinterest-token-remediation-views/v2.png`
+        - `state/wireframes/epic-b-pinterest-integration/b4-pinterest-token-remediation-views/v3.png`
+
+      Plus a written brief at
+      `state/design/briefs/pinterest-token-remediation-views.md`.
+
+      The brief + renditions UPGRADE the minimal inline 401/403 placeholders
+      that b2 + b3 ship (see those stories' acceptance criteria) — same
+      page-level branch slot, now with full operator-facing remediation copy
+      and visual polish. The brief covers:
+
+      - `TokenInvalidView` (401) — page-level state shown inside the
+        authenticated shell when the env token is invalid/missing/revoked:
+        - Terse heading (e.g., "Pinterest needs a fresh token")
+        - 1-2 sentence explanation in plain language
+        - Numbered remediation steps (rotate token in Pinterest dashboard →
+          copy → paste into Vercel env → trigger redeploy)
+        - Visual treatment: warm-shell continuity from Epic A (do NOT use a
+          loud red error palette; this is a configuration state, not a panic
+          state)
+        - No retry button (the operator needs to take external action; a
+          retry button would lie about what unblocks them)
+
+      - `InsufficientScopeView` (403) — page-level state when the token is
+        valid but lacks scopes:
+        - Different heading (e.g., "Pinterest needs broader access")
+        - Distinct numbered steps (re-issue the token in Pinterest dashboard
+          with the required read scopes → copy → paste → redeploy)
+        - Same visual treatment / shell continuity as `TokenInvalidView`
+        - No retry button
+
+      - `error.tsx` (route-level fallback for unexpected failures) — distinct
+        from the two views above:
+        - Generic "Something went wrong loading Pinterest" copy
+        - "Try again" button wired to the Next 15 `reset()` callback
+        - Not Pinterest-specific copy; this is the catch-all
+
+      Wife-test pass: a non-technical reader should be able to act on each
+      remediation step verbatim. Avoid jargon ("OAuth", "scope", "bearer
+      token") in the operator copy unless plain-language alternatives are
+      genuinely worse. Reference Pinterest dashboard + Vercel env
+      verbatim by name.
+
+      **Touchpoint 1 (blocking, requires direct user access via team-lead):**
+      orchestrator presents renditions to Don, Don selects one (or requests
+      changes / more options), TPM appends the `wireframes:` block to this
+      story file with the approved rendition path + brief. Story does not
+      enter execute until that block is populated. Touchpoint 2 (brief
+      sign-off) also runs because the wife-test copy is load-bearing — Don
+      signs off on the textual brief separately from the visual rendition.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Tests target BEHAVIOR + the
+      architect MAJOR-1/2 invariants.
+
+      - tests/integration/pinterest/boards-page-token-invalid.test.tsx:
+        (1) Mock `verifyPinterestToken()` to return
+            `{ ok: false, reason: 'invalid_token' }`
+        (2) Render `/pinterest`
+        (3) Assert `TokenInvalidView` heading + remediation copy visible
+        (4) Assert NO `BoardGrid` or `BoardGridSkeleton` rendered
+        (5) Assert NO `error.tsx` content rendered (architect MAJOR-1)
+        (6) Assert Pinterest dashboard reference present in copy
+        (7) Assert "Vercel" or "environment variable" reference present
+
+      - tests/integration/pinterest/boards-page-insufficient-scope.test.tsx:
+        (1) Mock `verifyPinterestToken()` to return
+            `{ ok: false, reason: 'insufficient_scope' }`
+        (2) Render `/pinterest`
+        (3) Assert `InsufficientScopeView` heading + remediation copy visible
+        (4) Assert copy is DISTINCT from `TokenInvalidView` (different
+            heading + different remediation primitive)
+        (5) Assert NO `error.tsx` content rendered (architect MAJOR-1)
+
+      - tests/integration/pinterest/board-detail-token-invalid.test.tsx:
+        Same as boards-page-token-invalid.test.tsx but for
+        `/pinterest/[boardId]`. The 401 page-level branch must render in
+        BOTH routes (architect MAJOR-2 carry).
+
+      - tests/integration/pinterest/board-detail-insufficient-scope.test.tsx:
+        Same as boards-page-insufficient-scope but for `/pinterest/[boardId]`.
+
+      - tests/integration/pinterest/error-boundary.test.tsx:
+        (1) Mock `verifyPinterestToken()` to return `{ ok: true }`
+        (2) Mock `listPinterestBoards()` to throw an unexpected error (e.g.,
+            500 status normalized to `{ reason: 'unknown', status: 500 }` or
+            an unhandled fetch reject)
+        (3) Render `/pinterest`
+        (4) Assert `error.tsx` content renders (NOT `TokenInvalidView`,
+            NOT `InsufficientScopeView`)
+        (5) Assert "Try again" button visible
+
+      - tests/unit/pinterest/token-replacement-copy.test.ts:
+        (1) Module exports both `tokenInvalidCopy` and `insufficientScopeCopy`
+            (or equivalent named exports)
+        (2) Both copy primitives reference the Pinterest dashboard
+        (3) Both copy primitives reference Vercel env update steps
+        (4) The two copy primitives are textually distinct (no copy-paste
+            duplication)
+
+      - tests/e2e/pinterest-token-remediation.spec.ts — Playwright:
+        (1) Configure test env to use a known-bad token (or mock Pinterest
+            via Playwright route to return 401)
+        (2) Navigate to `/pinterest`; assert TokenInvalidView heading
+            visible
+        (3) Configure test env / mock to return 403; navigate; assert
+            InsufficientScopeView heading visible (distinct from 401)
+
+      DO NOT write tests for: empty-state UI, retryable rate-limit/network
+      browse error UI. Those land in B5.
+
+      DO NOT regress B2/B3 healthy-token tests — they should still pass
+      after this slice ships.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Make the failing tests pass. UI work — translate the ui-design brief
+      into Tailwind + brand tokens.
+
+      AUTHORITATIVE VISUAL SOURCE:
+      - state/design/briefs/pinterest-token-remediation-views.md (+ optional .png)
+
+      Files to produce / modify:
+
+      - lib/pinterest/token-replacement-copy.ts — shared copy module:
+        ```ts
+        export const tokenInvalidCopy = {
+          heading: '...',
+          summary: '...',
+          steps: [
+            'Go to the Pinterest developer dashboard...',
+            'Generate a new access token...',
+            'Open your project in Vercel → Settings → Environment Variables...',
+            'Update PINTEREST_ACCESS_TOKEN with the new value...',
+            'Redeploy or wait for the next deploy...',
+          ],
+        };
+        export const insufficientScopeCopy = {
+          heading: '...',
+          summary: '...',
+          steps: [
+            'Go to the Pinterest developer dashboard...',
+            'Re-issue the access token with the required read scopes (boards:read, pins:read)...',
+            'Copy the new token and update Vercel...',
+            'Redeploy...',
+          ],
+        };
+        ```
+        Final copy bound by ui-design brief.
+
+      - components/pinterest/TokenInvalidView.tsx — server-renderable:
+        - Imports `tokenInvalidCopy` from the shared module
+        - Renders heading, summary, ordered remediation steps
+        - Tailwind styling per brief; warm-shell visual continuity
+        - NO retry button
+
+      - components/pinterest/InsufficientScopeView.tsx — server-renderable:
+        - Imports `insufficientScopeCopy` from the shared module
+        - Renders heading, summary, ordered remediation steps with the
+          re-scope-specific phrasing
+        - Same Tailwind / shell language as TokenInvalidView
+
+      - app/(authenticated)/pinterest/page.tsx — MODIFY (extend B2):
+        - Inside the server component, BEFORE the boards fetch, await
+          `verifyPinterestToken()`
+        - If `result.ok === false && result.reason === 'invalid_token'` →
+          render `<TokenInvalidView/>` and return early
+        - If `result.ok === false && result.reason === 'insufficient_scope'`
+          → render `<InsufficientScopeView/>` and return early
+        - If `result.ok === false && result.reason === 'network'` (or other
+          unexpected) → propagate up to `error.tsx` (let it throw)
+        - If `result.ok === true` → continue to the existing
+          `<Suspense>`-wrapped boards fetch (no behavioral change for the
+          healthy path)
+
+      - app/(authenticated)/pinterest/[boardId]/page.tsx — MODIFY (extend B3):
+        - Same `verifyPinterestToken()` gate as `page.tsx` BEFORE the pins
+          fetch
+        - 401 → `<TokenInvalidView/>`; 403 → `<InsufficientScopeView/>`
+        - 'network'/unexpected → propagate to `error.tsx`
+        - Healthy → continue to existing `<Suspense>`-wrapped pins fetch +
+          `notFound()` flow (no behavioral change for the healthy path)
+
+      - app/(authenticated)/pinterest/error.tsx — Create:
+        - Generic unexpected-failure UI per ui-design brief
+        - Wires "Try again" button to the Next 15 `reset()` callback prop
+        - This catches anything that propagates past the page-level token
+          branches (including B5's future rate_limit / network browse
+          failures, until B5 adds inline retryable UI)
+
+      Do NOT add: empty-state UI, retryable inline browse-error UI,
+      `[boardId]/not-found.tsx` board-specific copy. Those land in B5.
+
+      Do NOT modify `not-found.tsx` (B3) — invalid-board path stays the
+      same.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the architect MAJOR-1 and MAJOR-2 invariants AND the no-regression
+      contract for B2/B3 healthy paths.
+
+      ARCHITECT MAJOR-1: token-invalid + insufficient-scope render at
+      page-level, NOT through error.tsx.
+      - Read `app/(authenticated)/pinterest/page.tsx` and confirm
+        `verifyPinterestToken()` is awaited BEFORE the `<Suspense>` boundary
+        so the token branch can return early without throwing into the
+        suspense subtree.
+      - Same check in `[boardId]/page.tsx`.
+      - Confirm `error.tsx` is registered but only catches genuine unexpected
+        throws. Integration test asserts this — reviewer cross-checks.
+
+      ARCHITECT MAJOR-2: 401 vs 403 are SEPARATE views with distinct
+      remediation paths.
+      - Read `TokenInvalidView` and `InsufficientScopeView` source — they
+        must NOT share a single rendered component with prop-driven copy
+        toggles. Two distinct components, two distinct copy primitives.
+      - Read `tokenInvalidCopy` vs `insufficientScopeCopy` — text MUST be
+        materially different (not just a one-word swap).
+
+      OPERATOR READABILITY (wife-test):
+      - Read both copy primitives end-to-end as a non-technical reader.
+      - Each step must be actionable without external clarification.
+      - No jargon ("OAuth", "bearer", "scope") unless plain-language version
+        is genuinely worse and a glossary footnote is provided.
+
+      NO REGRESSION:
+      - B2 boards path still streams + renders for healthy token.
+      - B3 pins path still streams + renders + handles `notFound()` for
+        healthy token + invalid board.
+      - `not-found.tsx` (B3) is NOT touched by this slice.
+
+      NO SCOPE CREEP:
+      - No empty-state UI shipped (B5).
+      - No inline retryable rate-limit/network browse error UI shipped (B5).
+
+      All tests pass: 4 new integration tests for token branches, 1 for
+      error.tsx, 1 unit for copy module, 1 e2e, plus all B1/B2/B3 tests
+      still green.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit `feat(b4): page-level 401/403 token-remediation branches + shared copy module`.
+      Branch: `epic-b/pinterest-token-remediation-views`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router (server components + page-level conditional rendering + error.tsx with reset())'
+    runtime: 'Server-renderable views (no client JS); Tailwind-first styling'
+    testing: 'Vitest integration; Playwright e2e with mocked Pinterest 401/403 responses'
+  key_files:
+    - path: lib/pinterest/client.ts
+      purpose: 'Consumed from B1 — verifyPinterestToken called at page entry'
+    - path: lib/pinterest/errors.ts
+      purpose: 'Consumed from B1 — invalid_token / insufficient_scope arms drive the branch'
+    - path: app/(authenticated)/pinterest/page.tsx
+      purpose: 'MODIFIED — adds token-health gate before existing Suspense boards fetch (B2)'
+    - path: app/(authenticated)/pinterest/[boardId]/page.tsx
+      purpose: 'MODIFIED — adds token-health gate before existing Suspense pins fetch (B3)'
+    - path: state/design/briefs/pinterest-token-remediation-views.md
+      purpose: 'Produced by ui-design step'
+    - path: state/epics/epic-b-pinterest-integration/docs/architect-review.md
+      purpose: 'MAJOR-1 + MAJOR-2 baked decisions enforced in this slice'
+    - path: state/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+      purpose: 'Layer 4 (Server Components branching) + Layer 5 (Token views) + Layer 8 (Token-Replacement Copy Module)'
+    - path: state/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+      purpose: 'Slice 4 spec'
+
+files_to_modify:
+  - file: lib/pinterest/token-replacement-copy.ts
+    change: 'Create; shared terse copy with tokenInvalidCopy + insufficientScopeCopy exports'
+  - file: components/pinterest/TokenInvalidView.tsx
+    change: 'Create; server-renderable 401 page-level branch view'
+  - file: components/pinterest/InsufficientScopeView.tsx
+    change: 'Create; server-renderable 403 page-level branch view (distinct from 401)'
+  - file: app/(authenticated)/pinterest/page.tsx
+    change: 'Modify — add verifyPinterestToken() gate BEFORE existing Suspense boards fetch'
+  - file: app/(authenticated)/pinterest/[boardId]/page.tsx
+    change: 'Modify — add verifyPinterestToken() gate BEFORE existing Suspense pins fetch'
+  - file: app/(authenticated)/pinterest/error.tsx
+    change: 'Create; unexpected-failure-only fallback with reset() retry'
+  - file: state/design/briefs/pinterest-token-remediation-views.md
+    change: 'Created in ui-design step'
+  - file: tests/integration/pinterest/boards-page-token-invalid.test.tsx
+    change: 'Created in test-spec'
+  - file: tests/integration/pinterest/boards-page-insufficient-scope.test.tsx
+    change: 'Created in test-spec'
+  - file: tests/integration/pinterest/board-detail-token-invalid.test.tsx
+    change: 'Created in test-spec'
+  - file: tests/integration/pinterest/board-detail-insufficient-scope.test.tsx
+    change: 'Created in test-spec'
+  - file: tests/integration/pinterest/error-boundary.test.tsx
+    change: 'Created in test-spec'
+  - file: tests/unit/pinterest/token-replacement-copy.test.ts
+    change: 'Created in test-spec'
+  - file: tests/e2e/pinterest-token-remediation.spec.ts
+    change: 'Created in test-spec'
+
+design_decisions:
+  - decision: 'Token-invalid and insufficient-scope render as page-level branches inside route segment, NOT via error.tsx'
+    rationale: 'Architect MAJOR-1 — error.tsx is reserved for unexpected failures + retries; token failures are expected, deterministic states with bespoke remediation copy that DO NOT recover via retry'
+  - decision: '401 and 403 are TWO distinct view components with distinct copy primitives (NOT a single component with prop-driven toggles)'
+    rationale: 'Architect MAJOR-2 — different remediation paths (rotate token vs re-scope token); a single component invites future drift toward a unified copy that loses the distinction'
+  - decision: 'Both views are server-renderable with zero client JS'
+    rationale: 'No interactivity required (operator action is external); horizontal plan layer 5 mandates server-renderable; reduces bundle size and aligns with the no-token-leak boundary'
+  - decision: 'Shared `lib/pinterest/token-replacement-copy.ts` module exports two named primitives'
+    rationale: 'Single source of truth for copy revisions while preserving the 401/403 textual distinction'
+  - decision: '`verifyPinterestToken()` is awaited BEFORE the existing Suspense boundaries in `page.tsx` and `[boardId]/page.tsx`'
+    rationale: 'Token branch needs to short-circuit the streaming subtree; awaiting outside Suspense keeps the boundary semantics clean (architect MAJOR-1 requires page-level branch)'
+  - decision: 'No retry button on either token-remediation view'
+    rationale: 'A retry would lie about what unblocks the operator — they need external action (env update + redeploy); error.tsx retains retry for genuinely transient failures'
+  - decision: '`error.tsx` is generic, not Pinterest-specific'
+    rationale: 'Catch-all for unexpected failures (500s, malformed JSON, fetch rejects without normalized error class); future inline retryable UI for rate_limit/network lands in B5'
+  - decision: 'No copy on either view names the specific environment variable internals (e.g., does not say "Bearer token" or "Authorization header")'
+    rationale: 'Wife-test bar — operator should not need to understand HTTP auth to act on the steps; reference user-visible surfaces only (Pinterest dashboard, Vercel env)'
+
+cross_cutting: []
+
+risks:
+  - severity: high
+    description: 'Token-health gate placed INSIDE the Suspense boundary, causing the token branch to throw and surface via error.tsx instead of rendering page-level — silently regresses architect MAJOR-1'
+    mitigation: 'Implement step explicitly places the gate BEFORE Suspense; integration test asserts NO error.tsx content rendered on 401/403; reviewer cross-reads the route source'
+  - severity: high
+    description: 'Single shared view component with prop-driven 401/403 toggle — silently regresses architect MAJOR-2 over time'
+    mitigation: 'Two distinct components with two distinct copy primitives; integration tests assert distinct headings + distinct remediation step text'
+  - severity: medium
+    description: 'Copy fails the wife-test — operator hits a step they cannot act on without external clarification'
+    mitigation: 'ui-design brief enforces wife-test bar; reviewer reads the copy as a non-technical operator (manual readability check); revisions land in B5 if needed but should not block this slice'
+  - severity: medium
+    description: 'Pinterest dashboard or Vercel env UI changes after copy is written, making step references stale'
+    mitigation: 'Researcher question #1 captures current navigation paths; copy uses durable noun phrases ("Project Settings → Environment Variables") rather than UI element class names; B5 polish slot absorbs minor copy updates'
+  - severity: medium
+    description: 'B2/B3 healthy paths regress because the token gate accidentally short-circuits even on healthy responses (e.g., wrong reason field comparison)'
+    mitigation: 'B2/B3 integration tests must still pass; reviewer runs the full Epic B test suite, not just the new tests in this slice'
+  - severity: low
+    description: '`error.tsx` accidentally catches `notFound()` and breaks B3 invalid-board UX'
+    mitigation: 'Researcher question #3 confirms `error.tsx` does NOT swallow `notFound()`; B3 e2e test for invalid board still runs and must still render `not-found.tsx`'
+
+references:
+  - path: state/planning/prd.md
+    relevant_excerpt: |
+      US-B-1: Use the configured Pinterest account. Given the token is missing,
+      revoked, or invalid, when the browse route processes the request, then
+      the app blocks the flow and shows token-replacement guidance instead of
+      treating Pinterest as available.
+      US-B-3: Keep Pinterest access stable through env configuration. Given the
+      env token expires or is revoked, when a later Pinterest request occurs,
+      then the integration fails clearly and surfaces replace-the-token
+      guidance rather than pretending access still works.
+      FR-B-6: Token health failures must surface a remediation surface, not a
+      generic error.
+  - path: state/epics/epic-b-pinterest-integration/docs/architect-review.md
+    relevant_excerpt: |
+      Architect MAJOR-1: Token-invalid / insufficient-scope = explicit
+      page-level rendered branch in route segment, NOT error.tsx. Rationale:
+      error.tsx is for unexpected failures + retries only. Token failures are
+      an expected, deterministic state with bespoke remediation copy.
+      Architect MAJOR-2: Split 401 (invalid/missing token) and 403
+      (insufficient scope) handling at the client + render layer. Rationale:
+      Different operator remediation paths: 401 → rotate token; 403 → re-issue
+      token with correct scopes.
+  - path: state/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+    relevant_excerpt: |
+      Layer: Server Components. Call `verifyPinterestToken()` before list
+      fetches in both routes. Render `TokenInvalidView` when token verification
+      returns the 401 branch. Render `InsufficientScopeView` when token
+      verification returns the 403 branch. Render browse content only after a
+      healthy token result. Surface retryable unexpected failures to
+      `error.tsx`.
+      Layer: Token-Replacement Copy Module. Keep one source of truth for
+      operator-facing token-remediation copy. Provide distinct 401 copy for
+      missing / invalid / revoked token replacement. Provide distinct 403 copy
+      for insufficient-scope token re-issue with the required read scopes.
+  - path: state/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+    relevant_excerpt: |
+      Step 4 — Token-invalid + 401/403 page-level render branches. WHAT WORKS
+      AFTER THIS STEP: When `verifyPinterestToken()` returns `invalid_token`,
+      both `/pinterest` and `/pinterest/[boardId]` render `TokenInvalidView` as
+      a page-level branch (NOT through `error.tsx`). When it returns
+      `insufficient_scope`, both routes render `InsufficientScopeView` with
+      distinct re-scope copy. The shared
+      `lib/pinterest/token-replacement-copy.ts` module sources the terse
+      remediation copy referencing the Pinterest dashboard and Vercel env
+      steps. `error.tsx` remains reserved for unexpected failures plus retry.
+
+ui_indicators: 'NEW UI surface — TokenInvalidView, InsufficientScopeView, error.tsx; UPGRADES the minimal inline 401/403 placeholders shipped in b2 + b3; no pre-supplied wireframe; ui-design step REQUIRED before test-spec; copy quality is load-bearing (wife-test bar); renditions: 3 per wireframe-protocol Touchpoint 1; Touchpoint 2 (brief sign-off) ALSO required because wife-test copy is load-bearing'
+
+# (placeholder wireframes: block removed 2026-04-20 — replaced by populated block at top of file after Touchpoint 1 approval)

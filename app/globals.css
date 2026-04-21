@@ -5,10 +5,10 @@
   --color-primary-tint: #d4a5a8;
   --color-accent: #c9a96e;
   --color-neutral-fg: #3d3530;
-  --color-neutral-muted: #8c7e78;
+  --color-neutral-muted: #6f625c; /* darkened 2026-04-20 from #8c7e78 for AA contrast on small text (≥5.5:1) */
   --color-surface: #faf7f2;
   --color-surface-raised: #f0ebe3;
-  --color-destructive: #c0595a;
+  --color-destructive: #b04848; /* darkened 2026-04-20 from #c0595a to clear AA at 5.45:1 on ivory */
   --gradient-signature: linear-gradient(
     135deg,
     #e8d5e0 0%,
@@ -25,12 +25,12 @@
   --secondary: #f0ebe3;
   --secondary-foreground: #3d3530;
   --muted: #f0ebe3;
-  --muted-foreground: #8c7e78;
+  --muted-foreground: #6f625c; /* was #8c7e78; AA-contrast fix 2026-04-20 */
   --accent: #d4a5a8;
   --accent-foreground: #6b3f5e;
-  --destructive: #c0595a;
+  --destructive: #b04848; /* was #c0595a; AA-contrast fix 2026-04-20 */
   --destructive-foreground: #faf7f2;
-  --border: #8c7e78;
+  --border: #8c7e78; /* kept at Taupe Mist — meets 3:1 for UI components/dividers */
   --input: #f0ebe3;
   --ring: #6b3f5e;
   --breakpoint-sm: 40rem;

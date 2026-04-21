@@ -56,11 +56,21 @@ colors:
 
   neutral_mid:
     name: 'Taupe Mist'
+    hex: '#6F625C'
+    rgb: 'rgb(111, 98, 92)'
+    cmyk: 'cmyk(0, 12, 17, 56)'
+    pms: 'PMS 405 C (darkened)'
+    usage: 'Secondary text, captions, metadata, placeholder text'
+    # 2026-04-20: darkened from #8C7E78 (3.29:1 on parchment — AA fail) to #6F625C (≈5.5:1 AA pass)
+    # per accessibility-specialist a11y-spec Fix (a), approved by Don for Epic B wireframe sweep.
+    # The pre-darken value is preserved for divider/border use at --color-border only.
+  neutral_mid_divider:
+    name: 'Taupe Mist (divider-only, decorative)'
     hex: '#8C7E78'
     rgb: 'rgb(140, 126, 120)'
     cmyk: 'cmyk(0, 10, 14, 45)'
     pms: 'PMS 405 C'
-    usage: 'Secondary text, captions, metadata, placeholder text'
+    usage: 'Dividers/borders only — meets 3:1 UI-component threshold but not 4.5:1 text threshold'
 
   neutral_light:
     name: 'Pearl Fog'
@@ -71,12 +81,15 @@ colors:
     usage: 'Dividers, borders, disabled states'
 
   destructive:
-    name: 'Dusty Rose'
-    hex: '#C0595A'
-    rgb: 'rgb(192, 89, 90)'
-    cmyk: 'cmyk(0, 54, 53, 25)'
-    pms: 'PMS 7524 C'
+    name: 'Crimson Dusk'
+    hex: '#B04848'
+    rgb: 'rgb(176, 72, 72)'
+    cmyk: 'cmyk(0, 59, 59, 31)'
+    pms: 'PMS 7523 C (approximate)'
     usage: 'Error states, destructive actions — warm tone prevents jarring contrast'
+    # 2026-04-20: darkened from #C0595A (4.43:1 on ivory — borderline AA fail) to #B04848 (≈5.45:1 AA pass)
+    # per accessibility-specialist a11y-spec Fix (c), approved by Don for Epic B wireframe sweep.
+    # Name changed from "Dusty Rose" to "Crimson Dusk" to distinguish from primary_light (also "Dusty Rose").
 
 typography:
   heading_font:
