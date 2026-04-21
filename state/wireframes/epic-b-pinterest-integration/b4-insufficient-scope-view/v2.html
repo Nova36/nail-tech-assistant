@@ -1,207 +1,675 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>InsufficientScopeView (403) · b4 v2 — Balanced</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --background: #faf7f2; --foreground: #3d3530; --card: #f0ebe3;
-    --primary: #6b3f5e; --primary-foreground: #faf7f2; --primary-tint: #d4a5a8;
-    --accent: #c9a96e; --muted: #f0ebe3; --muted-foreground: #6f625c;
-    --border: #8c7e78; --destructive: #b04848; --ring: #6b3f5e;
-    --touch-target-min: 44px;
-  }
-  html { background: var(--background); color: var(--foreground); }
-  body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: radial-gradient(circle at top, rgb(212 165 168 / 0.18), transparent 35%), var(--background); min-height: 100vh; }
-  .font-fraunces { font-family: 'Fraunces', Georgia, serif; }
+  <head>
+    <meta charset="utf-8" />
+    <title>InsufficientScopeView (403) · b4 v2 — Balanced</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: #faf7f2;
+        --foreground: #3d3530;
+        --card: #f0ebe3;
+        --primary: #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint: #d4a5a8;
+        --accent: #c9a96e;
+        --muted: #f0ebe3;
+        --muted-foreground: #6f625c;
+        --border: #8c7e78;
+        --destructive: #b04848;
+        --ring: #6b3f5e;
+        --touch-target-min: 44px;
+      }
+      html {
+        background: var(--background);
+        color: var(--foreground);
+      }
+      body {
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(
+            circle at top,
+            rgb(212 165 168 / 0.18),
+            transparent 35%
+          ),
+          var(--background);
+        min-height: 100vh;
+      }
+      .font-fraunces {
+        font-family: 'Fraunces', Georgia, serif;
+      }
 
-  .vp { margin: 28px auto; background: var(--background); background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.18), transparent 35%); border: 1px solid rgb(140 126 120 / 0.22); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 56px rgba(61,53,48,0.12); }
-  .vp-mobile { width: 375px; } .vp-tablet { width: 768px; } .vp-desktop { width: 1280px; }
-  .vp-bar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: #ede4d9; border-bottom: 1px solid rgb(140 126 120 / 0.2); font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
-  .vp-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-tint); }
-  .vp-bar .dot.b { background: var(--accent); opacity: 0.7; }
-  .vp-bar .dot.c { background: var(--primary); opacity: 0.55; }
-  .vp-bar .tag { margin-left: auto; border: 1px solid rgb(140 126 120 / 0.3); padding: 2px 8px; border-radius: 999px; font-size: 10px; }
+      .vp {
+        margin: 28px auto;
+        background: var(--background);
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.12);
+      }
+      .vp-mobile {
+        width: 375px;
+      }
+      .vp-tablet {
+        width: 768px;
+      }
+      .vp-desktop {
+        width: 1280px;
+      }
+      .vp-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid rgb(140 126 120 / 0.2);
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .vp-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+      }
+      .vp-bar .dot.b {
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .vp-bar .dot.c {
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      .vp-bar .tag {
+        margin-left: auto;
+        border: 1px solid rgb(140 126 120 / 0.3);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+      }
 
-  aside.anno { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-foreground); padding: 3px 8px; border-radius: 4px; background: rgba(250,247,242,0.7); border: 1px dashed rgb(140 126 120 / 0.42); }
-  aside.anno::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); opacity: 0.55; }
-  aside.anno.pin { position: absolute; top: -11px; left: 14px; background: var(--background); z-index: 2; }
+      aside.anno {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(250, 247, 242, 0.7);
+        border: 1px dashed rgb(140 126 120 / 0.42);
+      }
+      aside.anno::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      aside.anno.pin {
+        position: absolute;
+        top: -11px;
+        left: 14px;
+        background: var(--background);
+        z-index: 2;
+      }
 
-  .b4-mount-fade { animation: b4-fade-in 240ms ease-out both; }
-  @keyframes b4-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      .b4-mount-fade {
+        animation: b4-fade-in 240ms ease-out both;
+      }
+      @keyframes b4-fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
 
-  .sk-v1 { background: linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.45) 50%, rgba(255,255,255,0) 70%), var(--card); background-size: 220% 100%; background-position: 120% 0; animation: sk-sweep 2.6s ease-in-out infinite; }
-  @keyframes sk-sweep { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+      .sk-v1 {
+        background:
+          linear-gradient(
+            100deg,
+            rgba(255, 255, 255, 0) 30%,
+            rgba(255, 255, 255, 0.45) 50%,
+            rgba(255, 255, 255, 0) 70%
+          ),
+          var(--card);
+        background-size: 220% 100%;
+        background-position: 120% 0;
+        animation: sk-sweep 2.6s ease-in-out infinite;
+      }
+      @keyframes sk-sweep {
+        0% {
+          background-position: 120% 0;
+        }
+        100% {
+          background-position: -120% 0;
+        }
+      }
 
-  /* 403 step-counter: Champagne Gold border + Mulberry Dusk numeral */
-  .step-n {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border-radius: 50%;
-    border: 1px solid color-mix(in oklab, var(--accent) 60%, transparent);
-    background: transparent;
-    font-family: 'Inter', sans-serif; font-weight: 500; font-size: 13px;
-    color: var(--primary);
-    flex-shrink: 0;
-  }
+      /* 403 step-counter: Champagne Gold border + Mulberry Dusk numeral */
+      .step-n {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid color-mix(in oklab, var(--accent) 60%, transparent);
+        background: transparent;
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+        font-size: 13px;
+        color: var(--primary);
+        flex-shrink: 0;
+      }
 
-  .link-action { position: relative; color: var(--primary); text-decoration: none; transition: color 180ms ease; display: inline-block; padding: 4px 0; min-height: 32px; }
-  .link-action::after { content: ''; position: absolute; left: 0; bottom: 0; height: 1px; width: 0; background: currentColor; transition: width 220ms ease; }
-  .link-action:hover::after, .link-action:focus-visible::after { width: 100%; }
-  .link-action:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 2px; }
-  .link-action .arrow { display: inline-block; margin-left: 4px; transition: transform 220ms ease; }
-  .link-action:hover .arrow, .link-action:focus-visible .arrow { transform: translateX(2px); }
+      .link-action {
+        position: relative;
+        color: var(--primary);
+        text-decoration: none;
+        transition: color 180ms ease;
+        display: inline-block;
+        padding: 4px 0;
+        min-height: 32px;
+      }
+      .link-action::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 1px;
+        width: 0;
+        background: currentColor;
+        transition: width 220ms ease;
+      }
+      .link-action:hover::after,
+      .link-action:focus-visible::after {
+        width: 100%;
+      }
+      .link-action:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 3px;
+        border-radius: 2px;
+      }
+      .link-action .arrow {
+        display: inline-block;
+        margin-left: 4px;
+        transition: transform 220ms ease;
+      }
+      .link-action:hover .arrow,
+      .link-action:focus-visible .arrow {
+        transform: translateX(2px);
+      }
 
-  @media (prefers-reduced-motion: reduce) {
-    .b4-mount-fade { animation: none !important; opacity: 1 !important; transform: none !important; }
-    .sk-v1 { animation: none !important; }
-    .link-action { transition: none !important; }
-    .link-action::after { transition: none !important; width: 0 !important; }
-    .link-action .arrow { transition: none !important; }
-  }
-</style>
-</head>
-<body>
-
-<header class="mx-auto max-w-6xl px-6 pt-10 pb-5">
-  <p class="text-[11px] tracking-[0.28em] uppercase mb-3" style="color: var(--muted-foreground);">Epic B · b4 · InsufficientScopeView (403) · Wireframe</p>
-  <h1 class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]">v2 — <span class="italic" style="color: var(--primary);">Balanced.</span></h1>
-  <p class="text-sm leading-6 mt-3 max-w-2xl" style="color: var(--muted-foreground);">Balanced <code>max-w-xl</code> · 40px key-ring glyph · medium step spacing. Expected default. 403 Champagne Gold step-border (the one color-pop); Mulberry Dusk numerals for AA.</p>
-</header>
-
-<!-- ════════════════ DESKTOP ════════════════ -->
-<div class="vp vp-desktop">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Desktop · 1280px</span><span class="tag">403 · max-w-xl</span></div>
-
-  <main class="mx-auto max-w-6xl px-6 pt-20 pb-16 min-h-[640px] grid place-items-center">
-    <section data-component="InsufficientScopeView"
-             class="b4-mount-fade relative max-w-xl w-full"
-             role="status" aria-live="polite" aria-labelledby="insuff-scope-heading">
-      <aside class="anno pin">component: InsufficientScopeView · role=status · 403 · max-w-xl</aside>
-
-      <!-- Key-ring with missing key (40px) -->
-      <div class="flex justify-center mb-6">
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none"
-             stroke="var(--muted-foreground)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-             aria-hidden="true">
-          <!-- Keyring -->
-          <circle cx="20" cy="13" r="4"/>
-          <!-- Present key 1 (left) -->
-          <path d="M15 18l-4 2.5v4l-1.5 1.5 1.5 1.5M11 23h-1.5"/>
-          <!-- Present key 2 (right) -->
-          <path d="M25 18l4 2.5v4l1.5 1.5-1.5 1.5M29 23h1.5"/>
-          <!-- Missing key slot (dashed empty loop below) -->
-          <path d="M17 18l1 4a2 2 0 1 1-1.5 3" stroke-dasharray="2.5 2.5"/>
-          <!-- Gap indicator dot -->
-          <circle cx="20" cy="28" r="0.8" fill="var(--muted-foreground)" stroke="none"/>
-        </svg>
-      </div>
-
-      <h1 id="insuff-scope-heading"
-          class="font-fraunces font-light text-4xl tracking-[-0.025em] leading-[1.08] text-center">
-        Pinterest needs <span class="italic" style="color: var(--primary);">broader access.</span>
-      </h1>
-
-      <p class="font-['Inter'] text-sm leading-6 mt-5 text-center max-w-md mx-auto" style="color: var(--muted-foreground);">
-        Your token is valid but missing read scopes. Re-issue with the scopes below.
+      @media (prefers-reduced-motion: reduce) {
+        .b4-mount-fade {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
+        .sk-v1 {
+          animation: none !important;
+        }
+        .link-action {
+          transition: none !important;
+        }
+        .link-action::after {
+          transition: none !important;
+          width: 0 !important;
+        }
+        .link-action .arrow {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="mx-auto max-w-6xl px-6 pt-10 pb-5">
+      <p
+        class="text-[11px] tracking-[0.28em] uppercase mb-3"
+        style="color: var(--muted-foreground)"
+      >
+        Epic B · b4 · InsufficientScopeView (403) · Wireframe
       </p>
+      <h1
+        class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+      >
+        v2 — <span class="italic" style="color: var(--primary)">Balanced.</span>
+      </h1>
+      <p
+        class="text-sm leading-6 mt-3 max-w-2xl"
+        style="color: var(--muted-foreground)"
+      >
+        Balanced <code>max-w-xl</code> · 40px key-ring glyph · medium step
+        spacing. Expected default. 403 Champagne Gold step-border (the one
+        color-pop); Mulberry Dusk numerals for AA.
+      </p>
+    </header>
 
-      <ol data-component="RemediationSteps" class="mt-10 space-y-5">
-        <aside class="anno pin">component: RemediationSteps · Mulberry numerals + Champagne Gold border (403)</aside>
+    <!-- ════════════════ DESKTOP ════════════════ -->
+    <div class="vp vp-desktop">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Desktop · 1280px</span
+        ><span class="tag">403 · max-w-xl</span>
+      </div>
 
-        <li class="flex gap-5 items-start">
-          <span class="step-n" aria-hidden="true">1</span>
-          <div class="text-sm leading-6 pt-1">
-            Open the
-            <a href="https://developers.pinterest.com/apps/" target="_blank" rel="noopener noreferrer"
-               class="link-action"
-               aria-label="Open Pinterest developer dashboard — opens in new tab">Pinterest developer dashboard<span class="arrow" aria-hidden="true">→</span></a>.
+      <main
+        class="mx-auto max-w-6xl px-6 pt-20 pb-16 min-h-[640px] grid place-items-center"
+      >
+        <section
+          data-component="InsufficientScopeView"
+          class="b4-mount-fade relative max-w-xl w-full"
+          role="status"
+          aria-live="polite"
+          aria-labelledby="insuff-scope-heading"
+        >
+          <aside class="anno pin">
+            component: InsufficientScopeView · role=status · 403 · max-w-xl
+          </aside>
+
+          <!-- Key-ring with missing key (40px) -->
+          <div class="flex justify-center mb-6">
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 40 40"
+              fill="none"
+              stroke="var(--muted-foreground)"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <!-- Keyring -->
+              <circle cx="20" cy="13" r="4" />
+              <!-- Present key 1 (left) -->
+              <path d="M15 18l-4 2.5v4l-1.5 1.5 1.5 1.5M11 23h-1.5" />
+              <!-- Present key 2 (right) -->
+              <path d="M25 18l4 2.5v4l1.5 1.5-1.5 1.5M29 23h1.5" />
+              <!-- Missing key slot (dashed empty loop below) -->
+              <path d="M17 18l1 4a2 2 0 1 1-1.5 3" stroke-dasharray="2.5 2.5" />
+              <!-- Gap indicator dot -->
+              <circle
+                cx="20"
+                cy="28"
+                r="0.8"
+                fill="var(--muted-foreground)"
+                stroke="none"
+              />
+            </svg>
           </div>
-        </li>
 
-        <li class="flex gap-5 items-start">
-          <span class="step-n" aria-hidden="true">2</span>
-          <div class="text-sm leading-6 pt-1">Re-issue the token with <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12.5px;">boards:read</code> + <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12.5px;">pins:read</code>.</div>
-        </li>
+          <h1
+            id="insuff-scope-heading"
+            class="font-fraunces font-light text-4xl tracking-[-0.025em] leading-[1.08] text-center"
+          >
+            Pinterest needs
+            <span class="italic" style="color: var(--primary)"
+              >broader access.</span
+            >
+          </h1>
 
-        <li class="flex gap-5 items-start">
-          <span class="step-n" aria-hidden="true">3</span>
-          <div class="text-sm leading-6 pt-1">Update <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12.5px;">PINTEREST_ACCESS_TOKEN</code> in Vercel project settings.</div>
-        </li>
+          <p
+            class="font-['Inter'] text-sm leading-6 mt-5 text-center max-w-md mx-auto"
+            style="color: var(--muted-foreground)"
+          >
+            Your token is valid but missing read scopes. Re-issue with the
+            scopes below.
+          </p>
 
-        <li class="flex gap-5 items-start">
-          <span class="step-n" aria-hidden="true">4</span>
-          <div class="text-sm leading-6 pt-1">Redeploy.</div>
-        </li>
-      </ol>
-    </section>
-  </main>
-</div>
+          <ol data-component="RemediationSteps" class="mt-10 space-y-5">
+            <aside class="anno pin">
+              component: RemediationSteps · Mulberry numerals + Champagne Gold
+              border (403)
+            </aside>
 
-<!-- ════════════════ TABLET ════════════════ -->
-<div class="vp vp-tablet">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Tablet · 768px</span><span class="tag">403 · max-w-xl</span></div>
-  <main class="mx-auto max-w-6xl px-6 pt-14 pb-12 min-h-[540px] grid place-items-center">
-    <section data-component="InsufficientScopeView" class="b4-mount-fade relative max-w-xl w-full"
-             role="status" aria-live="polite" aria-labelledby="insuff-scope-heading-t">
-      <div class="flex justify-center mb-6">
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="20" cy="13" r="4"/>
-          <path d="M15 18l-4 2.5v4l-1.5 1.5 1.5 1.5M11 23h-1.5"/>
-          <path d="M25 18l4 2.5v4l1.5 1.5-1.5 1.5M29 23h1.5"/>
-          <path d="M17 18l1 4a2 2 0 1 1-1.5 3" stroke-dasharray="2.5 2.5"/>
-          <circle cx="20" cy="28" r="0.8" fill="var(--muted-foreground)" stroke="none"/>
-        </svg>
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">1</span>
+              <div class="text-sm leading-6 pt-1">
+                Open the
+                <a
+                  href="https://developers.pinterest.com/apps/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link-action"
+                  aria-label="Open Pinterest developer dashboard — opens in new tab"
+                  >Pinterest developer dashboard<span
+                    class="arrow"
+                    aria-hidden="true"
+                    >→</span
+                  ></a
+                >.
+              </div>
+            </li>
+
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">2</span>
+              <div class="text-sm leading-6 pt-1">
+                Re-issue the token with
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12.5px;
+                  "
+                  >boards:read</code
+                >
+                +
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12.5px;
+                  "
+                  >pins:read</code
+                >.
+              </div>
+            </li>
+
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">3</span>
+              <div class="text-sm leading-6 pt-1">
+                Update
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12.5px;
+                  "
+                  >PINTEREST_ACCESS_TOKEN</code
+                >
+                in Vercel project settings.
+              </div>
+            </li>
+
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">4</span>
+              <div class="text-sm leading-6 pt-1">Redeploy.</div>
+            </li>
+          </ol>
+        </section>
+      </main>
+    </div>
+
+    <!-- ════════════════ TABLET ════════════════ -->
+    <div class="vp vp-tablet">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Tablet · 768px</span
+        ><span class="tag">403 · max-w-xl</span>
       </div>
-      <h1 id="insuff-scope-heading-t" class="font-fraunces font-light text-4xl tracking-[-0.025em] leading-[1.08] text-center">
-        Pinterest needs <span class="italic" style="color: var(--primary);">broader access.</span>
-      </h1>
-      <p class="text-sm leading-6 mt-5 text-center max-w-md mx-auto" style="color: var(--muted-foreground);">Your token is valid but missing read scopes. Re-issue with the scopes below.</p>
-      <ol data-component="RemediationSteps" class="mt-10 space-y-5">
-        <li class="flex gap-5 items-start"><span class="step-n" aria-hidden="true">1</span><div class="text-sm leading-6 pt-1">Open the <a href="#" class="link-action" aria-label="Open Pinterest developer dashboard — opens in new tab">Pinterest developer dashboard<span class="arrow" aria-hidden="true">→</span></a>.</div></li>
-        <li class="flex gap-5 items-start"><span class="step-n" aria-hidden="true">2</span><div class="text-sm leading-6 pt-1">Re-issue the token with <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12.5px;">boards:read</code> + <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12.5px;">pins:read</code>.</div></li>
-        <li class="flex gap-5 items-start"><span class="step-n" aria-hidden="true">3</span><div class="text-sm leading-6 pt-1">Update <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12.5px;">PINTEREST_ACCESS_TOKEN</code> in Vercel project settings.</div></li>
-        <li class="flex gap-5 items-start"><span class="step-n" aria-hidden="true">4</span><div class="text-sm leading-6 pt-1">Redeploy.</div></li>
-      </ol>
-    </section>
-  </main>
-</div>
+      <main
+        class="mx-auto max-w-6xl px-6 pt-14 pb-12 min-h-[540px] grid place-items-center"
+      >
+        <section
+          data-component="InsufficientScopeView"
+          class="b4-mount-fade relative max-w-xl w-full"
+          role="status"
+          aria-live="polite"
+          aria-labelledby="insuff-scope-heading-t"
+        >
+          <div class="flex justify-center mb-6">
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 40 40"
+              fill="none"
+              stroke="var(--muted-foreground)"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="20" cy="13" r="4" />
+              <path d="M15 18l-4 2.5v4l-1.5 1.5 1.5 1.5M11 23h-1.5" />
+              <path d="M25 18l4 2.5v4l1.5 1.5-1.5 1.5M29 23h1.5" />
+              <path d="M17 18l1 4a2 2 0 1 1-1.5 3" stroke-dasharray="2.5 2.5" />
+              <circle
+                cx="20"
+                cy="28"
+                r="0.8"
+                fill="var(--muted-foreground)"
+                stroke="none"
+              />
+            </svg>
+          </div>
+          <h1
+            id="insuff-scope-heading-t"
+            class="font-fraunces font-light text-4xl tracking-[-0.025em] leading-[1.08] text-center"
+          >
+            Pinterest needs
+            <span class="italic" style="color: var(--primary)"
+              >broader access.</span
+            >
+          </h1>
+          <p
+            class="text-sm leading-6 mt-5 text-center max-w-md mx-auto"
+            style="color: var(--muted-foreground)"
+          >
+            Your token is valid but missing read scopes. Re-issue with the
+            scopes below.
+          </p>
+          <ol data-component="RemediationSteps" class="mt-10 space-y-5">
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">1</span>
+              <div class="text-sm leading-6 pt-1">
+                Open the
+                <a
+                  href="#"
+                  class="link-action"
+                  aria-label="Open Pinterest developer dashboard — opens in new tab"
+                  >Pinterest developer dashboard<span
+                    class="arrow"
+                    aria-hidden="true"
+                    >→</span
+                  ></a
+                >.
+              </div>
+            </li>
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">2</span>
+              <div class="text-sm leading-6 pt-1">
+                Re-issue the token with
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12.5px;
+                  "
+                  >boards:read</code
+                >
+                +
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12.5px;
+                  "
+                  >pins:read</code
+                >.
+              </div>
+            </li>
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">3</span>
+              <div class="text-sm leading-6 pt-1">
+                Update
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12.5px;
+                  "
+                  >PINTEREST_ACCESS_TOKEN</code
+                >
+                in Vercel project settings.
+              </div>
+            </li>
+            <li class="flex gap-5 items-start">
+              <span class="step-n" aria-hidden="true">4</span>
+              <div class="text-sm leading-6 pt-1">Redeploy.</div>
+            </li>
+          </ol>
+        </section>
+      </main>
+    </div>
 
-<!-- ════════════════ MOBILE ════════════════ -->
-<div class="vp vp-mobile">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Mobile · 375px</span><span class="tag">403</span></div>
-  <main class="mx-auto px-5 pt-12 pb-10 min-h-[520px] grid place-items-center">
-    <section data-component="InsufficientScopeView" class="b4-mount-fade relative w-full"
-             role="status" aria-live="polite" aria-labelledby="insuff-scope-heading-m">
-      <div class="flex justify-center mb-5">
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="20" cy="13" r="4"/>
-          <path d="M15 18l-4 2.5v4l-1.5 1.5 1.5 1.5M11 23h-1.5"/>
-          <path d="M25 18l4 2.5v4l1.5 1.5-1.5 1.5M29 23h1.5"/>
-          <path d="M17 18l1 4a2 2 0 1 1-1.5 3" stroke-dasharray="2.5 2.5"/>
-          <circle cx="20" cy="28" r="0.8" fill="var(--muted-foreground)" stroke="none"/>
-        </svg>
+    <!-- ════════════════ MOBILE ════════════════ -->
+    <div class="vp vp-mobile">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Mobile · 375px</span
+        ><span class="tag">403</span>
       </div>
-      <h1 id="insuff-scope-heading-m" class="font-fraunces font-light text-[28px] tracking-[-0.02em] leading-[1.1] text-center">
-        Pinterest needs <span class="italic" style="color: var(--primary);">broader access.</span>
-      </h1>
-      <p class="text-sm leading-6 mt-4 text-center" style="color: var(--muted-foreground);">Your token is valid but missing read scopes.</p>
-      <ol data-component="RemediationSteps" class="mt-8 space-y-4">
-        <li class="flex gap-4 items-start"><span class="step-n" aria-hidden="true">1</span><div class="text-sm leading-6 pt-1">Open the <a href="#" class="link-action" aria-label="Open Pinterest developer dashboard — opens in new tab">Pinterest developer dashboard<span class="arrow" aria-hidden="true">→</span></a>.</div></li>
-        <li class="flex gap-4 items-start"><span class="step-n" aria-hidden="true">2</span><div class="text-sm leading-6 pt-1">Re-issue with <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12px;">boards:read</code> + <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12px;">pins:read</code>.</div></li>
-        <li class="flex gap-4 items-start"><span class="step-n" aria-hidden="true">3</span><div class="text-sm leading-6 pt-1">Update <code class="px-1.5 py-0.5 rounded" style="background: var(--card); color: var(--primary); font-size: 12px;">PINTEREST_ACCESS_TOKEN</code> in Vercel.</div></li>
-        <li class="flex gap-4 items-start"><span class="step-n" aria-hidden="true">4</span><div class="text-sm leading-6 pt-1">Redeploy.</div></li>
-      </ol>
-    </section>
-  </main>
-</div>
+      <main
+        class="mx-auto px-5 pt-12 pb-10 min-h-[520px] grid place-items-center"
+      >
+        <section
+          data-component="InsufficientScopeView"
+          class="b4-mount-fade relative w-full"
+          role="status"
+          aria-live="polite"
+          aria-labelledby="insuff-scope-heading-m"
+        >
+          <div class="flex justify-center mb-5">
+            <svg
+              width="36"
+              height="36"
+              viewBox="0 0 40 40"
+              fill="none"
+              stroke="var(--muted-foreground)"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="20" cy="13" r="4" />
+              <path d="M15 18l-4 2.5v4l-1.5 1.5 1.5 1.5M11 23h-1.5" />
+              <path d="M25 18l4 2.5v4l1.5 1.5-1.5 1.5M29 23h1.5" />
+              <path d="M17 18l1 4a2 2 0 1 1-1.5 3" stroke-dasharray="2.5 2.5" />
+              <circle
+                cx="20"
+                cy="28"
+                r="0.8"
+                fill="var(--muted-foreground)"
+                stroke="none"
+              />
+            </svg>
+          </div>
+          <h1
+            id="insuff-scope-heading-m"
+            class="font-fraunces font-light text-[28px] tracking-[-0.02em] leading-[1.1] text-center"
+          >
+            Pinterest needs
+            <span class="italic" style="color: var(--primary)"
+              >broader access.</span
+            >
+          </h1>
+          <p
+            class="text-sm leading-6 mt-4 text-center"
+            style="color: var(--muted-foreground)"
+          >
+            Your token is valid but missing read scopes.
+          </p>
+          <ol data-component="RemediationSteps" class="mt-8 space-y-4">
+            <li class="flex gap-4 items-start">
+              <span class="step-n" aria-hidden="true">1</span>
+              <div class="text-sm leading-6 pt-1">
+                Open the
+                <a
+                  href="#"
+                  class="link-action"
+                  aria-label="Open Pinterest developer dashboard — opens in new tab"
+                  >Pinterest developer dashboard<span
+                    class="arrow"
+                    aria-hidden="true"
+                    >→</span
+                  ></a
+                >.
+              </div>
+            </li>
+            <li class="flex gap-4 items-start">
+              <span class="step-n" aria-hidden="true">2</span>
+              <div class="text-sm leading-6 pt-1">
+                Re-issue with
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12px;
+                  "
+                  >boards:read</code
+                >
+                +
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12px;
+                  "
+                  >pins:read</code
+                >.
+              </div>
+            </li>
+            <li class="flex gap-4 items-start">
+              <span class="step-n" aria-hidden="true">3</span>
+              <div class="text-sm leading-6 pt-1">
+                Update
+                <code
+                  class="px-1.5 py-0.5 rounded"
+                  style="
+                    background: var(--card);
+                    color: var(--primary);
+                    font-size: 12px;
+                  "
+                  >PINTEREST_ACCESS_TOKEN</code
+                >
+                in Vercel.
+              </div>
+            </li>
+            <li class="flex gap-4 items-start">
+              <span class="step-n" aria-hidden="true">4</span>
+              <div class="text-sm leading-6 pt-1">Redeploy.</div>
+            </li>
+          </ol>
+        </section>
+      </main>
+    </div>
 
-<footer class="mx-auto max-w-6xl px-6 py-10 text-[11px] tracking-[0.22em] uppercase" style="color: var(--muted-foreground);">
-  b4 v2 · InsufficientScopeView (403) · balanced · max-w-xl · 40px key-ring glyph · Champagne Gold border · Option C · expected default
-</footer>
-
-</body>
+    <footer
+      class="mx-auto max-w-6xl px-6 py-10 text-[11px] tracking-[0.22em] uppercase"
+      style="color: var(--muted-foreground)"
+    >
+      b4 v2 · InsufficientScopeView (403) · balanced · max-w-xl · 40px key-ring
+      glyph · Champagne Gold border · Option C · expected default
+    </footer>
+  </body>
 </html>

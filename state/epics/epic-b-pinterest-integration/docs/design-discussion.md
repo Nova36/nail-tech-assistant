@@ -3,10 +3,12 @@
 Epic B is the browse-only Pinterest slice. The goal is to let the authenticated user open a Pinterest area inside the app, see their boards, click a board, and see that board's pins using one configured static access token. (Source: `state/planning/prd.md`, `state/planning/sign-off.md`)
 
 The user-story framing is straightforward:
+
 - US-B-1 says the app should use the configured Pinterest account without a user OAuth step, and block the route with token-replacement guidance if the token is missing, revoked, or invalid. (Source: `state/planning/prd.md`)
 - US-B-2 says the user should see a board grid, select a board, and then see that board's pin grid. (Source: `state/planning/prd.md`)
 
 What "done" looks like to me:
+
 - `/pinterest` loads inside the authenticated shell and renders boards from Pinterest.
 - `/pinterest/[boardId]` loads pins for the selected board.
 - Invalid or revoked token states do not pretend the integration is healthy.
@@ -14,6 +16,7 @@ What "done" looks like to me:
 - The Pinterest UI feels like an extension of Epic A's authenticated shell, not a separate mini-app. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 
 Explicit non-goals:
+
 - No OAuth authorize/callback flow.
 - No token refresh flow.
 - No client secret usage.
@@ -28,36 +31,42 @@ The tricky part is that "static token" really means "manual env-managed token," 
 ## 2. What I Found
 
 Epic A already did a lot of the heavy lifting:
+
 - `middleware.ts` already protects `/pinterest`-shaped routes through the existing authenticated shell matcher. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 - `app/(authenticated)/layout.tsx` already gives us the shell wrapper and container.
 - `lib/env.ts` already validates `env.PINTEREST_ACCESS_TOKEN` at module load.
 - `lib/firebase/server.ts` already demonstrates the `import 'server-only';` pattern Epic B should copy. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`, `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 
 Pinterest scope is intentionally narrow:
+
 - Auth is `Authorization: Bearer {token}` against `https://api.pinterest.com/v5`.
 - The three browse-relevant endpoints are `GET /v5/user_account`, `GET /v5/boards`, and `GET /v5/boards/{board_id}/pins`.
 - Pagination is cursor-based through `bookmark`.
 - `401`, `403`, `404`, `429`, and generic `5xx` are the important error classes for the UX. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 
 The current research points to server-side fetches as the right default:
+
 - Keep Pinterest calls in server code only.
 - Use native `fetch`.
 - Default to `cache: 'no-store'` for Slice 2.
 - Add `i.pinimg.com` to `next.config.ts` if using `next/image`. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`, `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 
 The researcher flagged four concrete gaps, and I agree they are real:
+
 1. `components/` does not exist yet, so Epic B has to bootstrap its own presentational directory. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 2. `lib/utils.ts` is missing, so the common shadcn-style `cn()` helper is not available if we want that pattern. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 3. `PINTEREST_APP_ID` exists in `.env.example` but is not represented in `lib/env.ts`, which means env docs and env schema are out of sync. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`, `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 4. The structured outline omits `app/(authenticated)/pinterest/[boardId]/page.tsx`, which is a critical miss because US-B-2 explicitly requires board-detail routing. (Source: `state/planning/structured-outline.md`, `state/planning/prd.md`)
 
 I also found one architecture fork that needs a decision:
+
 - The outline names API passthrough routes and also implies server-component page fetching.
 - The research explicitly calls this redundant and recommends resolving it before implementation. (Source: `state/planning/structured-outline.md`, `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 
 My read is that the simplest thing is best here: fetch Pinterest directly in server components via a small server-only client module, and skip API route indirection unless a later client-side feature actually needs it.
 
 There are a few data-confidence caveats worth keeping visible:
+
 - Exact `GET /v5/boards` field coverage, especially board cover-image naming, is only medium confidence.
 - Static-token TTL is not fully confirmed for dashboard-generated tokens.
 - Pinterest's full error-code enum beyond `code: 2` was not provided. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`, `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
@@ -67,33 +76,39 @@ There are a few data-confidence caveats worth keeping visible:
 I think we should implement this as a server-rendered, two-route browse surface with a thin Pinterest integration layer.
 
 Core fetch pattern:
+
 - Create `lib/pinterest/client.ts` and open it with `import 'server-only';`.
 - Read `env.PINTEREST_ACCESS_TOKEN` only inside that server-only module.
 - Expose small functions like `verifyPinterestToken()`, `listPinterestBoards()`, and `listPinterestBoardPins()`.
 - Normalize HTTP failures into typed errors instead of leaking raw `fetch` semantics everywhere. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 
 Module shape:
+
 - `lib/pinterest/client.ts`
 - `lib/pinterest/types.ts`
 - `lib/pinterest/errors.ts`
 
 I want those three modules because they separate concerns cleanly:
+
 - `client.ts` handles HTTP and auth header construction.
 - `types.ts` captures the response shapes we actually use.
 - `errors.ts` gives the pages and boundaries a stable contract for invalid token, not found, rate limit, and generic failure states.
 
 Route shape:
+
 - `app/(authenticated)/pinterest/page.tsx` for the board grid.
 - `app/(authenticated)/pinterest/[boardId]/page.tsx` for the pin grid.
 
 That route pair lines up directly with US-B-2 and avoids forcing everything through API routes that the page itself does not need. (Source: `state/planning/prd.md`)
 
 Boundary shape:
+
 - `app/(authenticated)/pinterest/error.tsx`
 - `app/(authenticated)/pinterest/not-found.tsx`
 - Optional local `app/(authenticated)/pinterest/[boardId]/not-found.tsx` if we want a board-specific message. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`, `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 
 I would build in this order:
+
 1. `lib/pinterest/{types,errors,client}.ts`
 2. `next.config.ts` image allowlist edit
 3. `app/(authenticated)/pinterest/page.tsx`
@@ -103,6 +118,7 @@ I would build in this order:
 7. Tests for token handling and browse rendering
 
 For components, I would bootstrap `components/pinterest/` and keep the MVP plain Tailwind-first:
+
 - `components/pinterest/BoardGrid.tsx`
 - `components/pinterest/PinGrid.tsx`
 - `components/pinterest/TokenReplacementGuidance.tsx`
@@ -110,11 +126,13 @@ For components, I would bootstrap `components/pinterest/` and keep the MVP plain
 On `lib/utils.ts`: my opinion is to defer it unless we actually adopt shadcn primitives in this slice. The dashboard already uses plain Tailwind, and the research says no primitives are installed yet. So I would not create `cn()` just because `components.json` points there. If you want shadcn conventions normalized early, we can add `lib/utils.ts` now, but I don't think Slice 2 needs it. (Source: `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 
 For the pin layout, I think we should commit to a uniform grid with padding for MVP.
+
 - Reason: it is simpler to implement, easier to make stable with `next/image`, and easier to keep aligned with the existing card-heavy authenticated shell.
 - Upgrade path: masonry remains available later if we decide the Pinterest feel matters more than implementation simplicity.
 - This is an opinion, not a hard requirement, and I want the user to explicitly confirm or override it.
 
 I would also keep pagination conservative:
+
 - Carry `bookmark` through the client layer.
 - Render the first page only in the initial implementation.
 - Add a "Load more" control before considering infinite scroll.
@@ -154,25 +172,30 @@ Mitigation: explicit empty-state copy on `/pinterest` and `/pinterest/[boardId]`
 ## 5. Dependencies and Constraints
 
 Epic A already constrains the implementation in useful ways:
+
 - `middleware.ts` already protects `/pinterest*`.
 - The authenticated shell already exists.
 - `env.PINTEREST_ACCESS_TOKEN` is already validated at module load. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 
 There is also a user-owned prerequisite:
+
 - A Pinterest developer app must already exist.
 - A static token must be generated.
 - That token must be pasted into Vercel env config.
 - The sign-off says that prerequisite path is already the chosen operating model. (Source: `state/planning/sign-off.md`)
 
 One existing Epic A file will need a small follow-up edit:
+
 - `next.config.ts` needs `remotePatterns` for `i.pinimg.com`. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 
 Dependency-wise, this slice stays light:
+
 - No new npm dependencies are required.
 - Native `fetch` is enough in Next 15.
 - No Pinterest SDK is needed. (Source: `state/epics/epic-b-pinterest-integration/docs/research-raw-findings.md`)
 
 Constraint worth repeating:
+
 - Sign-off #17 explicitly rules out OAuth callback, refresh, and client secret usage, so any design that starts drifting toward those is out of scope by definition. (Source: `state/planning/sign-off.md`)
 
 ## 6. Open Questions
@@ -194,6 +217,7 @@ Constraint worth repeating:
 The researcher called this small-to-medium. My reading is: medium, but only barely.
 
 Small signals:
+
 - Roughly one narrow API surface.
 - No OAuth.
 - No token refresh.
@@ -202,6 +226,7 @@ Small signals:
 - The browse contract is just boards plus board-detail pins. (Source: `state/epics/epic-b-pinterest-integration/docs/research-brief.md`)
 
 Medium signals:
+
 - We still need two user-facing routes, not one.
 - Error and not-found boundaries matter.
 - Token-revocation UX is load-bearing for US-B-1 acceptance, not polish.

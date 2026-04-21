@@ -10,18 +10,19 @@
 
 ## Variation summary
 
-| | **v1 — Intimate** | **v2 — Balanced** | **v3 — Confident** |
-|---|---|---|---|
-| Container | `max-w-md` (448px) | `max-w-xl` (576px) | `max-w-2xl` (672px) |
-| Glyph size | 32px | 40px | 48px |
-| Step-counter circle | 28px, 12px numeral | 32px, 13px numeral | 36px, 14px numeral |
-| Step vertical gap | `space-y-4` (16px) | `space-y-5` (20px) | `space-y-7` (28px) |
-| Eyebrow above heading | — | — | "Token status" |
-| Heading size (desktop) | `text-3xl` (30px) | `text-4xl` (36px) | `text-5xl` (48px) |
-| Body copy size | `text-sm` (14px) | `text-sm` (14px) | `text-[15px]` |
-| Vibe | Tight, debug-focused | Calm, confident | Expansive, premium |
+|                        | **v1 — Intimate**    | **v2 — Balanced**  | **v3 — Confident**  |
+| ---------------------- | -------------------- | ------------------ | ------------------- |
+| Container              | `max-w-md` (448px)   | `max-w-xl` (576px) | `max-w-2xl` (672px) |
+| Glyph size             | 32px                 | 40px               | 48px                |
+| Step-counter circle    | 28px, 12px numeral   | 32px, 13px numeral | 36px, 14px numeral  |
+| Step vertical gap      | `space-y-4` (16px)   | `space-y-5` (20px) | `space-y-7` (28px)  |
+| Eyebrow above heading  | —                    | —                  | "Token status"      |
+| Heading size (desktop) | `text-3xl` (30px)    | `text-4xl` (36px)  | `text-5xl` (48px)   |
+| Body copy size         | `text-sm` (14px)     | `text-sm` (14px)   | `text-[15px]`       |
+| Vibe                   | Tight, debug-focused | Calm, confident    | Expansive, premium  |
 
 **Constant across all three (Option C rule adherence):**
+
 - One italic accent word ("fresh token")
 - One icon glyph (disconnected-link)
 - `.b4-mount-fade` fade-in at 240ms + 6px translateY
@@ -35,69 +36,72 @@
 
 ## Scorecard
 
-| Criterion | v1 — Intimate | v2 — Balanced | v3 — Confident |
-|---|---|---|---|
-| Brief fidelity | 5 | 5 | 5 |
-| Option C tone adherence | 5 | 5 | 5 |
-| Layout polish | 3 | **5** | 4 |
-| Accessibility (15-pt) | 5 | 5 | 5 |
-| Motion (10-pt) | 5 | 5 | 5 |
-| Operator-task-fit (can Don fix his token at midnight in one glance?) | **5** | **5** | 4 |
-| **Total** | **28/30** | **30/30** | **28/30** |
+| Criterion                                                            | v1 — Intimate | v2 — Balanced | v3 — Confident |
+| -------------------------------------------------------------------- | ------------- | ------------- | -------------- |
+| Brief fidelity                                                       | 5             | 5             | 5              |
+| Option C tone adherence                                              | 5             | 5             | 5              |
+| Layout polish                                                        | 3             | **5**         | 4              |
+| Accessibility (15-pt)                                                | 5             | 5             | 5              |
+| Motion (10-pt)                                                       | 5             | 5             | 5              |
+| Operator-task-fit (can Don fix his token at midnight in one glance?) | **5**         | **5**         | 4              |
+| **Total**                                                            | **28/30**     | **30/30**     | **28/30**      |
 
 ---
 
 ## 15-point a11y audit (summary, pass/fail)
 
-| # | Check | v1 | v2 | v3 |
-|---|---|---|---|---|
-| 1 | `<main>` wraps content, unique | ✓ | ✓ | ✓ |
-| 2 | Single `<h1>` Fraunces italic accent | ✓ | ✓ | ✓ |
-| 3 | PinCard aria-label pattern — n/a for b4 | — | — | — |
-| 4 | Alt text for images — n/a (glyph is aria-hidden) | — | — | — |
-| 5 | Decorative glyph `aria-hidden="true"` | ✓ | ✓ | ✓ |
-| 6 | Taupe-Mist copy darkened to `#6F625C` | ✓ | ✓ | ✓ |
-| 7 | **Step numerals use Mulberry Dusk (not Champagne Gold)** — Fix (b) | ✓ | ✓ | ✓ |
-| 8 | Destructive — n/a for b4 | — | — | — |
-| 9 | `aria-live` on appending grid — n/a for b4 | — | — | — |
-| 10 | `role="status" aria-live="polite"` on the section wrapper | ✓ | ✓ | ✓ |
-| 11 | Focus rings `var(--ring)` + offset | ✓ | ✓ | ✓ |
-| 12 | Touch targets ≥ 44px on interactive; inline link-action ≥ 32px | ✓ | ✓ | ✓ |
-| 13 | New-tab link has `rel="noopener noreferrer"` + aria-label suffix | ✓ | ✓ | ✓ |
-| 14 | `.link-action` grow fires on `:focus-visible` (keyboard parity) | ✓ | ✓ | ✓ |
-| 15 | `prefers-reduced-motion` covers `.b4-mount-fade`, shimmer, `.link-action`, `.arrow` | ✓ | ✓ | ✓ |
+| #   | Check                                                                               | v1  | v2  | v3  |
+| --- | ----------------------------------------------------------------------------------- | --- | --- | --- |
+| 1   | `<main>` wraps content, unique                                                      | ✓   | ✓   | ✓   |
+| 2   | Single `<h1>` Fraunces italic accent                                                | ✓   | ✓   | ✓   |
+| 3   | PinCard aria-label pattern — n/a for b4                                             | —   | —   | —   |
+| 4   | Alt text for images — n/a (glyph is aria-hidden)                                    | —   | —   | —   |
+| 5   | Decorative glyph `aria-hidden="true"`                                               | ✓   | ✓   | ✓   |
+| 6   | Taupe-Mist copy darkened to `#6F625C`                                               | ✓   | ✓   | ✓   |
+| 7   | **Step numerals use Mulberry Dusk (not Champagne Gold)** — Fix (b)                  | ✓   | ✓   | ✓   |
+| 8   | Destructive — n/a for b4                                                            | —   | —   | —   |
+| 9   | `aria-live` on appending grid — n/a for b4                                          | —   | —   | —   |
+| 10  | `role="status" aria-live="polite"` on the section wrapper                           | ✓   | ✓   | ✓   |
+| 11  | Focus rings `var(--ring)` + offset                                                  | ✓   | ✓   | ✓   |
+| 12  | Touch targets ≥ 44px on interactive; inline link-action ≥ 32px                      | ✓   | ✓   | ✓   |
+| 13  | New-tab link has `rel="noopener noreferrer"` + aria-label suffix                    | ✓   | ✓   | ✓   |
+| 14  | `.link-action` grow fires on `:focus-visible` (keyboard parity)                     | ✓   | ✓   | ✓   |
+| 15  | `prefers-reduced-motion` covers `.b4-mount-fade`, shimmer, `.link-action`, `.arrow` | ✓   | ✓   | ✓   |
 
 ---
 
 ## 10-point animations audit (summary, pass/fail)
 
-| # | Check | v1 | v2 | v3 |
-|---|---|---|---|---|
-| 1 | Compositor-only animated properties (opacity, transform) | ✓ | ✓ | ✓ |
-| 2 | Every `@keyframes` has a reduced-motion override | ✓ | ✓ | ✓ |
-| 3 | Reduced-motion renders content instantly + complete | ✓ | ✓ | ✓ |
-| 4 | Hover uses `transform` (arrow `translateX`) | ✓ | ✓ | ✓ |
-| 5 | Shimmer scoped to `.sk-v1` skeleton only (v2 shows isolated loading sliver) | ✓ | ✓ | ✓ |
-| 6 | Stagger — n/a for b4 (no per-step stagger per Option C rule 4) | — | — | — |
-| 7 | `will-change` unused on b4 surfaces | ✓ | ✓ | ✓ |
-| 8 | Durations in ladder (180/220/240) | ✓ | ✓ | ✓ |
-| 9 | No JS animation libraries | ✓ | ✓ | ✓ |
-| 10 | Icon glyph STATIC (animations-spec §5c) — no draw-in, no pulse | ✓ | ✓ | ✓ |
+| #   | Check                                                                       | v1  | v2  | v3  |
+| --- | --------------------------------------------------------------------------- | --- | --- | --- |
+| 1   | Compositor-only animated properties (opacity, transform)                    | ✓   | ✓   | ✓   |
+| 2   | Every `@keyframes` has a reduced-motion override                            | ✓   | ✓   | ✓   |
+| 3   | Reduced-motion renders content instantly + complete                         | ✓   | ✓   | ✓   |
+| 4   | Hover uses `transform` (arrow `translateX`)                                 | ✓   | ✓   | ✓   |
+| 5   | Shimmer scoped to `.sk-v1` skeleton only (v2 shows isolated loading sliver) | ✓   | ✓   | ✓   |
+| 6   | Stagger — n/a for b4 (no per-step stagger per Option C rule 4)              | —   | —   | —   |
+| 7   | `will-change` unused on b4 surfaces                                         | ✓   | ✓   | ✓   |
+| 8   | Durations in ladder (180/220/240)                                           | ✓   | ✓   | ✓   |
+| 9   | No JS animation libraries                                                   | ✓   | ✓   | ✓   |
+| 10  | Icon glyph STATIC (animations-spec §5c) — no draw-in, no pulse              | ✓   | ✓   | ✓   |
 
 ---
 
 ## Gaps per rendition
 
 ### v1 — Intimate
+
 - **Compressed feel.** The narrow container makes the screen look terminal-like rather than a designed page. Good for experienced ops; less reassuring for a less technical operator.
 - Title `text-3xl` is quieter than the Fraunces hero moments established elsewhere in the app (dashboard is `text-6xl`, b2 winner uses `text-6xl` hero). The Fraunces hierarchy feels weaker here.
 - No spec violations.
 
 ### v2 — Balanced
+
 - **No gaps.** Hits Option C cleanly: max-w-xl lets the heading breathe, 40px glyph is visible but not dominant, `text-4xl` heading matches secondary-page hero scale elsewhere in the app.
 - Also includes a separate `TokenRemediationLoadingSkeleton` viewport so the shimmer-sliver transition contract is visible — paste-verbatim from base-template §5a.
 
 ### v3 — Confident
+
 - **Largest visual footprint.** 48px glyph + `text-5xl` heading start to feel like a landing-page announcement rather than a "you have a small fix to make" remediation. Right for a public-facing error; slightly overcooked for a private single-user operator screen.
 - **Eyebrow "Token status"** is a nice pattern but introduces a UI element that doesn't appear on any other b4 rendition — if Don picks v3, we should consider porting the eyebrow to b4-403 v3 for symmetry.
 - No critical spec violations.

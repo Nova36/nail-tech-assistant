@@ -3,6 +3,7 @@
 Lighter-touch story. Two renditions (v1, v2) for three states each: `EmptyBoardsState`, `EmptyBoardState`, `BrowseErrorRetry`. Not full Touchpoint 1 — addendum to the Epic B sweep.
 
 **Constant across both renditions (per spec):**
+
 - `role="status"` on empty states, `role="alert"` on BrowseErrorRetry.
 - Pushpin glyph `aria-hidden="true"`, 40px on desktop, Taupe-Mist stroke + Dusty-Rose decorative dot accent.
 - BrowseErrorRetry **heading uses Warm Charcoal** (NOT destructive red — destructive is reserved for destructive actions per brief).
@@ -16,12 +17,12 @@ Lighter-touch story. Two renditions (v1, v2) for three states each: `EmptyBoards
 
 ## Variation
 
-|  | **v1 — Centered** | **v2 — Composed** |
-|---|---|---|
-| Empty states alignment | Center | Left (5-col grid: 2 cols silhouette, 3 cols copy) |
+|                           | **v1 — Centered**                | **v2 — Composed**                                                   |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------- |
+| Empty states alignment    | Center                           | Left (5-col grid: 2 cols silhouette, 3 cols copy)                   |
 | Empty states illustration | Circle-with-dot pushpin (simple) | Dashed board-outline silhouette + fuller pushpin overlaid on corner |
-| Heading size (desktop) | `text-4xl` | `text-5xl` |
-| Feel | Quiet, simple, utility-leaning | More composed, more editorial, more Pinterest-evocative |
+| Heading size (desktop)    | `text-4xl`                       | `text-5xl`                                                          |
+| Feel                      | Quiet, simple, utility-leaning   | More composed, more editorial, more Pinterest-evocative             |
 
 `BrowseErrorRetry` is identical layout across v1 and v2 (the story asks for inline in-grid treatment; no room for much variation at the addendum scale).
 
@@ -29,14 +30,14 @@ Lighter-touch story. Two renditions (v1, v2) for three states each: `EmptyBoards
 
 ## Scorecard
 
-| Criterion | v1 — Centered | v2 — Composed |
-|---|---|---|
-| Brief fidelity | 5 | 5 |
-| Empty-state polish | 3 | **5** |
-| A11y adherence (15-pt relevant items) | 5 | 5 |
-| Motion adherence (10-pt) | 5 | 5 |
-| Cohesion with rest of Epic B (editorial brand tone) | 3 | **5** |
-| **Total** | **21/25** | **25/25** |
+| Criterion                                           | v1 — Centered | v2 — Composed |
+| --------------------------------------------------- | ------------- | ------------- |
+| Brief fidelity                                      | 5             | 5             |
+| Empty-state polish                                  | 3             | **5**         |
+| A11y adherence (15-pt relevant items)               | 5             | 5             |
+| Motion adherence (10-pt)                            | 5             | 5             |
+| Cohesion with rest of Epic B (editorial brand tone) | 3             | **5**         |
+| **Total**                                           | **21/25**     | **25/25**     |
 
 ---
 
@@ -69,10 +70,12 @@ Both renditions pass. Specifically:
 ## Gaps per rendition
 
 ### v1 — Centered
+
 - **Illustration is lightweight.** A simple circle-with-dot reads as a wireframe placeholder more than a deliberate illustration. Works as an MVP but doesn't match the editorial brand tone established by the dashboard + b2 winner.
 - **No compositional anchor.** Center-alignment with a small glyph feels under-designed compared to the Fraunces hero moments elsewhere. The empty state reads as a "sorry, nothing here" message rather than an invitation.
 
 ### v2 — Composed
+
 - **Silhouette overlap risk at narrow mobile widths** — the fuller pushpin overlays the silhouette's top-right corner, which at 375px width with large Fraunces headings below could feel cramped. Mobile treatment uses a constrained `max-w-[200px]` silhouette and 40px glyph to mitigate. Reviewed: layout holds.
 - **Slightly more visual weight** may be overkill for the "nothing's here" moment. Risk is minor — the content is editorial-leaning already.
 

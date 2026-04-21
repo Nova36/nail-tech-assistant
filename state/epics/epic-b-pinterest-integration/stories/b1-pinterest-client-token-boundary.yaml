@@ -36,13 +36,13 @@ description: |
   Uses `import 'server-only'` at the top of `lib/pinterest/client.ts`.
 
 acceptance_criteria:
-  - "Given the configured `PINTEREST_ACCESS_TOKEN` is valid, when `verifyPinterestToken()` runs against `GET /v5/user_account`, then it returns `{ ok: true }`."
+  - 'Given the configured `PINTEREST_ACCESS_TOKEN` is valid, when `verifyPinterestToken()` runs against `GET /v5/user_account`, then it returns `{ ok: true }`.'
   - "Given the configured token is missing or rejected with HTTP 401, when `verifyPinterestToken()` runs, then it returns `{ ok: false, reason: 'invalid_token' }` and does NOT throw."
   - "Given the token is valid but rejected with HTTP 403 (insufficient scope), when `verifyPinterestToken()` runs, then it returns `{ ok: false, reason: 'insufficient_scope' }` distinct from the 401 reason."
   - "Given a network failure (fetch reject) when calling Pinterest, when `verifyPinterestToken()` runs, then it returns `{ ok: false, reason: 'network' }` without throwing."
-  - "Given the project is built for production (`pnpm build` or equivalent), when a bundle-grep test scans `.next/static/**` (or the equivalent client-bundle output), then the string `pina_` is absent from every chunk."
-  - "Given the runtime env validation in `lib/env.ts` is the authoritative source for `PINTEREST_ACCESS_TOKEN`, when `.env.example` is inspected, then `PINTEREST_APP_ID` is no longer present."
-  - "Given `next.config.ts` is loaded, when the image config is evaluated, then `images.remotePatterns` includes `i.pinimg.com` so later board/pin media can render."
+  - 'Given the project is built for production (`pnpm build` or equivalent), when a bundle-grep test scans `.next/static/**` (or the equivalent client-bundle output), then the string `pina_` is absent from every chunk.'
+  - 'Given the runtime env validation in `lib/env.ts` is the authoritative source for `PINTEREST_ACCESS_TOKEN`, when `.env.example` is inspected, then `PINTEREST_APP_ID` is no longer present.'
+  - 'Given `next.config.ts` is loaded, when the image config is evaluated, then `images.remotePatterns` includes `i.pinimg.com` so later board/pin media can render.'
   - "Given the server-only client module, when any client component attempts to import it, then the import fails at build time (because of `import 'server-only'`)."
 
 steps:

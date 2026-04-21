@@ -6,14 +6,14 @@ complexity: small
 methodology: tdd
 depends_on: [b4-pinterest-token-remediation-views]
 deferred_eligible: true
-renditions: 2  # lighter touch per ui:major escalation "b5 includes a lighter ui-design step that produces an addendum rather than a full new brief"
+renditions: 2 # lighter touch per ui:major escalation "b5 includes a lighter ui-design step that produces an addendum rather than a full new brief"
 
 wireframes:
   touchpoint_1_status: APPROVED
-  approved_at: "2026-04-20"
+  approved_at: '2026-04-20'
   approved_by: don
   approved_rendition: state/wireframes/epic-b-pinterest-integration/b5-polish-and-smoke/v2.html
-  rationale: "v2 — Composed (25/25). Left-aligned 5-col grid (2 cols silhouette + 3 cols copy) + dashed board-outline silhouette + fuller pushpin glyph. Carries the editorial voice. v1 centered treatment read as under-designed vs the rest of Epic B."
+  rationale: 'v2 — Composed (25/25). Left-aligned 5-col grid (2 cols silhouette + 3 cols copy) + dashed board-outline silhouette + fuller pushpin glyph. Carries the editorial voice. v1 centered treatment read as under-designed vs the rest of Epic B.'
   addendum_doc: state/wireframes/epic-b-pinterest-integration/b5-polish-and-smoke/ADDENDUM.md
   references:
     - state/wireframes/epic-b-pinterest-integration/_base-template.md

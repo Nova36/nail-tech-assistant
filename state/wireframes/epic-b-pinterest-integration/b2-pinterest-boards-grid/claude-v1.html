@@ -1,421 +1,918 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>/pinterest · v1 — Denser</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  :root {
-    --background: #faf7f2;
-    --foreground: #3d3530;
-    --card: #f0ebe3;
-    --primary: #6b3f5e;
-    --primary-tint: #d4a5a8;
-    --accent: #c9a96e;
-    --muted: #f0ebe3;
-    --muted-foreground: #8c7e78;
-    --border: #8c7e78;
-    --touch-target-min: 44px;
-  }
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
-  html, body {
-    background: var(--background);
-    color: var(--foreground);
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  }
-  body {
-    background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.18), transparent 35%);
-    min-height: 100vh;
-  }
-  .font-fraunces { font-family: 'Fraunces', Georgia, serif; }
-  .text-primary { color: var(--primary); }
-  .text-muted-foreground { color: var(--muted-foreground); }
-  .bg-card { background-color: var(--card); }
-  .bg-muted { background-color: var(--muted); }
+  <head>
+    <meta charset="utf-8" />
+    <title>/pinterest · v1 — Denser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --background: #faf7f2;
+        --foreground: #3d3530;
+        --card: #f0ebe3;
+        --primary: #6b3f5e;
+        --primary-tint: #d4a5a8;
+        --accent: #c9a96e;
+        --muted: #f0ebe3;
+        --muted-foreground: #8c7e78;
+        --border: #8c7e78;
+        --touch-target-min: 44px;
+      }
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+      html,
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        min-height: 100vh;
+      }
+      .font-fraunces {
+        font-family: 'Fraunces', Georgia, serif;
+      }
+      .text-primary {
+        color: var(--primary);
+      }
+      .text-muted-foreground {
+        color: var(--muted-foreground);
+      }
+      .bg-card {
+        background-color: var(--card);
+      }
+      .bg-muted {
+        background-color: var(--muted);
+      }
 
-  /* Viewport simulators */
-  .vp {
-    margin: 28px auto;
-    background: var(--background);
-    background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.18), transparent 35%);
-    border: 1px solid rgb(140 126 120 / 0.22);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 24px 56px rgba(61,53,48,0.12);
-  }
-  .vp-mobile  { width: 390px; }
-  .vp-tablet  { width: 820px; }
-  .vp-desktop { width: 1280px; }
-  .vp-bar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 14px;
-    background: #ede4d9;
-    border-bottom: 1px solid rgb(140 126 120 / 0.2);
-    font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--muted-foreground);
-  }
-  .vp-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-tint); }
-  .vp-bar .dot.b { background: var(--accent); opacity: 0.7; }
-  .vp-bar .dot.c { background: var(--primary); opacity: 0.55; }
-  .vp-bar .tag {
-    margin-left: auto;
-    border: 1px solid rgb(140 126 120 / 0.3);
-    padding: 2px 8px; border-radius: 999px;
-    font-size: 10px;
-  }
+      /* Viewport simulators */
+      .vp {
+        margin: 28px auto;
+        background: var(--background);
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.12);
+      }
+      .vp-mobile {
+        width: 390px;
+      }
+      .vp-tablet {
+        width: 820px;
+      }
+      .vp-desktop {
+        width: 1280px;
+      }
+      .vp-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid rgb(140 126 120 / 0.2);
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .vp-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+      }
+      .vp-bar .dot.b {
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .vp-bar .dot.c {
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      .vp-bar .tag {
+        margin-left: auto;
+        border: 1px solid rgb(140 126 120 / 0.3);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+      }
 
-  /* Annotation callouts */
-  aside.anno {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-family: 'Inter', ui-sans-serif, sans-serif;
-    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--muted-foreground);
-    padding: 3px 8px; border-radius: 4px;
-    background: rgba(250,247,242,0.7);
-    border: 1px dashed rgb(140 126 120 / 0.42);
-  }
-  aside.anno::before {
-    content: ''; width: 5px; height: 5px; border-radius: 50%;
-    background: var(--primary);
-    opacity: 0.55;
-  }
-  aside.anno.pin {
-    position: absolute; top: -11px; left: 14px; z-index: 2;
-    background: var(--background);
-  }
+      /* Annotation callouts */
+      aside.anno {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Inter', ui-sans-serif, sans-serif;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(250, 247, 242, 0.7);
+        border: 1px dashed rgb(140 126 120 / 0.42);
+      }
+      aside.anno::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      aside.anno.pin {
+        position: absolute;
+        top: -11px;
+        left: 14px;
+        z-index: 2;
+        background: var(--background);
+      }
 
-  /* v1 skeleton — gentle horizontal shimmer */
-  .sk-v1 {
-    background:
-      linear-gradient(100deg,
-        rgba(255,255,255,0) 30%,
-        rgba(255,255,255,0.45) 50%,
-        rgba(255,255,255,0) 70%),
-      #e8dfd4;
-    background-size: 220% 100%;
-    background-position: 120% 0;
-    animation: sk-sweep 2.6s ease-in-out infinite;
-  }
-  @keyframes sk-sweep {
-    0%   { background-position: 120% 0; }
-    100% { background-position: -120% 0; }
-  }
+      /* v1 skeleton — gentle horizontal shimmer */
+      .sk-v1 {
+        background:
+          linear-gradient(
+            100deg,
+            rgba(255, 255, 255, 0) 30%,
+            rgba(255, 255, 255, 0.45) 50%,
+            rgba(255, 255, 255, 0) 70%
+          ),
+          #e8dfd4;
+        background-size: 220% 100%;
+        background-position: 120% 0;
+        animation: sk-sweep 2.6s ease-in-out infinite;
+      }
+      @keyframes sk-sweep {
+        0% {
+          background-position: 120% 0;
+        }
+        100% {
+          background-position: -120% 0;
+        }
+      }
 
-  /* v1 sentinel: invisible at idle; quiet pulse when fetching */
-  .sentinel-v1 {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: var(--primary-tint);
-    opacity: 0.5;
-    animation: pulse-v1 1.9s ease-in-out infinite;
-  }
-  @keyframes pulse-v1 {
-    0%,100% { transform: scale(0.92); opacity: 0.35; }
-    50%     { transform: scale(1.08); opacity: 0.6; }
-  }
+      /* v1 sentinel: invisible at idle; quiet pulse when fetching */
+      .sentinel-v1 {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+        opacity: 0.5;
+        animation: pulse-v1 1.9s ease-in-out infinite;
+      }
+      @keyframes pulse-v1 {
+        0%,
+        100% {
+          transform: scale(0.92);
+          opacity: 0.35;
+        }
+        50% {
+          transform: scale(1.08);
+          opacity: 0.6;
+        }
+      }
 
-  @media (prefers-reduced-motion: reduce) {
-    .sk-v1, .sentinel-v1, .card:hover { animation: none !important; transition: none !important; }
-    .card:hover { transform: none !important; }
-  }
+      @media (prefers-reduced-motion: reduce) {
+        .sk-v1,
+        .sentinel-v1,
+        .card:hover {
+          animation: none !important;
+          transition: none !important;
+        }
+        .card:hover {
+          transform: none !important;
+        }
+      }
 
-  /* Card */
-  .card {
-    position: relative;
-    border-radius: 28px;
-    background: var(--card);
-    box-shadow: 0 12px 32px rgba(61,53,48,0.08);
-    overflow: hidden;
-    transition: transform 180ms ease-out, box-shadow 180ms ease-out;
-    cursor: pointer;
-    min-height: 44px;
-  }
-  article { position: relative; }
-  .card:hover { transform: translateY(-2px); }
-  .card:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px rgb(107 63 94 / 0.2), 0 12px 32px rgba(61,53,48,0.08);
-  }
+      /* Card */
+      .card {
+        position: relative;
+        border-radius: 28px;
+        background: var(--card);
+        box-shadow: 0 12px 32px rgba(61, 53, 48, 0.08);
+        overflow: hidden;
+        transition:
+          transform 180ms ease-out,
+          box-shadow 180ms ease-out;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      article {
+        position: relative;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+      }
+      .card:focus-visible {
+        outline: none;
+        box-shadow:
+          0 0 0 2px rgb(107 63 94 / 0.2),
+          0 12px 32px rgba(61, 53, 48, 0.08);
+      }
 
-  /* Cover placeholders — no real imagery; use palette gradients as wireframe chrome */
-  .cover {
-    position: relative;
-    background:
-      linear-gradient(135deg, rgb(107 63 94 / 0.08), rgb(212 165 168 / 0.2) 60%, rgb(201 169 110 / 0.12));
-  }
-  .cover::after {
-    content: ''; position: absolute; inset: 0;
-    background:
-      radial-gradient(120% 70% at 20% 20%, rgba(255,255,255,0.6), transparent 55%),
-      repeating-linear-gradient(45deg, transparent 0 18px, rgba(61,53,48,0.035) 18px 19px);
-    pointer-events: none;
-  }
-  .cover .icon {
-    position: absolute; inset: auto 14px 14px auto;
-    width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(250,247,242,0.78);
-    display: grid; place-items: center;
-    color: var(--muted-foreground);
-    font-size: 12px; letter-spacing: 0.06em;
-    box-shadow: 0 4px 10px rgba(61,53,48,0.08);
-  }
-</style>
-</head>
-<body>
-
-<!-- ──────────────── Sheet header ──────────────── -->
-<header class="mx-auto max-w-6xl px-6 pt-10 pb-5">
-  <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3">
-    Epic B · b2 · /pinterest · Wireframe
-  </p>
-  <h1 class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]">
-    v1 — <span class="italic text-primary">Denser.</span>
-  </h1>
-  <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-2xl">
-    Boards grid at <code class="text-primary">/pinterest</code>. 4-col at xl · 4:3 covers · gentle shimmer skeleton ·
-    invisible-until-fetching sentinel · hover lift. Mobile → tablet → desktop stacked below.
-  </p>
-</header>
-
-<!-- ════════════════════════ DESKTOP — happy path ════════════════════════ -->
-<div class="vp vp-desktop">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Desktop · 1280px</span><span class="tag">xl · 4 cols</span></div>
-
-  <main class="mx-auto max-w-6xl px-6 py-10">
-
-    <!-- Page header region -->
-    <section class="relative mb-10" aria-labelledby="d-h">
-      <aside class="anno pin">region: header</aside>
-      <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3">Pinterest</p>
-      <h2 id="d-h" class="font-fraunces text-5xl font-light tracking-[-0.03em] leading-[1.02]">
-        Your <span class="italic text-primary">boards.</span>
-      </h2>
-      <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-prose">
-        Inspiration pulled from your Pinterest account. Tap a board to open its pins.
+      /* Cover placeholders — no real imagery; use palette gradients as wireframe chrome */
+      .cover {
+        position: relative;
+        background: linear-gradient(
+          135deg,
+          rgb(107 63 94 / 0.08),
+          rgb(212 165 168 / 0.2) 60%,
+          rgb(201 169 110 / 0.12)
+        );
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            120% 70% at 20% 20%,
+            rgba(255, 255, 255, 0.6),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            45deg,
+            transparent 0 18px,
+            rgba(61, 53, 48, 0.035) 18px 19px
+          );
+        pointer-events: none;
+      }
+      .cover .icon {
+        position: absolute;
+        inset: auto 14px 14px auto;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(250, 247, 242, 0.78);
+        display: grid;
+        place-items: center;
+        color: var(--muted-foreground);
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        box-shadow: 0 4px 10px rgba(61, 53, 48, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ──────────────── Sheet header ──────────────── -->
+    <header class="mx-auto max-w-6xl px-6 pt-10 pb-5">
+      <p
+        class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+      >
+        Epic B · b2 · /pinterest · Wireframe
       </p>
-    </section>
+      <h1
+        class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+      >
+        v1 — <span class="italic text-primary">Denser.</span>
+      </h1>
+      <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-2xl">
+        Boards grid at <code class="text-primary">/pinterest</code>. 4-col at xl
+        · 4:3 covers · gentle shimmer skeleton · invisible-until-fetching
+        sentinel · hover lift. Mobile → tablet → desktop stacked below.
+      </p>
+    </header>
 
-    <!-- BoardGrid region -->
-    <section class="relative" aria-label="Pinterest boards">
-      <aside class="anno pin">component: BoardGrid · 4 cols · gap-6</aside>
+    <!-- ════════════════════════ DESKTOP — happy path ════════════════════════ -->
+    <div class="vp vp-desktop">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Desktop · 1280px</span
+        ><span class="tag">xl · 4 cols</span>
+      </div>
 
-      <ul role="list" class="grid grid-cols-4 gap-6">
+      <main class="mx-auto max-w-6xl px-6 py-10">
+        <!-- Page header region -->
+        <section class="relative mb-10" aria-labelledby="d-h">
+          <aside class="anno pin">region: header</aside>
+          <p
+            class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+          >
+            Pinterest
+          </p>
+          <h2
+            id="d-h"
+            class="font-fraunces text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+          >
+            Your <span class="italic text-primary">boards.</span>
+          </h2>
+          <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-prose">
+            Inspiration pulled from your Pinterest account. Tap a board to open
+            its pins.
+          </p>
+        </section>
 
-        <li><article tabindex="0" class="card" aria-label="Soft Mauve · 47 pins">
-          <div class="cover aspect-[4/3]"><div class="icon">47</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2 text-[color:var(--foreground)]">Soft Mauve &amp; Chrome</h3>
-            <p class="text-xs text-muted-foreground mt-1">47 pins</p>
+        <!-- BoardGrid region -->
+        <section class="relative" aria-label="Pinterest boards">
+          <aside class="anno pin">component: BoardGrid · 4 cols · gap-6</aside>
+
+          <ul role="list" class="grid grid-cols-4 gap-6">
+            <li>
+              <article
+                tabindex="0"
+                class="card"
+                aria-label="Soft Mauve · 47 pins"
+              >
+                <div class="cover aspect-[4/3]"><div class="icon">47</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2 text-[color:var(--foreground)]"
+                  >
+                    Soft Mauve &amp; Chrome
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">47 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article
+                tabindex="0"
+                class="card"
+                aria-label="Wedding inspo — private · 32 pins"
+              >
+                <aside
+                  class="anno pin"
+                  style="top: auto; left: auto; bottom: -11px; right: 14px"
+                >
+                  component: BoardCard
+                </aside>
+                <div class="cover aspect-[4/3]"><div class="icon">🔒</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Wedding inspo — Spring '26
+                  </h3>
+                  <p
+                    class="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5"
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    >
+                      <rect x="3.5" y="7" width="9" height="6.5" rx="1" />
+                      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                    </svg>
+                    Private · 32 pins
+                  </p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]">
+                  <div class="icon">118</div>
+                </div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Champagne Finishes
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">118 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"><div class="icon">12</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Client · Amara — almond set
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">12 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"><div class="icon">74</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Mulberry &amp; plum moody
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">74 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"><div class="icon">23</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Ivory &amp; blush ombré
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">23 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"><div class="icon">56</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Gold foil experiments
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">56 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"><div class="icon">89</div></div>
+                <div class="p-4">
+                  <h3
+                    class="font-fraunces text-base font-medium leading-snug line-clamp-2"
+                  >
+                    Almond shape references
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">89 pins</p>
+                </div>
+              </article>
+            </li>
+
+            <!-- Streaming in: skeleton silhouettes mixed into the last row as next page arrives -->
+            <li>
+              <article aria-hidden="true" class="card">
+                <aside class="anno pin">component: BoardGridSkeleton</aside>
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article aria-hidden="true" class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-2/3 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article aria-hidden="true" class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-4/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article aria-hidden="true" class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </article>
+            </li>
+          </ul>
+
+          <!-- Sentinel — invisible at idle; this state shows it while fetching -->
+          <div class="relative mt-12" aria-hidden="true">
+            <aside class="anno pin">
+              component: InfiniteScrollSentinel · fetching
+            </aside>
+            <div class="flex justify-center py-4">
+              <div class="sentinel-v1"></div>
+            </div>
           </div>
-        </article></li>
+        </section>
+      </main>
+    </div>
 
-        <li><article tabindex="0" class="card" aria-label="Wedding inspo — private · 32 pins">
-          <aside class="anno pin" style="top:auto; left:auto; bottom:-11px; right:14px;">component: BoardCard</aside>
-          <div class="cover aspect-[4/3]"><div class="icon">🔒</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Wedding inspo — Spring '26</h3>
-            <p class="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1.5">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>
-              Private · 32 pins
+    <!-- ════════════════════════ DESKTOP — edge states ════════════════════════ -->
+    <div class="vp vp-desktop">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Desktop · 1280px</span
+        ><span class="tag">edge states</span>
+      </div>
+
+      <main class="mx-auto max-w-6xl px-6 py-10 space-y-16">
+        <!-- Initial Suspense fallback: 12 skeleton cards (v1 is denser) -->
+        <section class="relative">
+          <aside class="anno pin">
+            state: initial Suspense fallback · 12 skeletons
+          </aside>
+          <p
+            class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+          >
+            Pinterest
+          </p>
+          <h2 class="font-fraunces text-5xl font-light tracking-[-0.03em] mb-6">
+            Your <span class="italic text-primary">boards.</span>
+          </h2>
+          <ul role="list" class="grid grid-cols-4 gap-6">
+            <!-- 12 skeletons -->
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-2/3 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-4/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-2/3 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-4/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-2/3 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-4/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- 401/403 placeholder -->
+        <section class="relative">
+          <aside class="anno pin">
+            state: 401 / 403 placeholder · slice b4 upgrades later
+          </aside>
+          <p
+            class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+          >
+            Pinterest
+          </p>
+          <h2 class="font-fraunces text-5xl font-light tracking-[-0.03em] mb-6">
+            Your <span class="italic text-primary">boards.</span>
+          </h2>
+          <div
+            class="max-w-md mx-auto text-center rounded-[28px] bg-card p-10 border border-dashed"
+            style="border-color: rgb(107 63 94 / 0.5)"
+          >
+            <h3 class="font-fraunces text-3xl font-light tracking-[-0.02em]">
+              Pinterest is <span class="italic text-primary">paused.</span>
+            </h3>
+            <p class="text-sm leading-6 text-muted-foreground mt-3">
+              Your access token needs to be replaced. Update
+              <code class="text-primary">PINTEREST_ACCESS_TOKEN</code> in your
+              Vercel project settings.
             </p>
           </div>
-        </article></li>
+        </section>
 
-        <li><article tabindex="0" class="card">
-          <div class="cover aspect-[4/3]"><div class="icon">118</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Champagne Finishes</h3>
-            <p class="text-xs text-muted-foreground mt-1">118 pins</p>
+        <!-- Empty state -->
+        <section class="relative">
+          <aside class="anno pin">state: empty · zero boards</aside>
+          <p
+            class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+          >
+            Pinterest
+          </p>
+          <h2 class="font-fraunces text-5xl font-light tracking-[-0.03em] mb-6">
+            Your <span class="italic text-primary">boards.</span>
+          </h2>
+          <div class="min-h-[260px] grid place-items-center text-center">
+            <div>
+              <h3 class="font-fraunces text-4xl font-light tracking-[-0.02em]">
+                No boards <span class="italic text-primary">yet.</span>
+              </h3>
+              <p class="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+                Create a board on Pinterest and it'll show up here next time you
+                open the app.
+              </p>
+            </div>
           </div>
-        </article></li>
+        </section>
+      </main>
+    </div>
 
-        <li><article tabindex="0" class="card">
-          <div class="cover aspect-[4/3]"><div class="icon">12</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Client · Amara — almond set</h3>
-            <p class="text-xs text-muted-foreground mt-1">12 pins</p>
-          </div>
-        </article></li>
-
-        <li><article tabindex="0" class="card">
-          <div class="cover aspect-[4/3]"><div class="icon">74</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Mulberry &amp; plum moody</h3>
-            <p class="text-xs text-muted-foreground mt-1">74 pins</p>
-          </div>
-        </article></li>
-
-        <li><article tabindex="0" class="card">
-          <div class="cover aspect-[4/3]"><div class="icon">23</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Ivory &amp; blush ombré</h3>
-            <p class="text-xs text-muted-foreground mt-1">23 pins</p>
-          </div>
-        </article></li>
-
-        <li><article tabindex="0" class="card">
-          <div class="cover aspect-[4/3]"><div class="icon">56</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Gold foil experiments</h3>
-            <p class="text-xs text-muted-foreground mt-1">56 pins</p>
-          </div>
-        </article></li>
-
-        <li><article tabindex="0" class="card">
-          <div class="cover aspect-[4/3]"><div class="icon">89</div></div>
-          <div class="p-4">
-            <h3 class="font-fraunces text-base font-medium leading-snug line-clamp-2">Almond shape references</h3>
-            <p class="text-xs text-muted-foreground mt-1">89 pins</p>
-          </div>
-        </article></li>
-
-        <!-- Streaming in: skeleton silhouettes mixed into the last row as next page arrives -->
-        <li><article aria-hidden="true" class="card">
-          <aside class="anno pin">component: BoardGridSkeleton</aside>
-          <div class="sk-v1 aspect-[4/3]"></div>
-          <div class="p-4 space-y-2">
-            <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
-            <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
-          </div>
-        </article></li>
-        <li><article aria-hidden="true" class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-2/3 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></article></li>
-        <li><article aria-hidden="true" class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-4/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></article></li>
-        <li><article aria-hidden="true" class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></article></li>
-      </ul>
-
-      <!-- Sentinel — invisible at idle; this state shows it while fetching -->
-      <div class="relative mt-12" aria-hidden="true">
-        <aside class="anno pin">component: InfiniteScrollSentinel · fetching</aside>
-        <div class="flex justify-center py-4">
-          <div class="sentinel-v1"></div>
-        </div>
+    <!-- ════════════════════════ TABLET ════════════════════════ -->
+    <div class="vp vp-tablet">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Tablet · 820px</span
+        ><span class="tag">md · 3 cols</span>
       </div>
 
-    </section>
-  </main>
-</div>
+      <main class="mx-auto max-w-6xl px-6 py-8">
+        <section class="relative mb-8">
+          <aside class="anno pin">region: header</aside>
+          <p
+            class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-2"
+          >
+            Pinterest
+          </p>
+          <h2 class="font-fraunces text-4xl font-light tracking-[-0.03em]">
+            Your <span class="italic text-primary">boards.</span>
+          </h2>
+          <p class="text-sm leading-6 text-muted-foreground mt-2">
+            Inspiration pulled from your Pinterest account.
+          </p>
+        </section>
+        <section class="relative">
+          <aside class="anno pin">BoardGrid · md: 3 cols · gap-5</aside>
+          <ul role="list" class="grid grid-cols-3 gap-5">
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium line-clamp-2">
+                    Soft Mauve &amp; Chrome
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">47 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium line-clamp-2">
+                    Wedding inspo
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    🔒 Private · 32 pins
+                  </p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium line-clamp-2">
+                    Champagne Finishes
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">118 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium line-clamp-2">
+                    Client · Amara
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">12 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium line-clamp-2">
+                    Mulberry moody
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">74 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium line-clamp-2">
+                    Ivory &amp; blush ombré
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">23 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-2/3 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/3 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-4/5 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+          </ul>
+          <div class="mt-10 flex justify-center">
+            <div class="sentinel-v1"></div>
+          </div>
+        </section>
+      </main>
+    </div>
 
-<!-- ════════════════════════ DESKTOP — edge states ════════════════════════ -->
-<div class="vp vp-desktop">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Desktop · 1280px</span><span class="tag">edge states</span></div>
-
-  <main class="mx-auto max-w-6xl px-6 py-10 space-y-16">
-
-    <!-- Initial Suspense fallback: 12 skeleton cards (v1 is denser) -->
-    <section class="relative">
-      <aside class="anno pin">state: initial Suspense fallback · 12 skeletons</aside>
-      <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3">Pinterest</p>
-      <h2 class="font-fraunces text-5xl font-light tracking-[-0.03em] mb-6">
-        Your <span class="italic text-primary">boards.</span>
-      </h2>
-      <ul role="list" class="grid grid-cols-4 gap-6">
-        <!-- 12 skeletons -->
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/4 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-2/3 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-4/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/4 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-2/3 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-4/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/4 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-2/3 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-4/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-      </ul>
-    </section>
-
-    <!-- 401/403 placeholder -->
-    <section class="relative">
-      <aside class="anno pin">state: 401 / 403 placeholder · slice b4 upgrades later</aside>
-      <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3">Pinterest</p>
-      <h2 class="font-fraunces text-5xl font-light tracking-[-0.03em] mb-6">
-        Your <span class="italic text-primary">boards.</span>
-      </h2>
-      <div class="max-w-md mx-auto text-center rounded-[28px] bg-card p-10 border border-dashed" style="border-color: rgb(107 63 94 / 0.5);">
-        <h3 class="font-fraunces text-3xl font-light tracking-[-0.02em]">
-          Pinterest is <span class="italic text-primary">paused.</span>
-        </h3>
-        <p class="text-sm leading-6 text-muted-foreground mt-3">
-          Your access token needs to be replaced.
-          Update <code class="text-primary">PINTEREST_ACCESS_TOKEN</code> in your Vercel project settings.
-        </p>
+    <!-- ════════════════════════ MOBILE ════════════════════════ -->
+    <div class="vp vp-mobile">
+      <div class="vp-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">Mobile · 390px</span
+        ><span class="tag">1 col</span>
       </div>
-    </section>
 
-    <!-- Empty state -->
-    <section class="relative">
-      <aside class="anno pin">state: empty · zero boards</aside>
-      <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3">Pinterest</p>
-      <h2 class="font-fraunces text-5xl font-light tracking-[-0.03em] mb-6">
-        Your <span class="italic text-primary">boards.</span>
-      </h2>
-      <div class="min-h-[260px] grid place-items-center text-center">
-        <div>
-          <h3 class="font-fraunces text-4xl font-light tracking-[-0.02em]">No boards <span class="italic text-primary">yet.</span></h3>
-          <p class="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">Create a board on Pinterest and it'll show up here next time you open the app.</p>
-        </div>
-      </div>
-    </section>
+      <main class="mx-auto max-w-6xl px-5 py-6">
+        <section class="relative mb-6">
+          <aside class="anno pin">region: header</aside>
+          <p
+            class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-2"
+          >
+            Pinterest
+          </p>
+          <h2 class="font-fraunces text-3xl font-light tracking-[-0.03em]">
+            Your <span class="italic text-primary">boards.</span>
+          </h2>
+          <p class="text-sm leading-6 text-muted-foreground mt-2">
+            Inspiration pulled from your Pinterest account.
+          </p>
+        </section>
+        <section class="relative">
+          <aside class="anno pin">BoardGrid · 1 col · gap-5</aside>
+          <ul role="list" class="grid grid-cols-1 gap-5">
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium">
+                    Soft Mauve &amp; Chrome
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">47 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium">
+                    Wedding inspo
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">
+                    🔒 Private · 32 pins
+                  </p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <article tabindex="0" class="card">
+                <div class="cover aspect-[4/3]"></div>
+                <div class="p-4">
+                  <h3 class="font-fraunces text-base font-medium">
+                    Champagne Finishes
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-1">118 pins</p>
+                </div>
+              </article>
+            </li>
+            <li>
+              <div class="card">
+                <div class="sk-v1 aspect-[4/3]"></div>
+                <div class="p-4 space-y-2">
+                  <div class="h-3.5 w-3/4 rounded-full sk-v1"></div>
+                  <div class="h-2.5 w-1/4 rounded-full sk-v1"></div>
+                </div>
+              </div>
+            </li>
+          </ul>
+          <div class="mt-8 flex justify-center">
+            <div class="sentinel-v1"></div>
+          </div>
+        </section>
+      </main>
+    </div>
 
-  </main>
-</div>
-
-<!-- ════════════════════════ TABLET ════════════════════════ -->
-<div class="vp vp-tablet">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Tablet · 820px</span><span class="tag">md · 3 cols</span></div>
-
-  <main class="mx-auto max-w-6xl px-6 py-8">
-    <section class="relative mb-8">
-      <aside class="anno pin">region: header</aside>
-      <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-2">Pinterest</p>
-      <h2 class="font-fraunces text-4xl font-light tracking-[-0.03em]">Your <span class="italic text-primary">boards.</span></h2>
-      <p class="text-sm leading-6 text-muted-foreground mt-2">Inspiration pulled from your Pinterest account.</p>
-    </section>
-    <section class="relative">
-      <aside class="anno pin">BoardGrid · md: 3 cols · gap-5</aside>
-      <ul role="list" class="grid grid-cols-3 gap-5">
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium line-clamp-2">Soft Mauve &amp; Chrome</h3><p class="text-xs text-muted-foreground mt-1">47 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium line-clamp-2">Wedding inspo</h3><p class="text-xs text-muted-foreground mt-1">🔒 Private · 32 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium line-clamp-2">Champagne Finishes</h3><p class="text-xs text-muted-foreground mt-1">118 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium line-clamp-2">Client · Amara</h3><p class="text-xs text-muted-foreground mt-1">12 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium line-clamp-2">Mulberry moody</h3><p class="text-xs text-muted-foreground mt-1">74 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium line-clamp-2">Ivory &amp; blush ombré</h3><p class="text-xs text-muted-foreground mt-1">23 pins</p></div></article></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/4 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-2/3 rounded-full sk-v1"></div><div class="h-2.5 w-1/3 rounded-full sk-v1"></div></div></div></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-4/5 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-      </ul>
-      <div class="mt-10 flex justify-center"><div class="sentinel-v1"></div></div>
-    </section>
-  </main>
-</div>
-
-<!-- ════════════════════════ MOBILE ════════════════════════ -->
-<div class="vp vp-mobile">
-  <div class="vp-bar"><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span class="ml-2">Mobile · 390px</span><span class="tag">1 col</span></div>
-
-  <main class="mx-auto max-w-6xl px-5 py-6">
-    <section class="relative mb-6">
-      <aside class="anno pin">region: header</aside>
-      <p class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-2">Pinterest</p>
-      <h2 class="font-fraunces text-3xl font-light tracking-[-0.03em]">Your <span class="italic text-primary">boards.</span></h2>
-      <p class="text-sm leading-6 text-muted-foreground mt-2">Inspiration pulled from your Pinterest account.</p>
-    </section>
-    <section class="relative">
-      <aside class="anno pin">BoardGrid · 1 col · gap-5</aside>
-      <ul role="list" class="grid grid-cols-1 gap-5">
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium">Soft Mauve &amp; Chrome</h3><p class="text-xs text-muted-foreground mt-1">47 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium">Wedding inspo</h3><p class="text-xs text-muted-foreground mt-1">🔒 Private · 32 pins</p></div></article></li>
-        <li><article tabindex="0" class="card"><div class="cover aspect-[4/3]"></div><div class="p-4"><h3 class="font-fraunces text-base font-medium">Champagne Finishes</h3><p class="text-xs text-muted-foreground mt-1">118 pins</p></div></article></li>
-        <li><div class="card"><div class="sk-v1 aspect-[4/3]"></div><div class="p-4 space-y-2"><div class="h-3.5 w-3/4 rounded-full sk-v1"></div><div class="h-2.5 w-1/4 rounded-full sk-v1"></div></div></div></li>
-      </ul>
-      <div class="mt-8 flex justify-center"><div class="sentinel-v1"></div></div>
-    </section>
-  </main>
-</div>
-
-<footer class="mx-auto max-w-6xl px-6 py-10 text-[11px] tracking-[0.22em] uppercase text-muted-foreground">
-  v1 · Components: BoardGrid • BoardCard • BoardGridSkeleton • InfiniteScrollSentinel · States: happy · initial-skeleton · 401/403 placeholder · empty
-</footer>
-
-</body>
+    <footer
+      class="mx-auto max-w-6xl px-6 py-10 text-[11px] tracking-[0.22em] uppercase text-muted-foreground"
+    >
+      v1 · Components: BoardGrid • BoardCard • BoardGridSkeleton •
+      InfiniteScrollSentinel · States: happy · initial-skeleton · 401/403
+      placeholder · empty
+    </footer>
+  </body>
 </html>

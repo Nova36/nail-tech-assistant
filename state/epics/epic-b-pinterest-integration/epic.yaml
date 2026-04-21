@@ -42,7 +42,7 @@ quality_gates:
   lint: required
   unit_tests: required
   e2e_tests: recommended
-  bundle_grep_token_absent: required  # b1 acceptance — `pina_` must not appear under .next/static/**
+  bundle_grep_token_absent: required # b1 acceptance — `pina_` must not appear under .next/static/**
 
 acceptance_at_epic_completion: |
   - PRD US-B-1: With a healthy `PINTEREST_ACCESS_TOKEN`, `/pinterest` and
@@ -76,7 +76,7 @@ risks_applicable:
   - 'Risk: secret handling regression — addressed by b1 bundle-grep test (`security:plan-audit` escalation)'
   - 'Risk: working-state gap between b2/b3 deploy and b4 deploy if token unhealthy mid-window — addressed by b2 verifyPinterestToken() inline placeholder per architect option (a) (`architecture:slice-boundary-token-verify` escalation)'
   - 'Risk: visual decisions retrofitted into already-built code if wireframes lag — addressed by ui-design step inserted into b2/b3/b4 (`ui:major` escalation)'
-  - 'Risk: motion quality below Epic A felt-quality bar with Don''s infinite-scroll override + Suspense streaming — addressed by animations-specialist sidecar at execute (`ui:animations` escalation, minor)'
+  - "Risk: motion quality below Epic A felt-quality bar with Don's infinite-scroll override + Suspense streaming — addressed by animations-specialist sidecar at execute (`ui:animations` escalation, minor)"
   - 'Risk: Pinterest API response-shape variance (esp. board cover-image fields, pin media variants) — addressed by typed errors.ts discriminated union + b3 explicit response-shape parsing'
   - 'Risk: rate-limit / network failures in browse path falling through to error.tsx — addressed by b5 inline retryable browse error UI'
 
@@ -103,7 +103,13 @@ stories:
     depends_on: [b4-pinterest-token-remediation-views]
 
 min_viable_ship_cut:
-  stories: [b1-pinterest-client-token-boundary, b2-pinterest-boards-grid, b3-pinterest-pin-grid, b4-pinterest-token-remediation-views]
+  stories:
+    [
+      b1-pinterest-client-token-boundary,
+      b2-pinterest-boards-grid,
+      b3-pinterest-pin-grid,
+      b4-pinterest-token-remediation-views,
+    ]
   rationale: "S1+S2+S3+S4 satisfies US-B-1 + US-B-2 + US-B-3 in full. b5 is deferred-eligible if Mother's Day 2026-05-10 pressure hits."
 
 escalations_carrying_into_execute:
@@ -117,9 +123,19 @@ escalations_carrying_into_execute:
     satisfied_by: b2 acceptance criterion adopting architect option (a) — verifyPinterestToken() server-side + inline 401/403 placeholder; b4 upgrades placeholder to styled views
   - trigger: ui:major
     severity: major
-    target_stories: [b2-pinterest-boards-grid, b3-pinterest-pin-grid, b4-pinterest-token-remediation-views]
+    target_stories:
+      [
+        b2-pinterest-boards-grid,
+        b3-pinterest-pin-grid,
+        b4-pinterest-token-remediation-views,
+      ]
     satisfied_by: ui-design step inserted between research and test-spec in b2/b3/b4 (lighter addendum step in b5); blocking on Touchpoint 1 wireframe approval before implement
   - trigger: ui:animations
     severity: minor
-    target_stories: [b2-pinterest-boards-grid, b3-pinterest-pin-grid, b4-pinterest-token-remediation-views]
+    target_stories:
+      [
+        b2-pinterest-boards-grid,
+        b3-pinterest-pin-grid,
+        b4-pinterest-token-remediation-views,
+      ]
     satisfied_by: animations-specialist sidecar review at execute time for skeleton transitions, IntersectionObserver append stagger, prefers-reduced-motion handling

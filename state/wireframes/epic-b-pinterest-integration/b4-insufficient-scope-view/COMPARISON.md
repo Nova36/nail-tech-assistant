@@ -12,17 +12,18 @@
 
 Same three-way split as b4-401 so the layouts stay symmetric.
 
-| | **v1 — Intimate** | **v2 — Balanced** | **v3 — Confident** |
-|---|---|---|---|
-| Container | `max-w-md` | `max-w-xl` | `max-w-2xl` |
-| Glyph size | 32px | 40px | 48px |
-| Step-counter circle | 28px, 12px numeral | 32px, 13px numeral | 36px, 14px numeral |
-| Step vertical gap | `space-y-4` | `space-y-5` | `space-y-7` |
-| Eyebrow above heading | — | — | "Scope status" |
-| Heading size (desktop) | `text-3xl` | `text-4xl` | `text-5xl` |
-| Vibe | Tight, debug-focused | Calm, confident | Expansive |
+|                        | **v1 — Intimate**    | **v2 — Balanced**  | **v3 — Confident** |
+| ---------------------- | -------------------- | ------------------ | ------------------ |
+| Container              | `max-w-md`           | `max-w-xl`         | `max-w-2xl`        |
+| Glyph size             | 32px                 | 40px               | 48px               |
+| Step-counter circle    | 28px, 12px numeral   | 32px, 13px numeral | 36px, 14px numeral |
+| Step vertical gap      | `space-y-4`          | `space-y-5`        | `space-y-7`        |
+| Eyebrow above heading  | —                    | —                  | "Scope status"     |
+| Heading size (desktop) | `text-3xl`           | `text-4xl`         | `text-5xl`         |
+| Vibe                   | Tight, debug-focused | Calm, confident    | Expansive          |
 
 **403-specific (all three):**
+
 - Italic accent: "broader access"
 - Glyph: key-ring with missing key
 - Step-counter border: **Champagne Gold** (the one color-pop the 403 carries, per fix (b))
@@ -34,15 +35,15 @@ Same three-way split as b4-401 so the layouts stay symmetric.
 
 ## Scorecard
 
-| Criterion | v1 — Intimate | v2 — Balanced | v3 — Confident |
-|---|---|---|---|
-| Brief fidelity | 5 | 5 | 5 |
-| Option C tone adherence | 5 | 5 | 5 |
-| Layout polish | 3 | **5** | 4 |
-| Accessibility (15-pt) | 5 | 5 | 5 |
-| Motion (10-pt) | 5 | 5 | 5 |
-| Visual parity with 401 (same rendition tier) | 5 | 5 | 4 |
-| **Total** | **28/30** | **30/30** | **28/30** |
+| Criterion                                    | v1 — Intimate | v2 — Balanced | v3 — Confident |
+| -------------------------------------------- | ------------- | ------------- | -------------- |
+| Brief fidelity                               | 5             | 5             | 5              |
+| Option C tone adherence                      | 5             | 5             | 5              |
+| Layout polish                                | 3             | **5**         | 4              |
+| Accessibility (15-pt)                        | 5             | 5             | 5              |
+| Motion (10-pt)                               | 5             | 5             | 5              |
+| Visual parity with 401 (same rendition tier) | 5             | 5             | 4              |
+| **Total**                                    | **28/30**     | **30/30**     | **28/30**      |
 
 Note on parity: v1/v2 match 401's v1/v2 exactly except for the 3 allowed differences (glyph, border color, step-2 copy). v3 has an "Scope status" eyebrow whereas 401 v3 has "Token status" eyebrow — this is correct (different remediation context), but symmetric. If Don picks v3 for both, copy reads well as a pair.
 
@@ -67,12 +68,15 @@ Identical to b4-401 — all 10 pass on all three renditions. Motion is deliberat
 ## Gaps per rendition
 
 ### v1 — Intimate
+
 - Same concern as 401 v1: compressed feel, `text-3xl` heading weakens Fraunces hierarchy. Good if Don wants 401 and 403 to both feel debug-tool-tight.
 
 ### v2 — Balanced
+
 - **No gaps.** Lands squarely in Option C's intended tone. Expected default.
 
 ### v3 — Confident
+
 - "Scope status" eyebrow is a pair to 401 v3's "Token status" — they read well together if Don picks v3 on both. Mixing (v3 on one, v2 on other) would be allowed but introduces a small asymmetry.
 - Same size-creep risk as 401 v3 — 48px glyph + `text-5xl` feels larger than a typical remediation screen. Ok for a premium brand tone; slightly overcooked for a private single-user op screen.
 
@@ -91,6 +95,7 @@ Avoid mixing (e.g., v2 on 401 and v3 on 403). The architect made these separate 
 ## Glyph notes
 
 The key-ring-with-missing-key glyph uses:
+
 - A circle at top as the ring
 - Two full key silhouettes (simplified: a stub stem + a single tooth + end ring for the grip)
 - One dashed loop descending from the ring, trailing off to where the missing key would be (tail ends in an open hook, not a complete key)

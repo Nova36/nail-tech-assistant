@@ -39,14 +39,14 @@ The motion system for Epic B is **quiet, editorial, and composed**. Three rules 
 
 ## 2. Perceptual timing reference
 
-| Duration | User perception | Use for |
-|---|---|---|
-| 0-120ms | Imperceptible / "instant" | Color-shift on hover (`color`, `border-color`). Feels snappy. |
-| 150-220ms | Quick, responsive | Hover transforms (lift, border-color), underline-grow, link color. |
-| 220-320ms | Quick + quality | Card entrance fade, remediation view fade-in, stagger cell. |
-| 400-600ms | Deliberate, felt | Glyph draw-in (if used), staged multi-step reveal. |
-| >700ms | Felt-slow when waiting | **Never use for waiting-state entrances.** Acceptable only for idle loops the user is not blocked on. |
-| 2000-3000ms | Idle-loop territory | Shimmer (2.6s), sentinel breathe (2.2s), optional glyph float (3-4s). |
+| Duration    | User perception           | Use for                                                                                               |
+| ----------- | ------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 0-120ms     | Imperceptible / "instant" | Color-shift on hover (`color`, `border-color`). Feels snappy.                                         |
+| 150-220ms   | Quick, responsive         | Hover transforms (lift, border-color), underline-grow, link color.                                    |
+| 220-320ms   | Quick + quality           | Card entrance fade, remediation view fade-in, stagger cell.                                           |
+| 400-600ms   | Deliberate, felt          | Glyph draw-in (if used), staged multi-step reveal.                                                    |
+| >700ms      | Felt-slow when waiting    | **Never use for waiting-state entrances.** Acceptable only for idle loops the user is not blocked on. |
+| 2000-3000ms | Idle-loop territory       | Shimmer (2.6s), sentinel breathe (2.2s), optional glyph float (3-4s).                                 |
 
 **Easing default:** `ease-out` for entrances (fast start, soft landing — feels responsive), `ease-in-out` for idle loops (symmetric, non-distracting), `cubic-bezier(0.4, 0, 0.2, 1)` (Material "standard") for any hover that needs a touch more polish than plain `ease`.
 
@@ -59,26 +59,49 @@ These already exist in `_base-template.md` §5. They are the foundation; every s
 ```css
 /* Skeleton shimmer — the compositor exception, contained to skeleton surfaces */
 @keyframes sk-sweep {
-  0%   { background-position: 120% 0; }
-  100% { background-position: -120% 0; }
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
 }
 
 /* Sentinel idle breathe — signals "I am watching for your next page" */
 @keyframes breathe {
-  0%, 100% { opacity: 0.35; transform: scale(0.9); }
-  50%      { opacity: 0.8;  transform: scale(1.25); }
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.25);
+  }
 }
 
 /* Card entrance — used by infinite-scroll appended pages and by remediation fade-in */
 @keyframes card-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Remediation-view fade-in — flatter translate than card-enter, more "settling" */
 @keyframes view-settle {
-  from { opacity: 0; transform: translateY(2px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 ```
 
@@ -90,30 +113,32 @@ These already exist in `_base-template.md` §5. They are the foundation; every s
 
 ### 4a. Surface inventory
 
-| `data-component` | Element | Motion |
-|---|---|---|
-| `BoardDetailHeader` | The h1 + Champagne Gold eyebrow above the grid | Fade-in on mount (opacity only, 260ms ease-out) |
-| `PinGridSkeleton` | 8-12 skeleton tiles shown before first data | Shimmer (`sk-sweep`, 2.6s infinite) |
-| `PinGrid` | The uniform 3-col grid container | No motion on the container itself |
-| `PinCard` | Each pin tile | Hover lift + border-tint (shared with b2 `BoardCard`); stagger fade-in on append |
-| `InfiniteScrollSentinel` | The 10px dot below the grid | Idle `breathe` animation when `.fetching` class is on |
-| *appended page of PinCards* | Newly-mounted `PinCard`s after sentinel trigger | `card-enter` with staggered `animation-delay` |
+| `data-component`            | Element                                         | Motion                                                                           |
+| --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| `BoardDetailHeader`         | The h1 + Champagne Gold eyebrow above the grid  | Fade-in on mount (opacity only, 260ms ease-out)                                  |
+| `PinGridSkeleton`           | 8-12 skeleton tiles shown before first data     | Shimmer (`sk-sweep`, 2.6s infinite)                                              |
+| `PinGrid`                   | The uniform 3-col grid container                | No motion on the container itself                                                |
+| `PinCard`                   | Each pin tile                                   | Hover lift + border-tint (shared with b2 `BoardCard`); stagger fade-in on append |
+| `InfiniteScrollSentinel`    | The 10px dot below the grid                     | Idle `breathe` animation when `.fetching` class is on                            |
+| _appended page of PinCards_ | Newly-mounted `PinCard`s after sentinel trigger | `card-enter` with staggered `animation-delay`                                    |
 
 ### 4b. Motion recipe (copy-paste ready)
 
 ```css
 /* Page-mount entrance — the Fraunces h1 + eyebrow settle in together */
-[data-component="BoardDetailHeader"] {
+[data-component='BoardDetailHeader'] {
   animation: view-settle 280ms ease-out both;
 }
 
 /* Skeleton fill (base template §5a) */
-[data-component="PinGridSkeleton"] .sk-v1 {
+[data-component='PinGridSkeleton'] .sk-v1 {
   background:
-    linear-gradient(100deg,
-      rgba(255,255,255,0) 30%,
-      rgba(255,255,255,0.45) 50%,
-      rgba(255,255,255,0) 70%),
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0) 70%
+    ),
     var(--card);
   background-size: 220% 100%;
   background-position: 120% 0;
@@ -121,29 +146,35 @@ These already exist in `_base-template.md` §5. They are the foundation; every s
 }
 
 /* Card hover (base template §5c, repeated for clarity) */
-[data-component="PinCard"] {
-  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+[data-component='PinCard'] {
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
   border: 1px solid transparent;
 }
-[data-component="PinCard"]:hover {
+[data-component='PinCard']:hover {
   transform: translateY(-2px);
   border-color: color-mix(in oklab, var(--primary-tint) 55%, transparent);
-  box-shadow: 0 8px 24px -12px color-mix(in oklab, var(--primary) 20%, transparent);
+  box-shadow: 0 8px 24px -12px
+    color-mix(in oklab, var(--primary) 20%, transparent);
 }
 
 /* Appended-page stagger — CRITICAL for the b3 infinite-scroll feel */
-[data-component="PinCard"].card-enter {
+[data-component='PinCard'].card-enter {
   animation: card-enter 260ms ease-out both;
   /* animation-delay is set INLINE per card by the IntersectionObserver callback — see 4d */
 }
 
 /* Sentinel (base template §5b) */
-[data-component="InfiniteScrollSentinel"] .sentinel {
-  width: 10px; height: 10px; border-radius: 50%;
+[data-component='InfiniteScrollSentinel'] .sentinel {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   background: var(--primary-tint);
   opacity: 0.55;
 }
-[data-component="InfiniteScrollSentinel"] .sentinel.fetching {
+[data-component='InfiniteScrollSentinel'] .sentinel.fetching {
   animation: breathe 2.2s ease-in-out infinite;
 }
 ```
@@ -178,12 +209,25 @@ newCards.forEach((card, i) => {
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  [data-component="BoardDetailHeader"] { animation: none !important; }
-  [data-component="PinGridSkeleton"] .sk-v1 { animation: none !important; }
-  [data-component="PinCard"] { transition: none !important; }
-  [data-component="PinCard"]:hover { transform: none !important; box-shadow: none !important; }
-  [data-component="PinCard"].card-enter { animation: none !important; }
-  [data-component="InfiniteScrollSentinel"] .sentinel.fetching { animation: none !important; }
+  [data-component='BoardDetailHeader'] {
+    animation: none !important;
+  }
+  [data-component='PinGridSkeleton'] .sk-v1 {
+    animation: none !important;
+  }
+  [data-component='PinCard'] {
+    transition: none !important;
+  }
+  [data-component='PinCard']:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  [data-component='PinCard'].card-enter {
+    animation: none !important;
+  }
+  [data-component='InfiniteScrollSentinel'] .sentinel.fetching {
+    animation: none !important;
+  }
 }
 ```
 
@@ -197,31 +241,33 @@ newCards.forEach((card, i) => {
 
 ### 5a. Surface inventory
 
-| `data-component` | Element | Motion |
-|---|---|---|
-| `TokenRemediationLoadingSkeleton` | Brief loading sliver BEFORE view resolves | Shimmer (`sk-sweep`, 2.6s) |
-| `TokenInvalidView` (wrapper) | The whole view container | `view-settle` on mount, 240ms |
-| Icon glyph (disconnected-link, inside `TokenInvalidView`) | The restrained vector above h1 | **Static. No animation.** (See decision 5c.) |
-| h1 + Inter sentence | Heading block | Inherits parent fade-in (no own animation) |
-| `RemediationSteps` | Ordered list of 4 steps | No stagger on the steps — list appears atomically with parent |
-| Step-counter numerals (inside `RemediationSteps`) | The "1 / 2 / 3 / 4" circles with Mulberry Dusk border | Static |
-| `.link-action` ("Open Pinterest Dashboard") | Outbound link | Underline-grow on hover (base template §5e) + enhanced micro-interaction (see 5d) |
+| `data-component`                                          | Element                                               | Motion                                                                            |
+| --------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `TokenRemediationLoadingSkeleton`                         | Brief loading sliver BEFORE view resolves             | Shimmer (`sk-sweep`, 2.6s)                                                        |
+| `TokenInvalidView` (wrapper)                              | The whole view container                              | `view-settle` on mount, 240ms                                                     |
+| Icon glyph (disconnected-link, inside `TokenInvalidView`) | The restrained vector above h1                        | **Static. No animation.** (See decision 5c.)                                      |
+| h1 + Inter sentence                                       | Heading block                                         | Inherits parent fade-in (no own animation)                                        |
+| `RemediationSteps`                                        | Ordered list of 4 steps                               | No stagger on the steps — list appears atomically with parent                     |
+| Step-counter numerals (inside `RemediationSteps`)         | The "1 / 2 / 3 / 4" circles with Mulberry Dusk border | Static                                                                            |
+| `.link-action` ("Open Pinterest Dashboard")               | Outbound link                                         | Underline-grow on hover (base template §5e) + enhanced micro-interaction (see 5d) |
 
 ### 5b. Motion recipe
 
 ```css
 /* The whole view settles in as one composed piece — no inner stagger */
-[data-component="TokenInvalidView"] {
+[data-component='TokenInvalidView'] {
   animation: view-settle 240ms ease-out both;
 }
 
 /* Loading sliver that precedes the view — this is where shimmer lives, NOT on the remediation content */
-[data-component="TokenRemediationLoadingSkeleton"] .sk-v1 {
+[data-component='TokenRemediationLoadingSkeleton'] .sk-v1 {
   background:
-    linear-gradient(100deg,
-      rgba(255,255,255,0) 30%,
-      rgba(255,255,255,0.45) 50%,
-      rgba(255,255,255,0) 70%),
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0) 70%
+    ),
     var(--card);
   background-size: 220% 100%;
   background-position: 120% 0;
@@ -229,26 +275,32 @@ newCards.forEach((card, i) => {
 }
 
 /* Link-action underline grow (shared base template §5e) */
-[data-component="TokenInvalidView"] .link-action {
+[data-component='TokenInvalidView'] .link-action {
   position: relative;
   color: var(--primary);
   text-decoration: none;
   transition: color 180ms ease;
 }
-[data-component="TokenInvalidView"] .link-action::after {
-  content: ''; position: absolute; left: 0; bottom: -2px;
-  height: 1px; width: 0;
+[data-component='TokenInvalidView'] .link-action::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 0;
   background: currentColor;
   transition: width 220ms ease;
 }
-[data-component="TokenInvalidView"] .link-action:hover::after { width: 100%; }
+[data-component='TokenInvalidView'] .link-action:hover::after {
+  width: 100%;
+}
 
 /* Subtle arrow nudge on the outbound "Open Pinterest Dashboard" link (see 5d) */
-[data-component="TokenInvalidView"] .link-action .arrow {
+[data-component='TokenInvalidView'] .link-action .arrow {
   display: inline-block;
   transition: transform 220ms ease;
 }
-[data-component="TokenInvalidView"] .link-action:hover .arrow {
+[data-component='TokenInvalidView'] .link-action:hover .arrow {
   transform: translateX(2px);
 }
 ```
@@ -258,6 +310,7 @@ newCards.forEach((card, i) => {
 **Decision:** the disconnected-link glyph renders **statically**. No `stroke-dasharray` draw-in animation.
 
 **Rationale:**
+
 1. The glyph is informational, not decorative. It helps a user (likely Don debugging his own token at midnight) identify "this is the 401 screen" at a glance. A 600ms draw-in delays recognition.
 2. Option C's rule 4 says "motion dialed down." A draw-in would be the most animated element on the screen — inverting the intended hierarchy.
 3. The whole view already fades in via `view-settle` at 240ms. Layering a second animation on the glyph inside that parent fade is noisy.
@@ -289,11 +342,22 @@ This is strictly additive — only the outbound Pinterest link gets this treatme
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  [data-component="TokenInvalidView"] { animation: none !important; }
-  [data-component="TokenRemediationLoadingSkeleton"] .sk-v1 { animation: none !important; }
-  [data-component="TokenInvalidView"] .link-action { transition: none !important; }
-  [data-component="TokenInvalidView"] .link-action::after { transition: none !important; width: 0 !important; }
-  [data-component="TokenInvalidView"] .link-action .arrow { transition: none !important; }
+  [data-component='TokenInvalidView'] {
+    animation: none !important;
+  }
+  [data-component='TokenRemediationLoadingSkeleton'] .sk-v1 {
+    animation: none !important;
+  }
+  [data-component='TokenInvalidView'] .link-action {
+    transition: none !important;
+  }
+  [data-component='TokenInvalidView'] .link-action::after {
+    transition: none !important;
+    width: 0 !important;
+  }
+  [data-component='TokenInvalidView'] .link-action .arrow {
+    transition: none !important;
+  }
 }
 ```
 
@@ -305,10 +369,10 @@ This is strictly additive — only the outbound Pinterest link gets this treatme
 
 **Identical motion spec to `TokenInvalidView`** with three surface-level swaps:
 
-| Differs from 401 in | 401 | 403 |
-|---|---|---|
-| `data-component` | `TokenInvalidView` | `InsufficientScopeView` |
-| Icon glyph | disconnected-link | key-ring-with-missing-key |
+| Differs from 401 in         | 401                              | 403                              |
+| --------------------------- | -------------------------------- | -------------------------------- |
+| `data-component`            | `TokenInvalidView`               | `InsufficientScopeView`          |
+| Icon glyph                  | disconnected-link                | key-ring-with-missing-key        |
 | Step-counter numeral border | Mulberry Dusk (`var(--primary)`) | Champagne Gold (`var(--accent)`) |
 
 ### 6a. Motion recipe
@@ -316,16 +380,26 @@ This is strictly additive — only the outbound Pinterest link gets this treatme
 Everything from §5b, with the selector changed:
 
 ```css
-[data-component="InsufficientScopeView"] {
+[data-component='InsufficientScopeView'] {
   animation: view-settle 240ms ease-out both;
 }
 
 /* Same underline-grow + arrow nudge as TokenInvalidView */
-[data-component="InsufficientScopeView"] .link-action { /* …same as 5b… */ }
-[data-component="InsufficientScopeView"] .link-action::after { /* …same… */ }
-[data-component="InsufficientScopeView"] .link-action:hover::after { width: 100%; }
-[data-component="InsufficientScopeView"] .link-action .arrow { transition: transform 220ms ease; }
-[data-component="InsufficientScopeView"] .link-action:hover .arrow { transform: translateX(2px); }
+[data-component='InsufficientScopeView'] .link-action {
+  /* …same as 5b… */
+}
+[data-component='InsufficientScopeView'] .link-action::after {
+  /* …same… */
+}
+[data-component='InsufficientScopeView'] .link-action:hover::after {
+  width: 100%;
+}
+[data-component='InsufficientScopeView'] .link-action .arrow {
+  transition: transform 220ms ease;
+}
+[data-component='InsufficientScopeView'] .link-action:hover .arrow {
+  transform: translateX(2px);
+}
 ```
 
 ### 6b. Icon glyph decision — STATIC (same as 5c)
@@ -339,6 +413,7 @@ Identical to 5g with selector `[data-component="InsufficientScopeView"]` substit
 ### 6d. Note on visual distinctness without motion
 
 Option C rule 5 says "401 vs 403 must look visibly distinct at a glance." The motion spec is **identical** between the two views because:
+
 - Making motion differ would confuse the signal. If 403 shimmered and 401 did not, users would conflate motion with severity.
 - Both views are operator-facing remediation; both deserve the same composed tone.
 - The glyph + step-counter color difference is already at-a-glance distinguishable without invoking motion.
@@ -349,46 +424,47 @@ Option C rule 5 says "401 vs 403 must look visibly distinct at a glance." The mo
 
 ### 7a. Surface inventory
 
-| `data-component` | Element | Motion |
-|---|---|---|
-| `EmptyBoardsState` wrapper | Centered empty state, no boards from Pinterest | `view-settle` on mount, 240ms |
-| `EmptyBoardState` wrapper | Same pattern, for a specific empty board | `view-settle` on mount, 240ms |
-| Pushpin glyph | The minimal 40×40 glyph above the copy | **Static. No idle float.** (See decision 7c.) |
-| Fraunces "No boards yet." / "This board is empty." | Copy block | Inherits parent fade |
-| `BrowseErrorRetry` wrapper | Retryable browse error component | `view-settle` on mount, 240ms |
-| Retry button (inside `BrowseErrorRetry`) | The one actionable affordance in b5 | Enhanced micro-interaction (see 7d) |
+| `data-component`                                   | Element                                        | Motion                                        |
+| -------------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
+| `EmptyBoardsState` wrapper                         | Centered empty state, no boards from Pinterest | `view-settle` on mount, 240ms                 |
+| `EmptyBoardState` wrapper                          | Same pattern, for a specific empty board       | `view-settle` on mount, 240ms                 |
+| Pushpin glyph                                      | The minimal 40×40 glyph above the copy         | **Static. No idle float.** (See decision 7c.) |
+| Fraunces "No boards yet." / "This board is empty." | Copy block                                     | Inherits parent fade                          |
+| `BrowseErrorRetry` wrapper                         | Retryable browse error component               | `view-settle` on mount, 240ms                 |
+| Retry button (inside `BrowseErrorRetry`)           | The one actionable affordance in b5            | Enhanced micro-interaction (see 7d)           |
 
 ### 7b. Motion recipe
 
 ```css
-[data-component="EmptyBoardsState"],
-[data-component="EmptyBoardState"],
-[data-component="BrowseErrorRetry"] {
+[data-component='EmptyBoardsState'],
+[data-component='EmptyBoardState'],
+[data-component='BrowseErrorRetry'] {
   animation: view-settle 240ms ease-out both;
 }
 
 /* Retry button micro-interaction — b5 is where a LITTLE more life is earned */
-[data-component="BrowseErrorRetry"] .retry-button {
+[data-component='BrowseErrorRetry'] .retry-button {
   transition:
     transform 180ms ease,
     background-color 180ms ease,
     box-shadow 220ms ease;
   will-change: transform;
 }
-[data-component="BrowseErrorRetry"] .retry-button:hover {
+[data-component='BrowseErrorRetry'] .retry-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--primary) 25%, transparent);
+  box-shadow: 0 6px 16px -8px
+    color-mix(in oklab, var(--primary) 25%, transparent);
 }
-[data-component="BrowseErrorRetry"] .retry-button:active {
+[data-component='BrowseErrorRetry'] .retry-button:active {
   transform: translateY(0);
   transition-duration: 80ms;
 }
 
 /* The retry icon (circular arrow) gets a quarter-rotation on hover — quiet, intentional */
-[data-component="BrowseErrorRetry"] .retry-button .retry-icon {
+[data-component='BrowseErrorRetry'] .retry-button .retry-icon {
   transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-[data-component="BrowseErrorRetry"] .retry-button:hover .retry-icon {
+[data-component='BrowseErrorRetry'] .retry-button:hover .retry-icon {
   transform: rotate(90deg);
 }
 ```
@@ -398,6 +474,7 @@ Option C rule 5 says "401 vs 403 must look visibly distinct at a glance." The mo
 **Decision:** the pushpin glyph renders **statically** on both `EmptyBoardsState` and `EmptyBoardState`. No 3-4px float loop.
 
 **Rationale:**
+
 1. An idle float loop on an empty state draws the eye indefinitely. The purpose of an empty state is to communicate "there is nothing here" and offer next steps — not to hold attention.
 2. Don's "pops of fun" is an affirm for motion + illustration, not an instruction to animate everything. The illustration IS the pop here. Motion would be redundant.
 3. The pushpin glyph is a static object in real life. A floating pushpin reads as surreal/playful, which conflicts with the editorial, quietly-luxurious brand tone.
@@ -425,14 +502,27 @@ This is the ONE place in Epic B where a hover affordance does more than underlin
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  [data-component="EmptyBoardsState"],
-  [data-component="EmptyBoardState"],
-  [data-component="BrowseErrorRetry"] { animation: none !important; }
-  [data-component="BrowseErrorRetry"] .retry-button { transition: none !important; }
-  [data-component="BrowseErrorRetry"] .retry-button:hover { transform: none !important; box-shadow: none !important; }
-  [data-component="BrowseErrorRetry"] .retry-button:active { transform: none !important; }
-  [data-component="BrowseErrorRetry"] .retry-button .retry-icon { transition: none !important; }
-  [data-component="BrowseErrorRetry"] .retry-button:hover .retry-icon { transform: none !important; }
+  [data-component='EmptyBoardsState'],
+  [data-component='EmptyBoardState'],
+  [data-component='BrowseErrorRetry'] {
+    animation: none !important;
+  }
+  [data-component='BrowseErrorRetry'] .retry-button {
+    transition: none !important;
+  }
+  [data-component='BrowseErrorRetry'] .retry-button:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  [data-component='BrowseErrorRetry'] .retry-button:active {
+    transform: none !important;
+  }
+  [data-component='BrowseErrorRetry'] .retry-button .retry-icon {
+    transition: none !important;
+  }
+  [data-component='BrowseErrorRetry'] .retry-button:hover .retry-icon {
+    transform: none !important;
+  }
 }
 ```
 
@@ -448,17 +538,27 @@ Paste this **once** per wireframe, after all component-specific `@media` overrid
   .sk-v1,
   .sentinel.fetching,
   .card-enter,
-  [data-component$="View"],
-  [data-component$="State"],
-  [data-component$="Retry"],
-  [data-component^="Board"],
-  [data-component^="Pin"],
-  [data-component$="Skeleton"] { animation: none !important; }
+  [data-component$='View'],
+  [data-component$='State'],
+  [data-component$='Retry'],
+  [data-component^='Board'],
+  [data-component^='Pin'],
+  [data-component$='Skeleton'] {
+    animation: none !important;
+  }
 
   /* Hover transforms neutralized; color-shifts preserved (still informational) */
-  .card { transition: none !important; }
-  .card:hover { transform: none !important; box-shadow: none !important; }
-  .link-action::after { transition: none !important; width: 0 !important; }
+  .card {
+    transition: none !important;
+  }
+  .card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .link-action::after {
+    transition: none !important;
+    width: 0 !important;
+  }
 }
 ```
 
@@ -520,6 +620,7 @@ Neither is a blocker. The wireframes can be produced against this spec as-is; th
 **Motion principle for Epic B:** quiet, editorial, composed. Motion works WITH illustration, never LOUDER than it. Every animated surface has a reduced-motion twin. Compositor-only properties except the contained shimmer. No JS libraries.
 
 **The three load-bearing decisions in this spec:**
+
 1. **b3 stagger = 40ms increment, 320ms envelope cap, clamped** — any more and new-page loads feel sluggish.
 2. **b4 icon glyphs are static** — motion should not be the thing that distinguishes 401 from 403; color + shape already do that, and they stay distinguishable under reduced-motion.
 3. **b5 pushpin glyph is static** — empty states communicate absence; idle motion contradicts that message.

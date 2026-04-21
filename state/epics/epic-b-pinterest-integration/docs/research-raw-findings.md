@@ -7,23 +7,27 @@
 ## A. Codebase (Epic A surface Epic B will consume)
 
 ### A.1 Env validation — `lib/env.ts`
+
 - Zod schema at `lib/env.ts:~40-65` declares `PINTEREST_ACCESS_TOKEN: requiredString`. **Already required** and will throw at startup if missing.
 - `PINTEREST_APP_ID` is referenced in `.env.example` and `.env.local` but is **NOT** in the `Env` interface or schema — currently not validated, not exposed via `env.PINTEREST_APP_ID`. If Epic B needs it (e.g., for token-setup guidance links), it must be added.
 - Typed `Env` interface exports: `PINTEREST_ACCESS_TOKEN: string` is the only Pinterest key.
 - `env` is a module singleton: `export const env: Env = getEnv();` — any import of `@/lib/env` materializes all env values synchronously at startup.
 
 ### A.2 Firebase server wiring — `lib/firebase/`
+
 - `lib/firebase/server.ts` begins with `import 'server-only';` (line 1, verified by `server_only_usage` grep and asserted by a unit test). This is the **pattern to copy** for `lib/pinterest/api.ts`.
 - `lib/firebase/session.ts` exposes `getSession(req): Promise<Session | null>` and `getSessionFromCookieString()`, both calling `createServerFirebaseAdmin()`. These use firebase-admin and therefore run in the Node runtime, not edge.
 - `lib/firebase/client.ts` handles the browser-side Firebase SDK with `NEXT_PUBLIC_*` vars — Epic B must not import this on any code path that touches the Pinterest token.
 - Memoization pattern: `createServerFirebaseAdmin()` uses `globalThis[Symbol.for('firebase-admin-app')]` to dedupe across HMR. Good template if we need a memoized Pinterest client.
 
 ### A.3 Authenticated shell — `app/(authenticated)/`
+
 - `app/(authenticated)/layout.tsx` exists with a Header + Footer scaffold wrapping `<main className="mx-auto max-w-6xl px-6 py-8 sm:py-10">{children}</main>`.
 - `app/(authenticated)/page.tsx` is the dashboard. It uses generous rounded cards, `bg-card`, `text-foreground`, `font-heading-display`, `--gradient-signature`, and `focus-visible:ring-2` tokens — reuse in Pinterest UI to stay on-brand.
 - **Epic B nests under `app/(authenticated)/pinterest/`** → `page.tsx` (board grid) + `[boardId]/page.tsx` (pin grid). Slice 2 outline lists `page.tsx` but the board-detail file is not explicitly named; architect should confirm route shape.
 
 ### A.4 Middleware + session guard
+
 - `middleware.ts` uses a single negative-lookahead regex matcher:
   ```
   '/((?!login$|login/|api/health$|_next/|favicon\\.ico$|robots\\.txt$).*)'
@@ -33,6 +37,7 @@
 - `lib/auth/allowlist.ts` exports `assertAllowedEmail()` — returns `{ok: true}` or `{ok: false, reason: 'not_allowed' | 'invalid_format'}`. Use in any server action / route handler that needs a defense-in-depth check beyond the cookie.
 
 ### A.5 Styling — Tailwind v4 CSS-based config
+
 - **No `tailwind.config.ts`** — project uses Tailwind v4 via `@import 'tailwindcss';` in `app/globals.css` with `@theme inline { ... }` token declarations.
 - Available brand tokens (see `app/globals.css`):
   - Colors: `--color-primary` `#6b3f5e`, `--color-primary-tint`, `--color-accent` `#c9a96e`, `--color-neutral-fg`, `--color-neutral-muted`, `--color-surface`, `--color-surface-raised`, `--color-destructive`.
@@ -44,6 +49,7 @@
 - No explicit grid/card utilities pre-defined beyond Tailwind defaults; Pinterest UI will use standard `grid grid-cols-*` and `gap-*`.
 
 ### A.6 Components directory — DOES NOT EXIST
+
 - `components/` is **absent**. Epic B creates it. `components.json` (shadcn config) is present and points to:
   - `"components": "@/components"`, `"ui": "@/components/ui"`, `"utils": "@/lib/utils"`.
   - `baseColor: "neutral"`, `iconLibrary: "lucide"`.
@@ -51,6 +57,7 @@
 - **No shadcn primitives are installed yet.** If the design needs `<Button>`, `<Card>`, `<Skeleton>`, etc., the epic either (a) brings them in via `shadcn add` or (b) rolls plain Tailwind components. Decision point.
 
 ### A.7 Tests — conventions
+
 - `tests/unit/` uses Vitest. Conventions observed:
   - `import { describe, it, expect, vi, beforeEach } from 'vitest';`
   - Relative path imports (`../../../../lib/firebase/server`) not `@/` in test files — aliases may not be wired in vitest.
@@ -69,6 +76,7 @@
 - No `tests/unit/pinterest/` yet — Slice 2 adds it.
 
 ### A.8 Env files — current shape
+
 - `.env.example` (committed) contains a `Pinterest` section with clear setup comments:
   ```
   # --- Pinterest (static-token approach, single-user) ---
@@ -80,17 +88,21 @@
 - `PINTEREST_APP_ID=1562835` per sign-off #17 (project owner's app).
 
 ### A.9 Package + next config
+
 - `package.json`: Next.js ^15, React 19, firebase 12.x, firebase-admin 13.x, Tailwind v4, Vitest, Playwright, ESLint 9, zod. No Pinterest SDK — raw `fetch` will be used.
 - `next.config.ts` currently minimal (`const nextConfig: NextConfig = {}; export default nextConfig;`). **No `images.remotePatterns` set** — Epic B must add one for `i.pinimg.com` (see Section C.2).
 - Scripts include `lint`, `format`, `test`, `test:unit`, `test:e2e`, `typecheck`. CI hooked.
 
 ### A.10 Sign-off #17 confirmation (`state/planning/sign-off.md:52-58`)
+
 - Decision is authoritative: **static token, no OAuth callback, no refresh, no client_secret usage**.
 - Token belongs to the project owner's Pinterest account (app ID `1562835`).
 - Follow-up path: add wife as trial user on the app later; same env var swap, no code change.
 
 ### A.11 Epic B outline — Slice 2 file plan (`structured-outline.md`)
+
 Files Slice 2 names (authoritative for story decomposition):
+
 1. `app/(authenticated)/pinterest/page.tsx`
 2. `app/api/pinterest/boards/route.ts`
 3. `app/api/pinterest/boards/[id]/pins/route.ts`
@@ -109,6 +121,7 @@ Files Slice 2 names (authoritative for story decomposition):
 ## B. Pinterest API v5
 
 ### B.1 Auth + scopes
+
 - **Header:** `Authorization: Bearer {token}` — confirmed via Pinterest docs example `curl https://api.pinterest.com/v5/user_account --header 'Authorization: Bearer {your_token}'`.
 - **Base URL:** `https://api.pinterest.com/v5` (production). Sandbox at `https://api-sandbox.pinterest.com/v5` (not needed; we're production-only).
 - **Token format:** Pinterest issues access tokens with the `pina_` prefix (short-lived, 2592000s = 30 days for OAuth-issued tokens; **static tokens created on the developer dashboard under the project owner's app also carry the `pina_` prefix and have their own TTL**). Context7 confirms the 30-day expiry on standard access tokens — this is a real operational risk for a "static" token integration. **Flagged in section D.**
@@ -121,17 +134,20 @@ Files Slice 2 names (authoritative for story decomposition):
 ### B.2 Endpoints used in scope
 
 #### B.2.1 `GET /v5/user_account`
+
 - Purpose in our scope: token sanity check (liveness probe). Context7 confirms this is the canonical "does my token work?" endpoint.
 - Success returns user account JSON (username, account_type, profile_image fields — exact shape not returned in snippet, but Pinterest docs describe `username`, `account_type`, `profile_image`, `website_url`, `about`, `business_name`, `board_count`, `pin_count`, `follower_count`, `following_count`, `monthly_views`).
 - **Error 401 with `code: 2`** = invalid/expired token (authoritative, directly from context7).
 
 #### B.2.2 `GET /v5/boards`
+
 - Lists boards. Context7 returned only the bare endpoint entry (`GET /boards`) — the detailed query parameter table was not in the indexed snippets for this specific endpoint. **HOWEVER**, the pagination conventions below apply universally (confirmed on the pagination reference page), and other list endpoints in the same family (`GET /pins`, `GET /boards/{board_id}/pins`) share the `bookmark` + `page_size` model. Safe to assume:
   - Query: `page_size` (default 25, max 250), `bookmark` (cursor), plus `privacy` (PUBLIC / PROTECTED / SECRET / ALL) filter per Pinterest v5 spec.
 - Response: `{ items: Board[], bookmark: string|null }` with each `Board` having (per v5 spec, pattern confirmed via adjacent endpoints): `id`, `name`, `description`, `privacy`, `pin_count`, `follower_count`, `created_at`, `board_pins_modified_at`, `media` (image preview), `owner.username`.
 - **Open item for web-research:** the exact field list for `Board` (especially the cover-image URL field names and sizes). Context7 snippets did not surface a full Board schema. Flagged in Section F.
 
 #### B.2.3 `GET /v5/boards/{board_id}/pins`
+
 - **Directly confirmed via context7 (authoritative snippet):**
   ```
   GET https://api.pinterest.com/v5/boards/{board_id}/pins
@@ -148,6 +164,7 @@ Files Slice 2 names (authoritative for story decomposition):
   - `pin_metrics.{90d,lifetime_metrics}` (only populated when explicitly requested via `pin_metrics=true`).
 
 ### B.3 Pagination model
+
 - **Cursor-based** via `bookmark`. Same contract across all list endpoints:
   1. First request has no `bookmark`.
   2. Response returns `bookmark: "opaque-string" | null`.
@@ -156,6 +173,7 @@ Files Slice 2 names (authoritative for story decomposition):
 - **UX implication** (for section D): standard cursor pattern, pairs well with "Load more" button or IntersectionObserver infinite scroll. No random-access paging possible.
 
 ### B.4 Error shapes
+
 - **401** — Authentication failed/missing. Specific API `code: 2` on expired/invalid token (authoritative). Body shape is standard Pinterest error envelope (context7 snippet shows `code` and status-level description).
 - **403** — Valid auth but insufficient scope or forbidden action (e.g., reading a board the token owner doesn't have access to).
 - **404** — Resource not found (invalid board ID).
@@ -166,6 +184,7 @@ Files Slice 2 names (authoritative for story decomposition):
 Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code enum is not exhaustively listed in the indexed context7 content beyond `code: 2` for invalid token — additional codes need web verification if we want precise mapping (flagged in F).
 
 ### B.5 Rate limits
+
 - Pinterest uses **rate-limit categories** per endpoint (`org_read`, `org_write`, `ads_read`, `ads_write`, `trusted_read`, etc.). Browse endpoints fall under `org_read`.
 - **Exact per-minute/per-hour limits are not returned in context7 snippets** — Pinterest publishes them on the rate-limits page but the indexed content only surfaces the header-format sample:
   ```
@@ -178,6 +197,7 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 - **Backoff:** honor `x-ratelimit-reset` or standard `Retry-After`. Context7 did not show a Pinterest-specific `Retry-After` example — flagged as F item.
 
 ### B.6 Image CDN
+
 - **Hostname:** `i.pinimg.com` (directly confirmed by the response sample URLs: `https://i.pinimg.com/150x150/...`, `.../600x/...`, `.../1200x/...`).
 - **URL pattern:** `https://i.pinimg.com/{size}/{hex}/{hex}/{hex}/{file}.jpg`.
 - Sizes present in pin responses: `150x150`, `400x300`, `600x`, `1200x`. For a responsive grid the natural pairings are `400x300` (grid thumbnail), `600x` (tablet), `1200x` (desktop full-width).
@@ -185,8 +205,9 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 - **`next/image` remotePatterns entry** (see C.2).
 
 ### B.7 Revocation signals
+
 - **Authoritative:** expired or invalid token → `HTTP 401` with API error `code: 2`. Same surface for both cases — the integration cannot distinguish "expired" from "revoked" from "malformed" beyond the code.
-- For our "token-replacement guidance" error UX (per US-B-1 AC), all three cases collapse into the same user-facing message: *"Pinterest connection needs a new token."* This is acceptable.
+- For our "token-replacement guidance" error UX (per US-B-1 AC), all three cases collapse into the same user-facing message: _"Pinterest connection needs a new token."_ This is acceptable.
 - **No refresh path exists in our implementation** (sign-off #17 explicitly rejects OAuth refresh code).
 
 ---
@@ -194,8 +215,10 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 ## C. Next.js 15 integration
 
 ### C.1 Server-side fetch pattern
+
 - All Pinterest calls must originate from server components / route handlers / server actions. `lib/pinterest/api.ts` should begin with `import 'server-only';` (mirroring `lib/firebase/server.ts`).
 - **Recommended pattern** (confirmed in Next.js 15 docs via context7):
+
   ```ts
   // lib/pinterest/api.ts
   import 'server-only';
@@ -203,7 +226,10 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 
   const BASE = 'https://api.pinterest.com/v5';
 
-  async function pinterestFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  async function pinterestFetch<T>(
+    path: string,
+    init?: RequestInit
+  ): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
       ...init,
       headers: {
@@ -217,6 +243,7 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
     return res.json() as Promise<T>;
   }
   ```
+
 - **Caching decision (architect debate):** Next.js 15 gives three options:
   - `cache: 'force-cache'` (default) — bad here, we'd serve stale board data indefinitely.
   - `cache: 'no-store'` — every request hits Pinterest. Simple, correct for a single-user app with negligible traffic. Recommended default.
@@ -224,6 +251,7 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 - **Why not an API route wrapper for the board list?** Slice 2 outline includes `app/api/pinterest/boards/route.ts` anyway, which works as a passthrough. Rationale (plan-level): it keeps the route handler surface available for the later design-creation flow to reuse without tying the page to a server-component-only contract. Architect should confirm this isn't redundant with the server-component approach — could go either way.
 
 ### C.2 `next/image` remotePatterns
+
 - `next.config.ts` currently has no `images` block. Add:
   ```ts
   const nextConfig: NextConfig = {
@@ -241,12 +269,14 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 - Alternatively, **skip `next/image` entirely** and use plain `<img>` with Pinterest's pre-sized URLs — sidesteps the optimizer entirely, saves Vercel image-optimization usage, and Pinterest already serves correctly-sized variants (`400x300`, `600x`, `1200x`). Architect debate point: `next/image` gives blur placeholders + lazy loading for free, but adds optimizer round-trip cost on Vercel. Recommendation: **use `next/image` with `unoptimized={true}`** or the `remotePatterns` entry — preserves `loading="lazy"` and layout stability.
 
 ### C.3 App Router page shapes
+
 - `app/(authenticated)/pinterest/page.tsx` — server component, `async` default export, fetches boards via `lib/pinterest/api.ts`.
 - `app/(authenticated)/pinterest/[boardId]/page.tsx` — server component, `async`, takes `{ params: { boardId: string } }`, calls `notFound()` (from `next/navigation`) on 404.
 - **Streaming / Suspense:** Next.js 15 docs recommend `<Suspense>` + loading UI for parallel data fetches. Pins + board metadata are the two calls on the detail page — wrap in Suspense to stream the pin grid independently. Optional polish; not required for Slice 2 cut line.
 - `loading.tsx` per segment for skeleton — cheap, good UX for single-user / variable-latency upstream.
 
 ### C.4 Error / not-found boundaries
+
 - **`app/(authenticated)/pinterest/error.tsx`** — Client Component (`'use client'` directive required per Next.js docs, confirmed via context7). Signature:
   ```tsx
   'use client';
@@ -262,6 +292,7 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 - **Token-invalid UX branching:** thrown `PinterestApiError` should carry a discriminated status (401 / 403 / 429 / 5xx) so `error.tsx` can render the correct message (token replacement vs "try again"). The error shape is observable inside `error.tsx` via `error.digest` plus a custom property — but error-boundary children **do not receive the original Error instance over the network** in production (serialized). Better pattern: route the 401 case through a redirect to `/pinterest/token-missing` or render a dedicated component inside the page when the fetch returns 401 (no throw), reserving `throw` for unexpected failures.
 
 ### C.5 `server-only` package
+
 - Already in lockfile (implicit via firebase server import). `lib/pinterest/api.ts` should import it on line 1. Tests should mock it (`vi.mock('server-only', () => ({}))`) to stay runnable in node test env — same pattern as `tests/unit/lib/firebase/server.test.ts`.
 
 ---
@@ -299,12 +330,13 @@ Pinterest returns JSON bodies with `code` + `message` fields. Exact error-code e
 
 ## E. Context7 sources (with versions)
 
-| Library / site | Context7 ID | Queried |
-|---|---|---|
-| Pinterest Developer Platform | `/websites/developers_pinterest` | auth header, endpoint specs, pagination, rate-limit headers, error codes |
-| Next.js 15.1.8 | `/vercel/next.js/v15.1.8` | server component fetch, `remotePatterns`, `error.tsx`, `not-found.tsx`, `server-only`, streaming |
+| Library / site               | Context7 ID                      | Queried                                                                                          |
+| ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Pinterest Developer Platform | `/websites/developers_pinterest` | auth header, endpoint specs, pagination, rate-limit headers, error codes                         |
+| Next.js 15.1.8               | `/vercel/next.js/v15.1.8`        | server component fetch, `remotePatterns`, `error.tsx`, `not-found.tsx`, `server-only`, streaming |
 
 Confidence:
+
 - **A. Codebase:** High — direct file reads.
 - **B.1 Auth, B.3 Pagination, B.6 Image CDN, B.7 Revocation:** High — directly confirmed via context7 snippets.
 - **B.2.1 user_account, B.2.3 boards/{id}/pins:** High — confirmed.
