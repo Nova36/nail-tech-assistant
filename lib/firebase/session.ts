@@ -24,6 +24,10 @@ export async function getSessionFromCookieString(
     );
 
     if (!decodedClaims.email) {
+      console.error(
+        '[getSessionFromCookieString] decoded claims missing email',
+        { uid: decodedClaims.uid }
+      );
       return null;
     }
 
@@ -31,7 +35,13 @@ export async function getSessionFromCookieString(
       uid: decodedClaims.uid,
       email: decodedClaims.email,
     };
-  } catch {
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[getSessionFromCookieString] verifySessionCookie failed', {
+      code,
+      message,
+    });
     return null;
   }
 }
