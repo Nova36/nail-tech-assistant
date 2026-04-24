@@ -90,11 +90,19 @@ export default async function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps) {
   const cookieStore = await cookies();
-  const session = await getSessionFromCookieString(
-    cookieStore.get('session')?.value
-  );
+  const rawCookie = cookieStore.get('session')?.value;
+  console.log('[authLayout] entered', {
+    hasCookie: Boolean(rawCookie),
+    cookieLen: rawCookie?.length ?? 0,
+  });
+  const session = await getSessionFromCookieString(rawCookie);
+  console.log('[authLayout] session resolved', {
+    hasSession: Boolean(session),
+    uid: session?.uid ?? null,
+  });
 
   if (!session) {
+    console.log('[authLayout] no session, redirecting to /login');
     redirect('/login');
   }
 

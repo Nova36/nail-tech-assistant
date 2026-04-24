@@ -20,12 +20,18 @@ function isPublic(pathname: string): boolean {
 
 export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
+  const hasCookie = hasSessionCookie(req);
+  console.log('[middleware] request', { pathname, hasCookie });
 
   if (isPublic(pathname)) {
+    console.log('[middleware] public pass-through', { pathname });
     return NextResponse.next();
   }
 
-  if (hasSessionCookie(req)) {
+  if (hasCookie) {
+    console.log('[middleware] session cookie present, pass-through', {
+      pathname,
+    });
     return NextResponse.next();
   }
 
@@ -33,6 +39,9 @@ export function middleware(req: NextRequest): NextResponse {
   url.pathname = '/login';
   url.searchParams.set('from', pathname);
 
+  console.log('[middleware] no session cookie, redirecting to /login', {
+    pathname,
+  });
   return NextResponse.redirect(url);
 }
 
