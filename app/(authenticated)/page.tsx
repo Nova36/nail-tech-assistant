@@ -165,7 +165,7 @@ export default async function AuthenticatedHomePage() {
 
       <div className="grid gap-6" style={{ gridTemplateColumns: '1.1fr 1fr' }}>
         <article
-          className="relative flex min-h-[560px] flex-col gap-8 overflow-hidden rounded-[28px] p-8 shadow-[0_18px_44px_rgba(61,53,48,0.12)]"
+          className="relative flex min-h-[720px] flex-col gap-8 overflow-hidden rounded-[28px] p-8 shadow-[0_18px_44px_rgba(61,53,48,0.12)]"
           style={{ background: 'var(--gradient-signature)' }}
         >
           <div className="flex items-start justify-between gap-4">
@@ -217,7 +217,7 @@ export default async function AuthenticatedHomePage() {
           </div>
         </article>
 
-        <article className="flex min-h-[560px] flex-col gap-6 rounded-[28px] border border-dashed border-[color:rgb(107_63_94_/_0.30)] bg-background/60 p-8 shadow-[0_8px_28px_rgba(61,53,48,0.06)]">
+        <article className="flex min-h-[720px] flex-col gap-6 rounded-[28px] border border-dashed border-[color:rgb(107_63_94_/_0.30)] bg-background/60 p-8 shadow-[0_8px_28px_rgba(61,53,48,0.06)]">
           <div className="space-y-3">
             <p className="font-body text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
               — Your Gallery
