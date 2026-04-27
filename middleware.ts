@@ -1,52 +1,23 @@
 /**
- * A4 test-spec stub — overwritten in implement phase.
+ * Edge middleware: pass-through only. Auth is enforced server-side in
+ * the (authenticated) layout via verifySessionCookie, which checks the
+ * Firebase signature — a stronger guarantee than a presence check.
  *
- * Real implementation (edge runtime): checks presence of the 'session' cookie
- * and redirects to /login?from=<pathname> when missing. Pass-through for
- * /login and /api/health as belt-and-suspenders. Matcher excludes public paths.
+ * Headers x-mw-saw and x-mw-cookie-len are diagnostic; readable from
+ * any response in DevTools so we can confirm middleware actually ran
+ * without depending on Vercel log streaming.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { hasSessionCookie } from './lib/auth/session-guard';
-
-const PUBLIC_EXACT = new Set(['/login', '/api/health', '/api/auth/session']);
-
-function isPublic(pathname: string): boolean {
-  if (PUBLIC_EXACT.has(pathname)) return true;
-  if (pathname.startsWith('/_next/')) return true;
-  if (pathname === '/favicon.ico' || pathname === '/robots.txt') return true;
-  return false;
-}
-
 export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
-  const hasCookie = hasSessionCookie(req);
-  console.log('[middleware] request', { pathname, hasCookie });
-
-  if (isPublic(pathname)) {
-    console.log('[middleware] public pass-through', { pathname });
-    return NextResponse.next();
-  }
-
-  if (hasCookie) {
-    console.log('[middleware] session cookie present, pass-through', {
-      pathname,
-    });
-    return NextResponse.next();
-  }
-
-  const url = req.nextUrl.clone();
-  url.pathname = '/login';
-  url.searchParams.set('from', pathname);
-
-  console.log('[middleware] no session cookie, redirecting to /login', {
-    pathname,
-  });
-  return NextResponse.redirect(url);
+  const cookieValue = req.cookies.get('session')?.value ?? '';
+  const response = NextResponse.next();
+  response.headers.set('x-mw-saw', pathname);
+  response.headers.set('x-mw-cookie-len', String(cookieValue.length));
+  return response;
 }
 
 export const config = {
-  matcher: [
-    '/((?!login$|login/|api/health$|api/auth/session$|_next/|favicon\\.ico$|robots\\.txt$).*)',
-  ],
+  matcher: ['/((?!_next/|favicon\\.ico$|robots\\.txt$).*)'],
 };

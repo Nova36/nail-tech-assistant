@@ -1,10 +1,12 @@
+import { getAuth } from 'firebase-admin/auth';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { getSessionFromCookieString } from '@/lib/firebase/session';
+import { createServerFirebaseAdmin } from '@/lib/firebase/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 type AuthenticatedLayoutProps = {
   children: import('react').ReactNode;
@@ -91,18 +93,52 @@ export default async function AuthenticatedLayout({
 }: AuthenticatedLayoutProps) {
   const cookieStore = await cookies();
   const rawCookie = cookieStore.get('session')?.value;
-  console.log('[authLayout] entered', {
-    hasCookie: Boolean(rawCookie),
-    cookieLen: rawCookie?.length ?? 0,
-  });
-  const session = await getSessionFromCookieString(rawCookie);
-  console.log('[authLayout] session resolved', {
-    hasSession: Boolean(session),
-    uid: session?.uid ?? null,
-  });
 
-  if (!session) {
-    console.log('[authLayout] no session, redirecting to /login');
+  if (!rawCookie) {
+    redirect('/login');
+  }
+
+  let verifyError: { code?: string; message: string } | null = null;
+  let uid: string | null = null;
+  let email: string | null = null;
+  try {
+    const app = createServerFirebaseAdmin();
+    const decodedClaims = await getAuth(app).verifySessionCookie(
+      rawCookie,
+      false
+    );
+    uid = decodedClaims.uid;
+    email = decodedClaims.email ?? null;
+  } catch (error) {
+    verifyError = {
+      code: (error as { code?: string } | null)?.code,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  if (verifyError) {
+    return (
+      <div className="min-h-screen bg-background p-8 font-mono text-sm">
+        <h1 className="mb-4 text-xl font-bold">
+          Auth verification failed (diag)
+        </h1>
+        <pre className="whitespace-pre-wrap rounded bg-black/10 p-4">
+          {JSON.stringify(
+            { code: verifyError.code, message: verifyError.message },
+            null,
+            2
+          )}
+        </pre>
+        <p className="mt-6">
+          <Link href="/login" className="underline">
+            Back to /login
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
+  if (!uid || !email) {
     redirect('/login');
   }
 
