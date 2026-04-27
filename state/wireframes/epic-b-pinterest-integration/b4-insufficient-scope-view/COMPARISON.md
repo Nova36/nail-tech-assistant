@@ -112,3 +112,14 @@ The dashed-loop "missing key" metaphor is the choice I made over the base-templa
 > Which b4-403 (InsufficientScopeView) rendition should I ship — v1 (Intimate, max-w-md, 32px key-ring), v2 (Balanced, max-w-xl, 40px key-ring, expected default), or v3 (Confident, max-w-2xl, 48px key-ring, "Scope status" eyebrow)?
 >
 > My recommended default is **v2** to pair with b4-401 v2 — they share the same composed Option C tone, matched sizes, and only differ by the 3 allowed variables (glyph shape, step-border color, step-2 copy). Avoid mixing rendition tiers between the two 401/403 views — they should be visited as a pair.
+
+---
+
+## DECISION
+
+**Selected:** `v2.html` (Balanced — max-w-xl, 40px key-ring-with-empty-slot glyph)
+**Approved by:** Don
+**Approved at:** 2026-04-20 (Touchpoint 1; recorded in commit `77f08157` message)
+**Backfilled to this file at:** 2026-04-27 (per Don's confirmation "lets go with v2 of them all")
+**Pruned variants:** v1 (Intimate) and v3 (Confident) removed from disk after selection.
+**Pair note:** Matches `b4-token-invalid-view` v2 selection — the two screens render as a matched pair sharing Option C tone, differing only in the architect MAJOR-2 allowed variables (glyph shape, step-border color, step-2 copy).

@@ -96,3 +96,14 @@ The risk of v2 is minor visual weight at narrow widths, mitigated with the `max-
 > Which b5 rendition should I ship — v1 (Centered, simple circle-with-dot pushpin) or v2 (Composed, left-aligned with dashed board silhouette + fuller pushpin)?
 >
 > My recommended default is **v2** — the dashed silhouette carries the editorial brand tone into empty states, matching the rest of Epic B. v1 is an acceptable MVP but reads as under-designed next to the dashboard and b2 winner. `BrowseErrorRetry` is effectively identical between the two.
+
+---
+
+## DECISION
+
+**Selected:** `v2.html` (Composed — dashed board silhouette + fuller pushpin overlay, left-aligned 5-col empty states)
+**Approved by:** Don
+**Approved at:** 2026-04-20 (Touchpoint 1; recorded in commit `77f08157` message)
+**Backfilled to this file at:** 2026-04-27 (per Don's confirmation "lets go with v2 of them all")
+**Pruned variants:** v1 (Centered) removed from disk after selection.
+**Scope note:** Lighter-touch addendum (not a full Touchpoint 1) covering 3 polish surfaces — `EmptyBoardsState`, `EmptyBoardState`, `BrowseErrorRetry`. `BrowseErrorRetry` was identical in both renditions; the v2 selection only differentiates the two empty-state components.

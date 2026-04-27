@@ -118,3 +118,13 @@ If Don wants the Pinterest detail screen to feel **more special** than the board
 > Which b3 rendition should I ship — v1 (Denser, 4-col, 4:5 portrait), v2 (Editorial, 3-col, 1:1 square, matches b2 winner), or v3 (Magazine, 2-col, 3:4 classic-pinterest, eyebrow+meta above title)?
 >
 > My recommended default is **v2** — it inherits the b2 winner's layout grammar and reads as a continuation of the same page family. v1 packs more pins above fold but feels functional rather than editorial. v3 is the most distinctive but introduces a title/meta inversion that departs from b2.
+
+---
+
+## DECISION
+
+**Selected:** `v2.html` (Editorial — 3-col, 1:1 square, matches b2 winner layout grammar)
+**Approved by:** Don
+**Approved at:** 2026-04-20 (Touchpoint 1; recorded in commit `77f08157` message)
+**Backfilled to this file at:** 2026-04-27 (per Don's confirmation "lets go with v2 of them all")
+**Pruned variants:** v1 (Denser) and v3 (Magazine) removed from disk after selection.

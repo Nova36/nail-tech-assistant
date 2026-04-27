@@ -72,3 +72,14 @@ When you're ready to lock in the choice, tell me:
 - Which file you want approved (path)
 - Any small tweaks (one revision cycle)
 - Whether to also use this winning approach as the template for b3 + b4 wireframes
+
+---
+
+## DECISION
+
+**Selected:** `claude-v2.html` (Editorial)
+**Shimmer keyframe source:** `claude-v1.html` — kept on disk for the implementation step to lift its shimmer keyframes; not a competing layout option.
+**Approved by:** Don
+**Approved at:** 2026-04-20 (Touchpoint 1; recorded in commit `77f08157` message)
+**Backfilled to this file at:** 2026-04-27 (per Don's confirmation "lets go with v2 of them all")
+**Internal-vs-external note:** the verdict above recommends the internal `ui-designer` set on brief-fidelity grounds (inline `:root` tokens + `data-component` annotations the Claude design set lacks). Don's ship-pick is `claude-v2` regardless. The developer agent should compensate by importing the inline `:root` block from `app/globals.css` when porting, and inferring `data-component` boundaries from class strings rather than relying on annotations.

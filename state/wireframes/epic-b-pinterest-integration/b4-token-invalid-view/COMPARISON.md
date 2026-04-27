@@ -131,3 +131,14 @@ The rupture ticks are the only licence I took — small 1px-weight "spark" strok
 > Which b4-401 (TokenInvalidView) rendition should I ship — v1 (Intimate, max-w-md, 32px glyph, tight), v2 (Balanced, max-w-xl, 40px glyph, medium), or v3 (Confident, max-w-2xl, 48px glyph, "Token status" eyebrow)?
 >
 > My recommended default is **v2** — it hits Option C's "composed, quiet" tone exactly, the heading scale matches other secondary-page Fraunces hero moments, and it's the only rendition that also renders the preceding `TokenRemediationLoadingSkeleton` shimmer sliver so the full transition contract is visible.
+
+---
+
+## DECISION
+
+**Selected:** `v2.html` (Balanced — max-w-xl, 40px disconnected-link glyph, includes preceding `TokenRemediationLoadingSkeleton` shimmer)
+**Approved by:** Don
+**Approved at:** 2026-04-20 (Touchpoint 1; recorded in commit `77f08157` message)
+**Backfilled to this file at:** 2026-04-27 (per Don's confirmation "lets go with v2 of them all")
+**Pruned variants:** v1 (Intimate) and v3 (Confident) removed from disk after selection.
+**Pair note:** Don selected v2 for both 401 (TokenInvalid) and 403 (InsufficientScope) so the two views read as a matched pair sharing Option C's "composed, quiet" tone.
