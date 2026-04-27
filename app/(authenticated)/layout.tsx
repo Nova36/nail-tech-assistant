@@ -299,7 +299,7 @@ export default async function AuthenticatedLayout({
     redirect('/login');
   }
 
-  const displayName = deriveDisplayName(session.email);
+  const displayName = session.name ?? deriveDisplayName(session.email);
 
   return (
     <div className="flex min-h-screen bg-background">

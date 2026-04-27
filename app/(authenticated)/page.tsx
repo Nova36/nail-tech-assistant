@@ -140,9 +140,10 @@ export default async function AuthenticatedHomePage() {
   const session = await getSessionFromCookieString(
     cookieStore.get('session')?.value
   );
-  const firstName = session
-    ? deriveDisplayName(session.email).split(' ')[0]
+  const fullName = session
+    ? (session.name ?? deriveDisplayName(session.email))
     : 'there';
+  const firstName = fullName.split(' ')[0] ?? fullName;
 
   const now = new Date();
   const greeting = timeOfDayGreeting(now);

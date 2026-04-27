@@ -126,7 +126,7 @@ describe('lib/firebase/session — getSessionFromCookieString (string API)', () 
     await expect(getSessionFromCookieString(null)).resolves.toBeNull();
   });
 
-  it('returns Session for a valid cookie string', async () => {
+  it('returns Session for a valid cookie string (no displayName claim)', async () => {
     mockVerifySessionCookie.mockResolvedValue({
       uid: 'direct-uid',
       email: 'direct@example.com',
@@ -134,7 +134,35 @@ describe('lib/firebase/session — getSessionFromCookieString (string API)', () 
     const { getSessionFromCookieString } =
       await import('../../../../lib/firebase/session');
     const result = await getSessionFromCookieString('valid-cookie');
-    expect(result).toEqual({ uid: 'direct-uid', email: 'direct@example.com' });
+    expect(result).toEqual({
+      uid: 'direct-uid',
+      email: 'direct@example.com',
+      name: null,
+    });
+  });
+
+  it('surfaces displayName from claims as session.name when present', async () => {
+    mockVerifySessionCookie.mockResolvedValue({
+      uid: 'direct-uid',
+      email: 'direct@example.com',
+      name: 'Don Matthews',
+    });
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    const result = await getSessionFromCookieString('valid-cookie');
+    expect(result?.name).toBe('Don Matthews');
+  });
+
+  it('treats blank/whitespace name claim as null', async () => {
+    mockVerifySessionCookie.mockResolvedValue({
+      uid: 'direct-uid',
+      email: 'direct@example.com',
+      name: '   ',
+    });
+    const { getSessionFromCookieString } =
+      await import('../../../../lib/firebase/session');
+    const result = await getSessionFromCookieString('valid-cookie');
+    expect(result?.name).toBeNull();
   });
 
   it('returns null when verifySessionCookie throws', async () => {
