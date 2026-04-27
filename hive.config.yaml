@@ -3,33 +3,36 @@
 
 project:
   name: nail-tech-assistant
-  codebase_path: "/Users/don/Documents/GitHub/Nail Tech Assitant"
+  codebase_path: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+
+paths:
+  state_dir: state # Hive state lives at ./state/ (not the .pHive default); resolver reads this for HIVE_STATE_DIR
 
 execution:
   default_methodology: tdd
-  parallel_teams: 1          # solo developer on one project
+  parallel_teams: 1 # solo developer on one project
   retry_attempts: 2
-  terminal_mux: cmux         # symmetric visibility — Claude agents spawn in cmux panes, not in-process
+  terminal_mux: cmux # symmetric visibility — Claude agents spawn in cmux panes, not in-process
   circuit_breaker:
     max_failures_per_story: 3
 
 planning:
-  collaborative_review: true  # team agents cross-review planning docs before user sees them
+  collaborative_review: true # team agents cross-review planning docs before user sees them
 
 developer:
   pr_style: single-commit
-  commit_granularity: medium   # per-task
+  commit_granularity: medium # per-task
   review_depth: standard
   notes: null
 
 meta_team:
-  github_forwarding: false     # keep meta-issues local, don't file to GitHub
+  github_forwarding: false # keep meta-issues local, don't file to GitHub
 
 model_tiers:
   orchestrator: claude-opus-4-7
-  research: claude        # researcher role stays Claude
-  implement: codex        # developer role delegated to Codex (per TDD pilot)
-  review: claude          # reviewer role stays Claude
+  research: claude # researcher role stays Claude
+  implement: codex # developer role delegated to Codex (per TDD pilot)
+  review: claude # reviewer role stays Claude
 
 # Claude-Codex hybrid pilot (piloted in this project)
 # See ~/.claude/plugins/cache/plugin-codex/ for runtime helpers and prompting rules.
@@ -37,23 +40,23 @@ agent_routing:
   planning:
     orchestrator: claude-opus-4-7
     researcher: claude
-    technical-writer: codex     # document production delegated to Codex
-    architect: codex            # technical feasibility / system design delegated to Codex
-    tpm: claude-opus-4-7        # pivotal validator — extra scrutiny on Codex output
+    technical-writer: codex # document production delegated to Codex
+    architect: codex # technical feasibility / system design delegated to Codex
+    tpm: claude-opus-4-7 # pivotal validator — extra scrutiny on Codex output
     ui-designer: claude
     analyst: claude
   execution:
     # TDD step-to-agent mapping (see state/epics/<id>/stories/<id>.yaml → steps[].agent)
     researcher: claude
-    tester: claude              # initial test author — Claude writes failing tests from spec
-    developer: codex            # implementation — Codex makes failing tests pass
-    reviewer: claude            # review cycle — Claude validates Codex implementation
-    integrator: claude          # commit + push — low-risk, stays Claude
+    tester: claude # initial test author — Claude writes failing tests from spec
+    developer: codex # implementation — Codex makes failing tests pass
+    reviewer: claude # review cycle — Claude validates Codex implementation
+    integrator: claude # commit + push — low-risk, stays Claude
 
 codex_pilot:
   enabled: true
-  stop_time_review_gate: true   # see /codex:setup — review gate at story stop
-  rescue_agent: "codex:codex-rescue"
+  stop_time_review_gate: true # see /codex:setup — review gate at story stop
+  rescue_agent: 'codex:codex-rescue'
   validation_policy: |
     TPM (Claude Opus) reviews every Codex deliverable — planning documents and
     implementation PRs. If Codex output fails TPM validation, route to
@@ -63,7 +66,7 @@ quality_gates:
   typecheck: required
   lint: required
   unit_tests: required
-  e2e_tests: recommended       # Playwright checks on critical flows
+  e2e_tests: recommended # Playwright checks on critical flows
 
 token_budget:
   per_story_soft_cap: 50000
