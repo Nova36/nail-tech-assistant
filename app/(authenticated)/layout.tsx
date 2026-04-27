@@ -204,18 +204,24 @@ function Sidebar({
                       href={item.href}
                       aria-current={isActive ? 'page' : undefined}
                       aria-disabled={item.href === '#' ? 'true' : undefined}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: '#6B3F5E',
+                              color: '#FAF7F2',
+                              boxShadow: '0 8px 24px rgba(107,63,94,0.20)',
+                            }
+                          : undefined
+                      }
                       className={`group flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 font-body text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.22)] ${
                         isActive
-                          ? 'bg-primary text-primary-foreground shadow-[0_8px_24px_rgba(107,63,94,0.20)]'
+                          ? ''
                           : 'text-foreground/80 hover:bg-[color:rgb(212_203_197_/_0.45)]'
                       }`}
                     >
                       <span
-                        className={
-                          isActive
-                            ? 'text-primary-foreground'
-                            : 'text-foreground/60'
-                        }
+                        style={isActive ? { color: '#FAF7F2' } : undefined}
+                        className={isActive ? '' : 'text-foreground/60'}
                       >
                         <NavIcon kind={item.icon} />
                       </span>
@@ -224,10 +230,16 @@ function Sidebar({
                       </span>
                       {item.badge ? (
                         <span
-                          className={`rounded-full px-2 py-0.5 font-body text-[11px] font-medium tabular-nums ${
+                          style={
                             isActive
-                              ? 'bg-[color:rgb(250_247_242_/_0.18)] text-primary-foreground'
-                              : 'text-muted-foreground'
+                              ? {
+                                  backgroundColor: 'rgba(250,247,242,0.20)',
+                                  color: '#FAF7F2',
+                                }
+                              : undefined
+                          }
+                          className={`rounded-full px-2 py-0.5 font-body text-[11px] font-medium tabular-nums ${
+                            isActive ? '' : 'text-muted-foreground'
                           }`}
                         >
                           {item.badge}
@@ -256,7 +268,8 @@ function Sidebar({
       <div className="m-4 flex items-center gap-3 rounded-2xl border border-[color:rgb(212_203_197_/_0.7)] bg-card/85 px-4 py-3 shadow-[0_4px_14px_rgba(61,53,48,0.05)]">
         <span
           aria-hidden="true"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-body text-xs font-semibold tracking-[0.05em]"
+          style={{ backgroundColor: '#6B3F5E', color: '#FAF7F2' }}
+          className="flex h-10 w-10 items-center justify-center rounded-full font-body text-xs font-semibold tracking-[0.05em]"
         >
           {initials || 'NT'}
         </span>
