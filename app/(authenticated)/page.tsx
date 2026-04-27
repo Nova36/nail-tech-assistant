@@ -150,19 +150,22 @@ export default async function AuthenticatedHomePage() {
   const weekday = WEEKDAYS[now.getDay()];
 
   return (
-    <div className="mx-auto max-w-[1180px] space-y-10">
+    <div className="mx-auto space-y-10" style={{ maxWidth: '1180px' }}>
       <header className="space-y-3">
         <p className="font-body text-[11px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
           {greeting} · {weekday}
         </p>
         <h1 className="font-heading-display text-5xl font-light tracking-[-0.03em] text-foreground sm:text-6xl">
-          Hello, <span className="italic text-primary">{firstName}.</span>
+          Hello,{' '}
+          <span className="italic" style={{ color: '#6B3F5E' }}>
+            {firstName}.
+          </span>
         </h1>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+      <div className="grid gap-6" style={{ gridTemplateColumns: '1.1fr 1fr' }}>
         <article
-          className="relative flex min-h-[560px] flex-col justify-between overflow-hidden rounded-[28px] p-8 shadow-[0_18px_44px_rgba(61,53,48,0.12)]"
+          className="relative flex min-h-[560px] flex-col gap-8 overflow-hidden rounded-[28px] p-8 shadow-[0_18px_44px_rgba(61,53,48,0.12)]"
           style={{ background: 'var(--gradient-signature)' }}
         >
           <div className="flex items-start justify-between gap-4">
@@ -171,7 +174,8 @@ export default async function AuthenticatedHomePage() {
             </p>
             <span
               aria-hidden="true"
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(61,53,48,0.18)]"
+              style={{ backgroundColor: '#6B3F5E', color: '#FAF7F2' }}
+              className="flex h-14 w-14 items-center justify-center rounded-full shadow-[0_8px_20px_rgba(61,53,48,0.18)]"
             >
               <PlusIcon />
             </span>
@@ -179,7 +183,10 @@ export default async function AuthenticatedHomePage() {
 
           <div className="space-y-4">
             <h2 className="font-heading-display text-6xl font-light tracking-[-0.04em] text-foreground sm:text-7xl">
-              New <span className="italic text-primary">design</span>
+              New{' '}
+              <span className="italic" style={{ color: '#6B3F5E' }}>
+                design
+              </span>
             </h2>
             <p className="max-w-md font-body text-sm leading-7 text-foreground/80">
               Open a blank canvas — sketch a set from scratch, pick palette
@@ -187,7 +194,7 @@ export default async function AuthenticatedHomePage() {
             </p>
           </div>
 
-          <div className="space-y-5">
+          <div className="mt-auto space-y-5">
             <div className="flex flex-wrap gap-2">
               {['Sketch', 'Palette', 'Generate with AI'].map((chip) => (
                 <span
@@ -202,20 +209,24 @@ export default async function AuthenticatedHomePage() {
               href="#"
               aria-disabled="true"
               data-state="placeholder"
-              className="inline-flex min-h-[44px] items-center gap-3 rounded-full bg-background px-6 py-3 font-body text-sm font-medium text-primary shadow-[0_6px_16px_rgba(61,53,48,0.10)] outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
+              style={{ color: '#6B3F5E' }}
+              className="inline-flex min-h-[44px] items-center gap-3 rounded-full bg-background px-6 py-3 font-body text-sm font-medium shadow-[0_6px_16px_rgba(61,53,48,0.10)] outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
             >
               Start a new design <ArrowRightIcon />
             </Link>
           </div>
         </article>
 
-        <article className="flex min-h-[560px] flex-col justify-between rounded-[28px] border border-dashed border-[color:rgb(107_63_94_/_0.30)] bg-background/60 p-8 shadow-[0_8px_28px_rgba(61,53,48,0.06)]">
+        <article className="flex min-h-[560px] flex-col gap-6 rounded-[28px] border border-dashed border-[color:rgb(107_63_94_/_0.30)] bg-background/60 p-8 shadow-[0_8px_28px_rgba(61,53,48,0.06)]">
           <div className="space-y-3">
             <p className="font-body text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
               — Your Gallery
             </p>
             <h2 className="font-heading-display text-5xl font-light tracking-[-0.03em] text-foreground sm:text-6xl">
-              My <span className="italic text-primary">designs</span>
+              My{' '}
+              <span className="italic" style={{ color: '#6B3F5E' }}>
+                designs
+              </span>
             </h2>
             <p className="max-w-md font-body text-sm leading-7 text-muted-foreground">
               Revisit saved sets, browse favorites, and re-apply a look for a
@@ -223,7 +234,9 @@ export default async function AuthenticatedHomePage() {
             </p>
           </div>
 
-          <GalleryStack />
+          <div className="my-auto">
+            <GalleryStack />
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="font-body text-sm text-muted-foreground">
@@ -236,7 +249,8 @@ export default async function AuthenticatedHomePage() {
               href="#"
               aria-disabled="true"
               data-state="placeholder"
-              className="inline-flex min-h-[44px] items-center gap-3 rounded-full border border-[color:rgb(107_63_94_/_0.30)] bg-background px-6 py-3 font-body text-sm font-medium text-primary outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
+              style={{ color: '#6B3F5E' }}
+              className="inline-flex min-h-[44px] items-center gap-3 rounded-full border border-[color:rgb(107_63_94_/_0.30)] bg-background px-6 py-3 font-body text-sm font-medium outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
             >
               Browse gallery <ArrowRightIcon />
             </Link>
@@ -246,12 +260,18 @@ export default async function AuthenticatedHomePage() {
 
       <section
         aria-label="Studio summary"
-        className="grid gap-4 rounded-[24px] border border-[color:rgb(212_203_197_/_0.6)] bg-card/60 p-6 sm:grid-cols-[1fr_1fr_1fr_auto]"
+        className="grid items-center gap-4 rounded-[24px] border border-[color:rgb(212_203_197_/_0.6)] bg-card/60 p-6"
+        style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}
       >
         {KPI_TILES.map((tile, index) => (
           <div
             key={tile.label}
-            className={`space-y-2 sm:pr-4 ${index < KPI_TILES.length - 1 ? 'sm:border-r sm:border-[color:rgb(212_203_197_/_0.5)]' : ''}`}
+            className="space-y-2 pr-4"
+            style={
+              index < KPI_TILES.length - 1
+                ? { borderRight: '1px solid rgba(212,203,197,0.5)' }
+                : undefined
+            }
           >
             <p className="font-body text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               {tile.label}
@@ -268,7 +288,8 @@ export default async function AuthenticatedHomePage() {
           href="#"
           aria-disabled="true"
           data-state="placeholder"
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 self-center rounded-full px-4 py-2 font-body text-sm font-medium text-primary outline-none transition hover:bg-[color:rgb(107_63_94_/_0.06)] focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
+          style={{ color: '#6B3F5E' }}
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 self-center whitespace-nowrap rounded-full px-4 py-2 font-body text-sm italic outline-none transition hover:bg-[color:rgb(107_63_94_/_0.06)] focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
         >
           View studio <ArrowRightIcon />
         </Link>
