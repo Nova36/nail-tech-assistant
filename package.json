@@ -15,6 +15,7 @@
     "lint": "node node_modules/eslint/bin/eslint.js .",
     "format": "node node_modules/prettier/bin/prettier.cjs --write .",
     "test": "node node_modules/vitest/vitest.mjs run",
+    "test:security": "node node_modules/next/dist/bin/next build && node node_modules/vitest/vitest.mjs run --config vitest.config.security.ts",
     "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.config.rules.ts'",
     "test:e2e": "node node_modules/@playwright/test/cli.js test",
     "prepare": "node node_modules/husky/bin.js",
