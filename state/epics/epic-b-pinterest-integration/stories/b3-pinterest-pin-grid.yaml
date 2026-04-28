@@ -1,7 +1,9 @@
 id: b3-pinterest-pin-grid
 epic: epic-b-pinterest-integration
 title: '/pinterest/[boardId] pin grid with Suspense streaming + infinite scroll + notFound() on invalid board + minimal token-verify placeholder'
-status: pending
+status: completed
+completed_at: '2026-04-27'
+completed_commit: 'TBD' # filled by integrate step
 complexity: medium
 methodology: tdd
 depends_on: [b2-pinterest-boards-grid]
