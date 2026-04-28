@@ -16,9 +16,12 @@ import type {
 
 const PINTEREST_API_BASE = 'https://api.pinterest.com/v5';
 
-// Dev-only mock mode. Active ONLY when both:
-//   1. NODE_ENV !== 'production' (hard guard against accidental prod fire)
-//   2. env.PINTEREST_MOCK is set to one of the supported sentinels
+// Dev mock mode. Active when env.PINTEREST_MOCK is set to one of the
+// supported sentinels AND we're not running on Vercel. Vercel sets
+// VERCEL=1 automatically on every deploy, so accidental Vercel-env
+// leakage of PINTEREST_MOCK silently no-ops in prod while still letting
+// the flag work under BOTH `pnpm dev` and `pnpm start` locally —
+// local production-mode is a legitimate visual-iteration path.
 // See lib/env.ts and .env.example for usage.
 function getMockMode():
   | 'ok'
@@ -26,7 +29,7 @@ function getMockMode():
   | 'insufficient_scope'
   | 'network'
   | null {
-  if (process.env.NODE_ENV === 'production') return null;
+  if (process.env.VERCEL === '1') return null;
   return env.PINTEREST_MOCK ?? null;
 }
 
