@@ -1,7 +1,9 @@
 id: b2-pinterest-boards-grid
 epic: epic-b-pinterest-integration
 title: '/pinterest boards grid with Suspense streaming + IntersectionObserver infinite scroll + minimal token-verify placeholder'
-status: pending
+status: completed
+completed_at: '2026-04-27'
+completed_commit: '44f2e9b' # epic-b/pinterest-boards-grid
 complexity: medium
 methodology: tdd
 depends_on: [b1-pinterest-client-token-boundary]
