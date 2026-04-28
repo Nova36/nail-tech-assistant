@@ -68,11 +68,15 @@
   --color-ring: var(--ring);
   --font-heading-display: var(--font-heading-family);
   --font-body-copy: var(--font-body-family);
-  --breakpoint-sm: var(--breakpoint-sm);
-  --breakpoint-md: var(--breakpoint-md);
-  --breakpoint-lg: var(--breakpoint-lg);
-  --breakpoint-xl: var(--breakpoint-xl);
-  --breakpoint-tablet-landscape: var(--breakpoint-tablet-landscape);
+  /* Tailwind v4 expands these into the compiled @media rules; CSS spec
+     forbids var() inside media-feature comparisons, so the tokens here
+     must be literal values. The :root copies above stay authoritative
+     for any non-Tailwind CSS consumer (calc(), custom selectors). */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-tablet-landscape: 73.75rem;
   --spacing-touch-target: var(--touch-target-min);
 }
 
