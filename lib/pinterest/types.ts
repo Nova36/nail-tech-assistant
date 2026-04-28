@@ -22,6 +22,33 @@ export type PinterestBoard = {
   };
 };
 
+export type PinterestPinImageVariant = {
+  url: string;
+  width?: number;
+  height?: number;
+};
+
+export type PinterestPin = {
+  id: string;
+  title?: string;
+  description?: string;
+  alt_text?: string;
+  link?: string;
+  board_id?: string;
+  board_owner?: {
+    username?: string;
+  };
+  created_at?: string;
+  creative_type?: string;
+  dominant_color?: string;
+  media?: {
+    media_type?: string;
+    images?: {
+      [variant: string]: PinterestPinImageVariant | undefined;
+    };
+  };
+};
+
 export type PinterestPaginated<T> = {
   items: T[];
   bookmark: string | null;

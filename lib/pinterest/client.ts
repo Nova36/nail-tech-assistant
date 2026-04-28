@@ -6,10 +6,16 @@ import {
   mockBoardsPage1,
   mockBoardsPage2,
 } from '@/lib/pinterest/__fixtures__/boards';
+import {
+  MOCK_PINS_BOOKMARK_PAGE_2,
+  getMockPinsPage1,
+  getMockPinsPage2,
+} from '@/lib/pinterest/__fixtures__/pins';
 import { normalizePinterestResponse } from '@/lib/pinterest/errors';
 
 import type {
   PinterestBoard,
+  PinterestPin,
   PinterestPaginated,
   PinterestUserAccount,
 } from '@/lib/pinterest/types';
@@ -39,6 +45,19 @@ type VerifyPinterestTokenResult =
 
 type ListPinterestBoardsResult =
   | { ok: true; items: PinterestBoard[]; nextBookmark: string | null }
+  | {
+      ok: false;
+      reason:
+        | 'invalid_token'
+        | 'insufficient_scope'
+        | 'not_found'
+        | 'rate_limit'
+        | 'network'
+        | 'unknown';
+    };
+
+type ListPinterestBoardPinsResult =
+  | { ok: true; items: PinterestPin[]; nextBookmark: string | null }
   | {
       ok: false;
       reason:
@@ -141,6 +160,67 @@ export async function listPinterestBoards(opts?: {
     }
 
     const data = (await response.json()) as PinterestPaginated<PinterestBoard>;
+
+    return {
+      ok: true,
+      items: data.items ?? [],
+      nextBookmark: data.bookmark ?? null,
+    };
+  } catch {
+    return { ok: false, reason: 'network' };
+  }
+}
+
+export async function listPinterestBoardPins(opts: {
+  boardId: string;
+  bookmark?: string;
+  pageSize?: number;
+}): Promise<ListPinterestBoardPinsResult> {
+  const mock = getMockMode();
+  if (mock === 'ok') {
+    if (opts.bookmark === MOCK_PINS_BOOKMARK_PAGE_2) {
+      return {
+        ok: true,
+        items: getMockPinsPage2(opts.boardId),
+        nextBookmark: null,
+      };
+    }
+
+    return {
+      ok: true,
+      items: getMockPinsPage1(opts.boardId),
+      nextBookmark: MOCK_PINS_BOOKMARK_PAGE_2,
+    };
+  }
+  if (mock === 'invalid_token') return { ok: false, reason: 'invalid_token' };
+  if (mock === 'insufficient_scope')
+    return { ok: false, reason: 'insufficient_scope' };
+  if (mock === 'network') return { ok: false, reason: 'network' };
+
+  const searchParams = new URLSearchParams();
+  searchParams.set('page_size', String(opts.pageSize ?? 25));
+
+  if (opts.bookmark) {
+    searchParams.set('bookmark', opts.bookmark);
+  }
+
+  try {
+    const response = await pinterestFetch(
+      `/boards/${opts.boardId}/pins?${searchParams.toString()}`,
+      {
+        method: 'GET',
+      }
+    );
+    const error = normalizePinterestResponse(response);
+
+    if (error) {
+      return {
+        ok: false,
+        reason: error.reason,
+      };
+    }
+
+    const data = (await response.json()) as PinterestPaginated<PinterestPin>;
 
     return {
       ok: true,
