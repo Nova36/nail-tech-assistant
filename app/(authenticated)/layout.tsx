@@ -315,9 +315,9 @@ export default async function AuthenticatedLayout({
   const displayName = session.name ?? deriveDisplayName(session.email);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background">
       <Sidebar displayName={displayName} email={session.email} />
-      <main className="flex-1 overflow-x-hidden px-8 py-8 lg:px-12 lg:py-10">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto px-8 py-8 lg:px-12 lg:py-10">
         {children}
       </main>
     </div>
