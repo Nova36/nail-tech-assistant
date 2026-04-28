@@ -3,13 +3,30 @@ import 'server-only';
 import { env } from '@/lib/env';
 import { normalizePinterestResponse } from '@/lib/pinterest/errors';
 
-import type { PinterestUserAccount } from '@/lib/pinterest/types';
+import type {
+  PinterestBoard,
+  PinterestPaginated,
+  PinterestUserAccount,
+} from '@/lib/pinterest/types';
 
 const PINTEREST_API_BASE = 'https://api.pinterest.com/v5';
 
 type VerifyPinterestTokenResult =
   | { ok: true }
   | { ok: false; reason: 'invalid_token' | 'insufficient_scope' | 'network' };
+
+type ListPinterestBoardsResult =
+  | { ok: true; items: PinterestBoard[]; nextBookmark: string | null }
+  | {
+      ok: false;
+      reason:
+        | 'invalid_token'
+        | 'insufficient_scope'
+        | 'not_found'
+        | 'rate_limit'
+        | 'network'
+        | 'unknown';
+    };
 
 async function pinterestFetch(
   path: string,
@@ -46,6 +63,45 @@ export async function verifyPinterestToken(): Promise<VerifyPinterestTokenResult
     (await response.json()) as PinterestUserAccount;
 
     return { ok: true };
+  } catch {
+    return { ok: false, reason: 'network' };
+  }
+}
+
+export async function listPinterestBoards(opts?: {
+  bookmark?: string;
+  pageSize?: number;
+}): Promise<ListPinterestBoardsResult> {
+  const searchParams = new URLSearchParams();
+  searchParams.set('page_size', String(opts?.pageSize ?? 25));
+
+  if (opts?.bookmark) {
+    searchParams.set('bookmark', opts.bookmark);
+  }
+
+  try {
+    const response = await pinterestFetch(
+      `/boards?${searchParams.toString()}`,
+      {
+        method: 'GET',
+      }
+    );
+    const error = normalizePinterestResponse(response);
+
+    if (error) {
+      return {
+        ok: false,
+        reason: error.reason,
+      };
+    }
+
+    const data = (await response.json()) as PinterestPaginated<PinterestBoard>;
+
+    return {
+      ok: true,
+      items: data.items ?? [],
+      nextBookmark: data.bookmark ?? null,
+    };
   } catch {
     return { ok: false, reason: 'network' };
   }

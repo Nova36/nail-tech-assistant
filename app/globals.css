@@ -99,3 +99,16 @@ h5,
 h6 {
   font-family: var(--font-heading-family), serif;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component='BoardCard'],
+  [data-component='BoardCard']:hover {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .sk-v1 {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
+}
