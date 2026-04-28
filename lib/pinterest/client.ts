@@ -1,6 +1,11 @@
 import 'server-only';
 
 import { env } from '@/lib/env';
+import {
+  MOCK_BOOKMARK_PAGE_2,
+  mockBoardsPage1,
+  mockBoardsPage2,
+} from '@/lib/pinterest/__fixtures__/boards';
 import { normalizePinterestResponse } from '@/lib/pinterest/errors';
 
 import type {
@@ -10,6 +15,20 @@ import type {
 } from '@/lib/pinterest/types';
 
 const PINTEREST_API_BASE = 'https://api.pinterest.com/v5';
+
+// Dev-only mock mode. Active ONLY when both:
+//   1. NODE_ENV !== 'production' (hard guard against accidental prod fire)
+//   2. env.PINTEREST_MOCK is set to one of the supported sentinels
+// See lib/env.ts and .env.example for usage.
+function getMockMode():
+  | 'ok'
+  | 'invalid_token'
+  | 'insufficient_scope'
+  | 'network'
+  | null {
+  if (process.env.NODE_ENV === 'production') return null;
+  return env.PINTEREST_MOCK ?? null;
+}
 
 type VerifyPinterestTokenResult =
   | { ok: true }
@@ -45,6 +64,13 @@ async function pinterestFetch(
 }
 
 export async function verifyPinterestToken(): Promise<VerifyPinterestTokenResult> {
+  const mock = getMockMode();
+  if (mock === 'ok') return { ok: true };
+  if (mock === 'invalid_token') return { ok: false, reason: 'invalid_token' };
+  if (mock === 'insufficient_scope')
+    return { ok: false, reason: 'insufficient_scope' };
+  if (mock === 'network') return { ok: false, reason: 'network' };
+
   try {
     const response = await pinterestFetch('/user_account', { method: 'GET' });
     const error = normalizePinterestResponse(response);
@@ -72,6 +98,22 @@ export async function listPinterestBoards(opts?: {
   bookmark?: string;
   pageSize?: number;
 }): Promise<ListPinterestBoardsResult> {
+  const mock = getMockMode();
+  if (mock === 'ok') {
+    if (opts?.bookmark === MOCK_BOOKMARK_PAGE_2) {
+      return { ok: true, items: mockBoardsPage2, nextBookmark: null };
+    }
+    return {
+      ok: true,
+      items: mockBoardsPage1,
+      nextBookmark: MOCK_BOOKMARK_PAGE_2,
+    };
+  }
+  if (mock === 'invalid_token') return { ok: false, reason: 'invalid_token' };
+  if (mock === 'insufficient_scope')
+    return { ok: false, reason: 'insufficient_scope' };
+  if (mock === 'network') return { ok: false, reason: 'network' };
+
   const searchParams = new URLSearchParams();
   searchParams.set('page_size', String(opts?.pageSize ?? 25));
 

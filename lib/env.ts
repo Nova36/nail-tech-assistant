@@ -13,6 +13,7 @@ export interface Env {
   ALLOWED_EMAIL: string;
   APP_URL: string;
   PINTEREST_ACCESS_TOKEN: string;
+  PINTEREST_MOCK?: 'ok' | 'invalid_token' | 'insufficient_scope' | 'network';
 }
 
 class EnvValidationError extends Error {
@@ -43,6 +44,9 @@ const envSchema = z.object({
   ALLOWED_EMAIL: requiredString,
   APP_URL: requiredString,
   PINTEREST_ACCESS_TOKEN: requiredString,
+  PINTEREST_MOCK: z
+    .enum(['ok', 'invalid_token', 'insufficient_scope', 'network'])
+    .optional(),
 });
 
 /**
