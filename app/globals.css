@@ -95,6 +95,58 @@ body {
   font-family: var(--font-body-family), sans-serif;
 }
 
+.link-action {
+  position: relative;
+  display: inline-block;
+  min-height: 32px;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.link-action::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 0;
+  background: currentColor;
+  transition: width 220ms ease;
+}
+
+.link-action:hover::after,
+.link-action:focus-visible::after {
+  width: 100%;
+}
+
+.link-action:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.b4-mount-fade {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .b4-mount-fade {
+    animation: b4-fade-in 240ms ease-out both;
+  }
+}
+
+@keyframes b4-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 h1,
 h2,
 h3,
@@ -114,5 +166,16 @@ h6 {
   .sk-v1 {
     animation: none !important;
     background-position: 0 0 !important;
+  }
+
+  .link-action,
+  .link-action::after {
+    transition: none !important;
+  }
+
+  .b4-mount-fade {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }

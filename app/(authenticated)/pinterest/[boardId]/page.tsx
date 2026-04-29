@@ -2,41 +2,17 @@ import { notFound } from 'next/navigation';
 import React, { Suspense } from 'react';
 
 import { BoardDetailHeader } from '@/components/pinterest/BoardDetailHeader';
+import { InsufficientScopeView } from '@/components/pinterest/InsufficientScopeView';
 import { PinGrid } from '@/components/pinterest/PinGrid';
 import { PinGridSkeleton } from '@/components/pinterest/PinGridSkeleton';
+import { TokenInvalidView } from '@/components/pinterest/TokenInvalidView';
 import {
   listPinterestBoardPins,
   verifyPinterestToken,
 } from '@/lib/pinterest/client';
 
-import type { ReactNode } from 'react';
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function TokenPlaceholderInline({
-  title,
-  message,
-}: {
-  title: ReactNode;
-  message: string;
-}) {
-  return (
-    <section
-      data-component="TokenPlaceholderInline"
-      className="mx-auto max-w-md rounded-[28px] bg-card p-12 text-center"
-    >
-      <div className="rounded-[28px] border border-dashed border-[color:rgb(107_63_94_/_0.5)] p-8">
-        <h2 className="font-heading-display text-3xl font-light tracking-[-0.02em] text-foreground">
-          {title}
-        </h2>
-        <p className="mt-4 text-sm leading-6 text-muted-foreground">
-          {message}
-        </p>
-      </div>
-    </section>
-  );
-}
 
 function formatBoardName(boardId: string): string {
   return boardId
@@ -97,33 +73,6 @@ function PinsSection({
       notFound();
     }
 
-    if (result.reason === 'invalid_token') {
-      return (
-        <TokenPlaceholderInline
-          title={
-            <>
-              Pinterest is <em className="italic text-primary">paused.</em>
-            </>
-          }
-          message="Pinterest token needs to be replaced; see Vercel env."
-        />
-      );
-    }
-
-    if (result.reason === 'insufficient_scope') {
-      return (
-        <TokenPlaceholderInline
-          title={
-            <>
-              Pinterest needs{' '}
-              <em className="italic text-primary">expanded scope.</em>
-            </>
-          }
-          message="Pinterest token needs broader access; see Vercel env."
-        />
-      );
-    }
-
     throw new Error(`Failed to load Pinterest pins: ${result.reason}`);
   }
 
@@ -145,30 +94,15 @@ export default async function BoardDetailPage({ params }: Props) {
   const verify = await verifyPinterestToken();
 
   if (!verify.ok) {
-    return (
-      <main className="mx-auto max-w-6xl px-5 pb-8 pt-12 md:px-6 md:pb-10 md:pt-16 lg:pb-12 lg:pt-20">
-        {verify.reason === 'insufficient_scope' ? (
-          <TokenPlaceholderInline
-            title={
-              <>
-                Pinterest needs{' '}
-                <em className="italic text-primary">expanded scope.</em>
-              </>
-            }
-            message="Pinterest token needs broader access; see Vercel env."
-          />
-        ) : (
-          <TokenPlaceholderInline
-            title={
-              <>
-                Pinterest is <em className="italic text-primary">paused.</em>
-              </>
-            }
-            message="Pinterest token needs to be replaced; see Vercel env."
-          />
-        )}
-      </main>
-    );
+    if (verify.reason === 'invalid_token') {
+      return <TokenInvalidView />;
+    }
+
+    if (verify.reason === 'insufficient_scope') {
+      return <InsufficientScopeView />;
+    }
+
+    throw new Error(`pinterest verify failed: ${verify.reason}`);
   }
 
   const pinsResource = createPinsResource(listPinterestBoardPins({ boardId }));

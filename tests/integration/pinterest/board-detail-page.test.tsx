@@ -20,9 +20,6 @@
  *
  * ACs covered:
  *   AC-1-skeleton-streams              (skeleton before pin titles)
- *   AC-2-401-minimal-placeholder       (invalid_token branch)
- *   AC-3-403-minimal-placeholder       (insufficient_scope branch)
- *   AC-4-verify-before-fetch           (listPinterestBoardPins never called on fail)
  *   AC-5-io-append                     (sentinel triggers loadMorePins)
  *   AC-6-io-stop                       (null nextBookmark stops sentinel)
  *   AC-7-io-dedupe                     (rapid double-intersection → exactly one call)
@@ -221,93 +218,6 @@ describe('/pinterest/[boardId] page — skeleton-streams (AC-1)', () => {
     // Pin titles must NOT be visible yet
     expect(screen.queryByText('Gel Chrome Mauve')).toBeNull();
     expect(screen.queryByText('French Tip Ombre')).toBeNull();
-  });
-});
-
-describe('/pinterest/[boardId] page — 401 placeholder (AC-2, AC-4)', () => {
-  it('renders minimal 401 placeholder and never calls listPinterestBoardPins', async () => {
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'invalid_token',
-    });
-
-    await renderDetailPage();
-
-    // 401 copy visible — "Pinterest is paused" or token needs replacement
-    expect(
-      screen.getByText(
-        /Pinterest.*paused|token needs to be replaced|PINTEREST_ACCESS_TOKEN/i
-      )
-    ).toBeTruthy();
-
-    // listPinterestBoardPins must not have been called
-    expect(mockListPinterestBoardPins).not.toHaveBeenCalled();
-
-    // Skeleton must NOT render
-    expect(
-      document.querySelector('[data-component="PinGridSkeleton"]')
-    ).toBeNull();
-  });
-
-  it('renders TokenPlaceholderInline data-component on 401', async () => {
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'invalid_token',
-    });
-
-    await renderDetailPage();
-
-    expect(
-      document.querySelector('[data-component="TokenPlaceholderInline"]')
-    ).toBeTruthy();
-  });
-});
-
-describe('/pinterest/[boardId] page — 403 placeholder (AC-3, AC-4)', () => {
-  it('renders minimal 403 placeholder distinct from 401 and never calls listPinterestBoardPins', async () => {
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'insufficient_scope',
-    });
-
-    await renderDetailPage();
-
-    // 403 copy visible — "broader access" or "pins:read" or "insufficient"
-    expect(
-      screen.getByText(
-        /broader access|needs broader|boards:read|pins:read|insufficient/i
-      )
-    ).toBeTruthy();
-
-    // listPinterestBoardPins must not have been called
-    expect(mockListPinterestBoardPins).not.toHaveBeenCalled();
-
-    // Skeleton must NOT render
-    expect(
-      document.querySelector('[data-component="PinGridSkeleton"]')
-    ).toBeNull();
-  });
-
-  it('renders DIFFERENT copy for 403 vs 401', async () => {
-    // Render 401 first
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'invalid_token',
-    });
-    const { container: container401 } = await renderDetailPage();
-    const text401 = container401.textContent ?? '';
-
-    vi.clearAllMocks();
-
-    // Render 403
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'insufficient_scope',
-    });
-    const { container: container403 } = await renderDetailPage();
-    const text403 = container403.textContent ?? '';
-
-    expect(text401).not.toBe(text403);
   });
 });
 

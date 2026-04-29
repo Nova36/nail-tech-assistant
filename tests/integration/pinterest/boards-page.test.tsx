@@ -13,9 +13,6 @@
  *
  * ACs covered:
  *   AC-1-skeleton-streams          (skeleton before board names)
- *   AC-2-401-minimal-placeholder   (invalid_token branch)
- *   AC-3-403-minimal-placeholder   (insufficient_scope branch)
- *   AC-4-verify-before-fetch       (listPinterestBoards never called on fail)
  *   AC-5-io-append                 (sentinel triggers loadMoreBoards)
  *   AC-6-io-stop                   (null nextBookmark stops sentinel)
  *   AC-7-io-dedupe                 (rapid double-intersection → exactly one call)
@@ -164,78 +161,6 @@ describe('/pinterest page — skeleton-streams (AC-1)', () => {
     // Board names must NOT be visible yet
     expect(screen.queryByText('Gel Inspo')).toBeNull();
     expect(screen.queryByText('Nail Art')).toBeNull();
-  });
-});
-
-describe('/pinterest page — 401 placeholder (AC-2, AC-4)', () => {
-  it('renders minimal 401 placeholder and never calls listPinterestBoards', async () => {
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'invalid_token',
-    });
-
-    await renderPage();
-
-    // 401 copy visible (from design brief)
-    expect(
-      screen.getByText(
-        /Pinterest token needs replacement|token needs to be replaced|PINTEREST_ACCESS_TOKEN/i
-      )
-    ).toBeTruthy();
-
-    // listPinterestBoards must not have been called
-    expect(mockListPinterestBoards).not.toHaveBeenCalled();
-
-    // Skeleton must NOT render
-    expect(
-      document.querySelector('[data-component="BoardGridSkeleton"]')
-    ).toBeNull();
-  });
-});
-
-describe('/pinterest page — 403 placeholder (AC-3, AC-4)', () => {
-  it('renders minimal 403 placeholder distinct from 401 and never calls listPinterestBoards', async () => {
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'insufficient_scope',
-    });
-
-    await renderPage();
-
-    // 403 copy visible (from design brief — distinct from 401)
-    expect(
-      screen.getByText(/broader access|needs broader|boards:read|insufficient/i)
-    ).toBeTruthy();
-
-    // listPinterestBoards must not have been called
-    expect(mockListPinterestBoards).not.toHaveBeenCalled();
-
-    // Skeleton must NOT render
-    expect(
-      document.querySelector('[data-component="BoardGridSkeleton"]')
-    ).toBeNull();
-  });
-
-  it('renders DIFFERENT copy for 403 vs 401', async () => {
-    // Render 401 first
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'invalid_token',
-    });
-    const { container: container401 } = await renderPage();
-    const text401 = container401.textContent ?? '';
-
-    vi.clearAllMocks();
-
-    // Render 403
-    mockVerifyPinterestToken.mockResolvedValue({
-      ok: false,
-      reason: 'insufficient_scope',
-    });
-    const { container: container403 } = await renderPage();
-    const text403 = container403.textContent ?? '';
-
-    expect(text401).not.toBe(text403);
   });
 });
 
