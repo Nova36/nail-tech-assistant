@@ -14,7 +14,9 @@ export async function loadMoreBoards(bookmark: string): Promise<{
   const result = await listPinterestBoards({ bookmark });
 
   if (!result.ok) {
-    throw new Error(`Failed to load Pinterest boards: ${result.reason}`);
+    throw new Error(`Failed to load Pinterest boards: ${result.reason}`, {
+      cause: result,
+    });
   }
 
   return {
@@ -36,7 +38,9 @@ export async function loadMorePins(
   });
 
   if (!result.ok) {
-    throw new Error(`Failed to load Pinterest pins: ${result.reason}`);
+    throw new Error(`Failed to load Pinterest pins: ${result.reason}`, {
+      cause: result,
+    });
   }
 
   return {

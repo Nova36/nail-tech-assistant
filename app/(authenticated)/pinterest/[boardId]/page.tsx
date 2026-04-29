@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import React, { Suspense } from 'react';
 
 import { BoardDetailHeader } from '@/components/pinterest/BoardDetailHeader';
+import { EmptyPinsState } from '@/components/pinterest/EmptyPinsState';
 import { InsufficientScopeView } from '@/components/pinterest/InsufficientScopeView';
 import { PinGrid } from '@/components/pinterest/PinGrid';
 import { PinGridSkeleton } from '@/components/pinterest/PinGridSkeleton';
@@ -74,6 +75,10 @@ function PinsSection({
     }
 
     throw new Error(`Failed to load Pinterest pins: ${result.reason}`);
+  }
+
+  if (result.items.length === 0) {
+    return <EmptyPinsState />;
   }
 
   return (

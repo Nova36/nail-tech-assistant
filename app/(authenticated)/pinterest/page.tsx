@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 
 import { BoardGrid } from '@/components/pinterest/BoardGrid';
 import { BoardGridSkeleton } from '@/components/pinterest/BoardGridSkeleton';
+import { EmptyBoardsState } from '@/components/pinterest/EmptyBoardsState';
 import { InsufficientScopeView } from '@/components/pinterest/InsufficientScopeView';
 import { TokenInvalidView } from '@/components/pinterest/TokenInvalidView';
 import {
@@ -54,6 +55,10 @@ function BoardsSection({ boardsResource }: { boardsResource: BoardsResource }) {
 
   if (!result.ok) {
     throw new Error(`Failed to load Pinterest boards: ${result.reason}`);
+  }
+
+  if (result.items.length === 0) {
+    return <EmptyBoardsState />;
   }
 
   return (

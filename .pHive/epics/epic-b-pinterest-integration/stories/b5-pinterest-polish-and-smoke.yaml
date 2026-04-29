@@ -65,7 +65,7 @@ acceptance_criteria:
   - 'Given a board has zero pins (mocked response `items: []`), when the user opens `/pinterest/[boardId]`, then an explicit empty-state UI renders for that board, NOT a blank grid.'
   - 'Given the boards or pins server action returns a `rate_limit` or `network` error, when the response lands, then the affected grid surface renders an inline retryable browse-error UI (NOT a full-page error.tsx replacement) and offers a "Try again" control that retries the failed page.'
   - 'Given the operator triggers the inline retry, when the retry succeeds, then the previously-rendered items remain in place and the new page is appended (no list state loss).'
-  - 'Given the slice ships to Vercel preview with a real (non-mocked) PINTEREST_ACCESS_TOKEN, when an end-to-end smoke run executes (log in → /pinterest → click board → see pins), then it completes successfully against the real Pinterest API.'
+  - 'Given the production deploy at https://nail-tech-assistant.vercel.app holds a real (non-mocked) PINTEREST_ACCESS_TOKEN, when an end-to-end smoke run executes with `RUN_REAL_TOKEN_SMOKE=1` (log in → /pinterest → click board → see pins), then it completes successfully against the real Pinterest API. (Reframed 2026-04-29: original target was Vercel preview, but preview scope has no env vars per app-infra-gotchas #4 — production alias is the working real-token target.)'
   - 'Given B1-B4 already shipped, when this slice ships, then no prior acceptance criterion regresses (full Epic B test suite green).'
 
 steps:
@@ -138,10 +138,11 @@ steps:
 
       - tests/e2e/pinterest-real-token-smoke.spec.ts:
         Marked `test.describe.configure({ mode: 'serial' })` and gated
-        behind an env flag (e.g., `RUN_REAL_TOKEN_SMOKE=1`). Default-skip
-        in unit/integration runs; runs explicitly at epic acceptance
-        against Vercel preview with a real token.
-        (1) Open the deployed preview URL
+        behind `RUN_REAL_TOKEN_SMOKE=1`. Default-skip in unit/integration
+        runs; runs explicitly at epic acceptance against the production
+        alias `https://nail-tech-assistant.vercel.app` (preview scope
+        has no env vars per app-infra-gotchas #4).
+        (1) Open the production alias
         (2) Log in
         (3) Navigate to `/pinterest`; assert real boards render
         (4) Click first board; assert real pins render
@@ -193,8 +194,11 @@ steps:
 
       - playwright.config.ts — Modify:
         - Add a separate project / config for `pinterest-real-token-smoke`
-          that points at the preview URL
-        - Default-skip via env flag
+          that points at the production alias
+          (`https://nail-tech-assistant.vercel.app`) via a `SMOKE_BASE_URL`
+          override so a future preview-with-token run can retarget without
+          code changes
+        - Default-skip via `RUN_REAL_TOKEN_SMOKE=1` env flag
 
       Do NOT add new architectural surfaces. Do NOT modify token-remediation
       views (B4). Do NOT modify error.tsx (B4) — the new inline retryable UI
@@ -301,9 +305,9 @@ risks:
   - severity: medium
     description: 'Inline retry implementation accidentally unmounts the existing list state, losing all loaded items on retry'
     mitigation: 'Test asserts loaded items remain visible after retry; reviewer cross-reads BoardGrid/PinGrid state management'
-  - severity: medium
-    description: 'Real-token smoke fails against Vercel preview because the preview env lacks PINTEREST_ACCESS_TOKEN — false-red signal'
-    mitigation: 'Researcher confirms preview env has the token; if not, document the manual smoke procedure (run against a local dev with the real token) and gate the e2e to skip-on-no-token rather than fail'
+  - severity: low
+    description: 'Real-token smoke fails because the target environment lacks PINTEREST_ACCESS_TOKEN — false-red signal'
+    mitigation: 'CONFIRMED 2026-04-29: preview scope has zero env vars (per app-infra-gotchas #4); smoke target retargeted to production alias `https://nail-tech-assistant.vercel.app` where APP_URL+PINTEREST_ACCESS_TOKEN+Firebase blob are populated. SMOKE_BASE_URL override in playwright.config.ts allows a future preview-with-token target without code changes.'
   - severity: low
     description: 'Adding `loading.tsx` when Suspense was sufficient introduces double-fallback flash'
     mitigation: 'Conditional creation in implement step; reviewer skips it if research found no need'
