@@ -1,0 +1,461 @@
+id: b2-pinterest-boards-grid
+epic: epic-b-pinterest-integration
+title: '/pinterest boards grid with Suspense streaming + IntersectionObserver infinite scroll + minimal token-verify placeholder'
+status: completed
+completed_at: '2026-04-27'
+completed_commit: '44f2e9b' # epic-b/pinterest-boards-grid
+complexity: medium
+methodology: tdd
+depends_on: [b1-pinterest-client-token-boundary]
+renditions: 6 # 3 internal (v1/v2/v3) + 3 claude designer (claude-v1/v2/v3) produced 2026-04-19
+
+wireframes:
+  touchpoint_1_status: APPROVED
+  approved_at: '2026-04-20'
+  approved_by: don
+  base_rendition: .pHive/wireframes/epic-b-pinterest-integration/b2-pinterest-boards-grid/claude-v2.html
+  motion_addendum: 'claude-v1 shimmer keyframes (.sk-v1 + @keyframes sk-sweep) applied to BoardGridSkeleton'
+  comparison_doc: .pHive/wireframes/epic-b-pinterest-integration/b2-pinterest-boards-grid/COMPARISON.md
+  implementation_notes: |
+    When implementing, address the 4 misses documented in COMPARISON.md:
+    - MISS 1 (tokens): rely on app/globals.css :root variables via Tailwind v4 @theme inline — DO NOT hardcode hex.
+    - MISS 2 (annotations): add data-component="BoardGrid" | "BoardCard" | "BoardGridSkeleton" | "InfiniteScrollSentinel" attributes on the rendered elements.
+    - MISS 3 (new hex): zero new colors; use ONLY the brand palette. Skeleton fill = bg-secondary / bg-muted (#f0ebe3 from --card) not #e8dfd4.
+    - MISS 4 (breakpoints): test at 375 / 768 / 1280 per globals.css --breakpoint-* tokens.
+  shimmer_spec: |
+    /* shimmer from claude-v1.html — apply to BoardGridSkeleton only */
+    .sk-v1 {
+      background:
+        linear-gradient(100deg,
+          rgba(255,255,255,0) 30%,
+          rgba(255,255,255,0.45) 50%,
+          rgba(255,255,255,0) 70%),
+        var(--card); /* brand token, NOT #e8dfd4 */
+      background-size: 220% 100%;
+      background-position: 120% 0;
+      animation: sk-sweep 2.6s ease-in-out infinite;
+    }
+    @keyframes sk-sweep {
+      0%   { background-position: 120% 0; }
+      100% { background-position: -120% 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sk-v1 { animation: none !important; background: var(--card); }
+    }
+
+escalations_addressed:
+  - trigger: architecture:slice-boundary-token-verify
+    severity: moderate
+    placement: pre-exec
+    raised_by: architect
+    addressed_by: 'verifyPinterestToken() is called server-side in app/(authenticated)/pinterest/page.tsx BEFORE listPinterestBoards(); on 401/403 a MINIMAL inline placeholder (heading + one-line copy) renders in place of BoardGrid. The styled views + shared copy module ship in pinterest-token-remediation-views which UPGRADES this placeholder. This preserves the working-state invariant in the intermediate window between this story and pinterest-token-remediation-views — option (a) per the architect escalation.'
+  - trigger: ui:major
+    severity: major
+    placement: pre-exec
+    raised_by: ui-designer
+    addressed_by: 'ui-design step (between research and test-spec) produces wireframe renditions per references/wireframe-protocol.md Touchpoint 1; story is not finalized until Don approves a rendition; approved wireframe is embedded in the wireframes: block on this story file before execute begins'
+  - trigger: ui:animations
+    severity: minor
+    placement: pre-exec
+    raised_by: 'tpm + ui-designer'
+    addressed_by: 'sidecar at execute — animations-specialist reviews skeleton-to-content transitions, sentinel append motion, and prefers-reduced-motion handling; not blocking, no story-level action beyond this acknowledgment'
+
+description: |
+  Vertical Slice 2 of Epic B. Wires the first Pinterest browse route on top of the
+  server-only client established in B1: `app/(authenticated)/pinterest/page.tsx`
+  fetches the first page of boards via `listPinterestBoards()`, streams a
+  skeleton via `<Suspense fallback={<BoardGridSkeleton/>}>`, then renders a
+  uniform board grid. An `InfiniteScrollSentinel` (IntersectionObserver, client
+  component) appends later pages by calling a server action that reuses the same
+  server-only client.
+
+  This slice ASSUMES a healthy token. Token-invalid (401) and insufficient-scope
+  (403) page-level render branches land in B4 — keep them out of this slice's
+  scope to honor the working-state invariant per slice.
+
+  US-B-2 part 1 (board grid): satisfied at end of slice.
+
+  Resolved decisions baked in:
+  - Uniform grid layout, NOT masonry (cycle-state dd-q1).
+  - Infinite scroll via IntersectionObserver, NOT load-more (cycle-state dd-q2 —
+    Don's override of the design-discussion recommendation).
+  - Tailwind-first; NO `lib/utils.ts` `cn()` helper (cycle-state dd-q3).
+  - Stream with `<Suspense>` boundaries + skeletons; NOT block-render (cycle-state dd-q6).
+
+  This is the first Epic B slice with new UI surfaces (`BoardGrid`, `BoardCard`,
+  `BoardGridSkeleton`, `InfiniteScrollSentinel`). Unlike Epic A — which had
+  `.pHive/design/anthropic-source/*.html` mocks pre-supplied — Pinterest UI has no
+  pre-baked visual spec. The `ui-design` step produces a wireframe brief
+  (`.pHive/design/briefs/pinterest-boards-grid.md`) before `test-spec` so the
+  tester targets the right behavior and the developer has authoritative pixel
+  guidance.
+
+acceptance_criteria:
+  - 'Given the configured Pinterest token is valid and an authenticated user opens `/pinterest`, when the route streams, then the user sees `BoardGridSkeleton` first and then the resolved `BoardGrid` with the first page of boards.'
+  - 'Given the configured Pinterest token is invalid (Pinterest returns 401), when an authenticated user opens `/pinterest`, then the page renders a MINIMAL inline placeholder (heading + one-line "Pinterest token needs replacement; see Vercel env" copy) in place of `BoardGrid` — NOT through `error.tsx`. The styled `TokenInvalidView` lands in `b4-pinterest-token-remediation-views`, which UPGRADES this placeholder.'
+  - 'Given the configured Pinterest token lacks read scopes (Pinterest returns 403), when an authenticated user opens `/pinterest`, then the page renders a MINIMAL inline placeholder (heading + one-line "Pinterest token needs broader access; see Vercel env" copy) DISTINCT from the 401 placeholder — NOT through `error.tsx`. The styled `InsufficientScopeView` lands in `b4-pinterest-token-remediation-views`.'
+  - 'Given `app/(authenticated)/pinterest/page.tsx` is rendered, when execution starts, then `verifyPinterestToken()` is awaited BEFORE `listPinterestBoards()` is called, and on a non-ok result the appropriate placeholder is rendered without invoking the boards fetch (architect option (a) for `architecture:slice-boundary-token-verify`).'
+  - 'Given the first board page response includes a non-null `bookmark`, when the user scrolls until the `InfiniteScrollSentinel` enters the viewport, then the boards server action is invoked with that bookmark and the returned items are appended to `BoardGrid` without replacing the existing list.'
+  - 'Given the boards server action returns `{ items: [...], nextBookmark: null }`, when the sentinel observes that response, then it stops triggering further pagination requests for the current session.'
+  - 'Given the user is on `/pinterest` and clicks a `BoardCard`, when the click handler runs, then navigation moves to `/pinterest/[boardId]` (route exists in b3 as a placeholder no-op until b3 ships its implementation; this slice only verifies the link href is correct).'
+  - 'Given the boards server action is called with a `bookmark` parameter, when it executes, then it returns `{ items: PinterestBoard[]; nextBookmark: string | null }` matching the response contract.'
+  - 'Given a `BoardCard` renders board media via `next/image`, when the page is built, then no image-host config error is thrown (relies on b1 having added `i.pinimg.com` to `next.config.ts`).'
+  - 'Given the page is loaded on a tablet-width viewport, when the board grid renders, then card touch targets meet the existing tablet-friendly sizing established in Epic A.'
+  - 'Given the ui-design step has run, when the story is finalized, then the `wireframes:` block on this YAML is populated with the approved rendition path + brief per `references/wireframe-protocol.md` Touchpoint 1.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Next 15 server-action shape — what is the idiomatic return type for a
+      server action consumed by a client component (`InfiniteScrollSentinel`),
+      and how do we keep the token boundary intact when the server action calls
+      back into `lib/pinterest/client.ts`? Confirm `'use server'` directive
+      placement (top of `actions.ts` file vs per-export).
+      (2) `<Suspense>` + Server Components in Next 15 — exact pattern for
+      wrapping a server-component data fetch so the skeleton fallback streams
+      before the resolved content. Confirm whether `loading.tsx` segment-level
+      fallback conflicts with route-level `<Suspense>`.
+      (3) IntersectionObserver in a React 19 client component — best-practice
+      cleanup, `rootMargin` defaults that work on tablet viewports, and how to
+      prevent duplicate in-flight requests for the same `bookmark`.
+      Read `lib/pinterest/{client,types}.ts` from B1, `app/(authenticated)/layout.tsx`
+      from a4 (don't modify it — just understand the shell), and the brand
+      tokens at `.pHive/brand/tokens.json` for grid spacing/typography vocabulary.
+    agent: researcher
+  - id: ui-design
+    description: |
+      RUNS AT PLANNING TIME (per `references/wireframe-protocol.md` Touchpoint 1)
+      — story is not finalized for execute until the wireframe is approved.
+      Satisfies the `ui:major` escalation.
+
+      Produce **3 wireframe renditions** (per `renditions: 3` config above) at:
+        - `.pHive/wireframes/epic-b-pinterest-integration/b2-pinterest-boards-grid/v1.png`
+        - `.pHive/wireframes/epic-b-pinterest-integration/b2-pinterest-boards-grid/v2.png`
+        - `.pHive/wireframes/epic-b-pinterest-integration/b2-pinterest-boards-grid/v3.png`
+
+      Plus a written brief at `.pHive/design/briefs/pinterest-boards-grid.md`.
+
+      The brief + renditions cover:
+      - `/pinterest` page layout inside the existing authenticated shell
+      - Uniform `BoardGrid` — column count at tablet vs desktop, card aspect
+        ratio, gap/padding, card hover/focus state
+      - `BoardCard` — board media area, board name, optional pin_count + privacy
+        indicator; touch target minimum
+      - `BoardGridSkeleton` — skeleton card count to show during initial stream
+        (recommend 6-12 to fill above-the-fold), shimmer or static neutral fill
+        per Epic A's existing skeleton language if any
+      - `InfiniteScrollSentinel` — visual treatment when fetching the next page
+        (small spinner / pulse near bottom of grid; quiet, not chrome-heavy)
+      - **MINIMAL inline 401/403 placeholder** in the boards-grid slot (will be
+        upgraded by `b4-pinterest-token-remediation-views` to the styled
+        `TokenInvalidView` / `InsufficientScopeView`). Two short sentences each
+        — enough to make the unhealthy-token state legible without faking a
+        full remediation surface.
+      - Empty-state placeholder if zero boards (deferred to b5 polish but flag
+        the slot here so the dev doesn't render an empty `<div>`)
+
+      Reuse Epic A's warm-shell visual language: Mulberry Dusk / Ivory Cream /
+      Champagne Gold tokens already in `.pHive/brand/brand-system.yaml`. Stay
+      Tailwind-first per cycle-state dd-q3 — do NOT introduce `lib/utils.ts`
+      `cn()`.
+
+      **Touchpoint 1 (blocking, requires direct user access via team-lead):**
+      orchestrator presents renditions to Don, Don selects one (or requests
+      changes / more options), TPM appends the `wireframes:` block to this
+      story file with the approved rendition path + brief. Story does not
+      enter execute until that block is populated.
+
+      Output is consumed by tester (acceptance_criteria-aligned wireframe
+      semantics) and developer (pixel + spacing reference).
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Tests target BEHAVIOR (visible
+      semantics + data flow), not HTML structure.
+
+      - tests/unit/pinterest/list-boards.test.ts — `listPinterestBoards()` unit:
+        (1) Mocked 200 with `{ items: [...], bookmark: 'abc' }` returns
+            `{ items, nextBookmark: 'abc' }`
+        (2) Mocked 200 with `{ items: [...], bookmark: null }` returns
+            `{ items, nextBookmark: null }` (terminal page)
+        (3) Mocked 401 → throws or returns the `invalid_token` error per the
+            chosen contract (defer to B1's `errors.ts`)
+        (4) `bookmark` query param is forwarded to Pinterest correctly when
+            provided; omitted on first request
+        (5) Default `pageSize` matches Pinterest default (25) unless overridden
+
+      - tests/unit/pinterest/actions-boards.test.ts — boards server action unit:
+        (1) Calls `listPinterestBoards()` with the bookmark passed in
+        (2) Returns `{ items: [...], nextBookmark: string | null }`
+        (3) Does NOT expose the token to the client — assert the server action
+            return type contains no token field
+
+      - tests/integration/pinterest/boards-page.test.tsx — `/pinterest` render:
+        (1) With mocked healthy token + mocked board response, the page
+            eventually renders board names visible in the DOM (assert by role/
+            text per Epic A's behavior-first convention)
+        (2) Initial render shows `BoardGridSkeleton` semantics (assert by
+            `aria-busy` or skeleton role, not class names)
+        (3) `BoardCard` link `href` equals `/pinterest/{board.id}` for each
+            board
+
+      - tests/e2e/pinterest-boards.spec.ts — Playwright partial golden path:
+        (1) Log in as the allowlisted user (reuse Epic A auth helper)
+        (2) Navigate to `/pinterest`
+        (3) Assert skeleton renders, then resolves to a board grid (use
+            mocked Pinterest responses via Playwright route interception or
+            MSW per project test infrastructure)
+        (4) Scroll until the sentinel fires; assert a second batch of boards
+            appears
+        (5) Assert the network was called with the second page's bookmark
+
+      DO NOT write tests for: `/pinterest/[boardId]` route, pin grid, 401/403
+      page-level render branches, token-replacement copy, or empty-state UI.
+      Those land in B3 / B4 / B5.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Make the failing tests pass. UI work — translate the ui-design brief
+      into Tailwind + brand tokens.
+
+      AUTHORITATIVE VISUAL SOURCE:
+      - .pHive/design/briefs/pinterest-boards-grid.md (+ optional .png)
+      - .pHive/brand/tokens.json (color + spacing tokens)
+
+      Translation rules (same as Epic A's a3/a4):
+      - Brand palette via Tailwind tokens (Mulberry Dusk, Ivory Cream, Dusty
+        Rose, Champagne Gold, Warm Parchment)
+      - Typography via `font-display` / `font-body` utilities
+      - Stay Tailwind-first; do NOT add `lib/utils.ts` `cn()` (cycle-state dd-q3)
+
+      Files to produce:
+
+      - lib/pinterest/client.ts — extend with `listPinterestBoards({ bookmark, pageSize })`
+        following the existing `verifyPinterestToken` pattern (server-only, bearer
+        header, normalize errors via `lib/pinterest/errors.ts`)
+
+      - app/(authenticated)/pinterest/page.tsx — server component:
+        - **FIRST**: await `verifyPinterestToken()` BEFORE the Suspense
+          boundary. This satisfies the
+          `architecture:slice-boundary-token-verify` escalation.
+        - If `result.ok === false && result.reason === 'invalid_token'`:
+          render the MINIMAL inline 401 placeholder (per ui-design brief —
+          a heading + one short sentence pointing operator to the Vercel
+          env). Do NOT enter the Suspense boundary; do NOT call
+          `listPinterestBoards()`. The styled `TokenInvalidView` will land in
+          `b4-pinterest-token-remediation-views`, which UPGRADES this
+          placeholder.
+        - If `result.ok === false && result.reason === 'insufficient_scope'`:
+          render the MINIMAL inline 403 placeholder (heading + one sentence,
+          DISTINCT from the 401 placeholder). Same skip-the-fetch behavior.
+        - If `result.ok === false && result.reason === 'network'` (or other
+          unexpected): propagate to `error.tsx` (let it throw — error.tsx is
+          for unexpected failures + retries per architect MAJOR-1).
+        - If `result.ok === true`: enter the
+          `<Suspense fallback={<BoardGridSkeleton/>}>` boundary and fetch
+          the first board page via `listPinterestBoards({})`.
+        - Pass the result as serializable initial props to `<BoardGrid>`.
+
+      - app/(authenticated)/pinterest/actions.ts — server actions file:
+        - `'use server'` at the top
+        - Export `loadMoreBoards(bookmark: string): Promise<{ items: PinterestBoard[]; nextBookmark: string | null }>`
+          that calls `listPinterestBoards({ bookmark })` and returns the
+          normalized response
+
+      - components/pinterest/BoardGrid.tsx — client component:
+        - Accepts initial `items: PinterestBoard[]` and initial `nextBookmark`
+        - Uses local `useState` to track appended pages
+        - Renders a uniform grid via Tailwind
+        - Renders `<InfiniteScrollSentinel onIntersect={loadMore} disabled={!nextBookmark}/>`
+          at the bottom; `loadMore` calls the server action with the current
+          bookmark and updates state
+
+      - components/pinterest/BoardCard.tsx — client component:
+        - Accepts `board: PinterestBoard`
+        - Renders board name, optional metadata, board media via `next/image`
+          (relies on B1's `i.pinimg.com` allowlist)
+        - Wraps in a Next `<Link href={`/pinterest/${board.id}`}>`
+
+      - components/pinterest/BoardGridSkeleton.tsx — server-renderable:
+        - Renders N placeholder card silhouettes via Tailwind
+        - Sets `aria-busy="true"` for accessibility-friendly streaming
+
+      - components/pinterest/InfiniteScrollSentinel.tsx — client component:
+        - Uses IntersectionObserver via `useEffect`
+        - Cleans up the observer on unmount
+        - Guards against duplicate in-flight calls (track `loading` ref)
+        - Stops observing when `disabled` prop is true
+
+      Do NOT add: `[boardId]/page.tsx`, `not-found.tsx`, `error.tsx`,
+      `TokenInvalidView`, `InsufficientScopeView`, `token-replacement-copy.ts`,
+      `PinGrid`, `PinCard`, `PinGridSkeleton`, empty-state UI. Those are
+      later-slice work.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the slice ships a working board browse on healthy token without
+      bleeding into later-slice scope.
+
+      - `lib/pinterest/client.ts` `listPinterestBoards` reuses the
+        server-only fetch helper from B1; no fresh token reads.
+      - Server action in `actions.ts` returns the same `{ items, nextBookmark }`
+        shape that `BoardGrid` expects — contract producer/consumer match.
+      - `BoardGrid` does NOT use `useEffect`-based fetch on mount — initial
+        items come from server-rendered props (otherwise SSR streaming benefit
+        is lost).
+      - `InfiniteScrollSentinel` cleans up the observer; no duplicate fetches
+        on the same bookmark; stops when `nextBookmark === null`.
+      - `BoardCard` `next/image` renders `i.pinimg.com` URLs without runtime
+        host warnings (verify B1's allowlist took effect).
+      - `<Suspense>` placement actually streams (don't accidentally `await`
+        outside the boundary, which would block the whole page).
+      - NO 401/403 page-level branch — that's B4. NO token-replacement copy.
+        NO pin grid. NO empty-state UI.
+      - All tests pass: unit/list-boards, unit/actions-boards,
+        integration/boards-page, e2e/pinterest-boards.
+      - Tablet-touch sized: card hit targets meet the project's tablet
+        breakpoint conventions (carry forward from Epic A).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit `feat(b2): /pinterest boards grid with Suspense streaming + infinite scroll`.
+      Branch: `epic-b/pinterest-boards-grid`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router (server components + server actions + <Suspense> streaming)'
+    runtime: 'React 19 client components for grid + sentinel; Tailwind-first styling'
+    testing: 'Vitest unit/integration; Playwright e2e with mocked Pinterest responses'
+  key_files:
+    - path: lib/pinterest/client.ts
+      purpose: 'Consumed from B1; extended in this slice with listPinterestBoards'
+    - path: lib/pinterest/types.ts
+      purpose: 'Consumed from B1 — PinterestBoard / PinterestPaginated shapes'
+    - path: lib/pinterest/errors.ts
+      purpose: 'Consumed from B1 — error normalization for 401/403/network paths'
+    - path: app/(authenticated)/layout.tsx
+      purpose: 'Consumed from a4 — protected shell wrapper; NOT modified in this slice'
+    - path: .pHive/design/briefs/pinterest-boards-grid.md
+      purpose: 'Produced by ui-design step — authoritative wireframe brief'
+    - path: .pHive/brand/tokens.json
+      purpose: 'Brand color + spacing token reference'
+    - path: .pHive/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+      purpose: 'Layer 4 (Server Components) + Layer 5 (Client Components) + Layer 6 (Suspense) + Layer 7 (Pagination)'
+    - path: .pHive/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+      purpose: 'Slice 2 spec'
+
+files_to_modify:
+  - file: lib/pinterest/client.ts
+    change: 'Extend with listPinterestBoards({ bookmark, pageSize })'
+  - file: app/(authenticated)/pinterest/page.tsx
+    change: 'Create; server component with Suspense-wrapped boards fetch'
+  - file: app/(authenticated)/pinterest/actions.ts
+    change: 'Create; "use server" loadMoreBoards action'
+  - file: components/pinterest/BoardGrid.tsx
+    change: 'Create; client grid with infinite-scroll append'
+  - file: components/pinterest/BoardCard.tsx
+    change: 'Create; client card with next/image + Link to board detail'
+  - file: components/pinterest/BoardGridSkeleton.tsx
+    change: 'Create; skeleton fallback for Suspense'
+  - file: components/pinterest/InfiniteScrollSentinel.tsx
+    change: 'Create; IntersectionObserver client trigger'
+  - file: .pHive/design/briefs/pinterest-boards-grid.md
+    change: 'Created in ui-design step — authoritative wireframe brief'
+  - file: tests/unit/pinterest/list-boards.test.ts
+    change: 'Created in test-spec'
+  - file: tests/unit/pinterest/actions-boards.test.ts
+    change: 'Created in test-spec'
+  - file: tests/integration/pinterest/boards-page.test.tsx
+    change: 'Created in test-spec'
+  - file: tests/e2e/pinterest-boards.spec.ts
+    change: 'Created in test-spec'
+
+design_decisions:
+  - decision: 'Uniform grid layout for boards (and later pins)'
+    rationale: 'Cycle-state dd-q1 — Don confirmed uniform over masonry for layout stability + next/image cooperation'
+  - decision: 'Infinite scroll via IntersectionObserver instead of load-more button'
+    rationale: 'Cycle-state dd-q2 — Don OVERRODE the design-discussion load-more recommendation; sentinel-driven append matches Pinterest browse expectations'
+  - decision: 'Initial boards come from server-rendered props, not client useEffect fetch'
+    rationale: 'Suspense streaming requires server-component data fetch; using client fetch on mount would defeat the streaming pattern Don picked in dd-q6'
+  - decision: 'Server action (not API route) for pagination'
+    rationale: 'Next 15 idiomatic pattern; keeps token boundary inside `lib/pinterest/client.ts` while still letting the client component request more data'
+  - decision: 'No `lib/utils.ts` `cn()` helper introduced in this slice'
+    rationale: 'Cycle-state dd-q3 — defer shadcn `cn()` until shadcn primitives are actually adopted; Epic B stays Tailwind-first'
+  - decision: 'Skeleton uses `aria-busy` semantic, not visual-only spinner'
+    rationale: 'Streaming is an accessibility surface; behavior-first tests should target `aria-busy` rather than class names'
+
+cross_cutting: []
+
+risks:
+  - severity: high
+    description: 'Suspense boundary placement wrong — the boards fetch resolves outside the suspense subtree and blocks the whole page render'
+    mitigation: 'Research step #2 confirms idiomatic placement; integration test asserts skeleton actually renders before resolved boards (not just final state)'
+  - severity: high
+    description: 'IntersectionObserver fires duplicate requests for the same bookmark, appending duplicate items'
+    mitigation: 'Sentinel guards with a `loading` ref + dedupe on bookmark; integration test asserts second-page network call uses the correct bookmark and no duplicate appears'
+  - severity: medium
+    description: 'Pinterest returns boards with image variants we did not model in B1 types — `next/image` URL is malformed'
+    mitigation: 'Researcher confirms current image variant naming; types.ts cover-image typing intentionally flexible (B1 risk note); fall back to a placeholder image if a variant is missing'
+  - severity: medium
+    description: 'Server action exposes the token by mistake (e.g., includes a header copy in the response shape)'
+    mitigation: 'Reviewer grep step + unit test asserting return type has no token field; the action only returns `{ items, nextBookmark }`'
+  - severity: medium
+    description: '401/403 paths fall through to `error.tsx` in this slice and surprise the operator before B4 ships the page-level branches'
+    mitigation: 'Slice scope explicitly notes that 401/403 land in B4. If B2 ships before B4, document the temporary fallback in the integrate commit message so Don knows the gap.'
+  - severity: low
+    description: 'Tablet touch target sizing drifts from Epic A conventions'
+    mitigation: 'ui-design brief references Epic A`s tablet breakpoint; reviewer cross-checks card hit area'
+
+references:
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      US-B-2: Browse boards and pins. Given the configured Pinterest token is
+      valid, when I open the Pinterest browse area, then I see boards rendered
+      in a board grid. (US-B-2 part 1 — board grid scope of this slice.)
+      FR-B-2: The Pinterest browse surface must render a board grid for the
+      configured account on first load. FR-B-3: Pagination uses Pinterest's
+      bookmark cursor model.
+  - path: .pHive/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+    relevant_excerpt: |
+      Layer: Client Components. `BoardGrid.tsx` must render a uniform board grid
+      from initial server-provided items. `InfiniteScrollSentinel.tsx` must use
+      `IntersectionObserver` to trigger pagination when the sentinel enters
+      view. The sentinel must stop requesting more data when `nextBookmark`
+      becomes `null`.
+      Layer: Pagination Wiring. Provide a server action for board pagination
+      that accepts `bookmark` and returns `{ items, nextBookmark }`. Reuse the
+      same server-only Pinterest client list functions used by the initial page
+      render. Keep the token boundary server-side; the client may send cursor
+      and board ID, but never the token.
+  - path: .pHive/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+    relevant_excerpt: |
+      Step 2 — `/pinterest` boards grid. WHAT WORKS AFTER THIS STEP:
+      Authenticated user opens `/pinterest`, server fetches first page of boards
+      via `listPinterestBoards()`, `<Suspense fallback={<BoardGridSkeleton/>}>`
+      streams skeletons during fetch, then `BoardGrid` renders a uniform board
+      grid; scrolling triggers `InfiniteScrollSentinel` which calls the boards
+      server action with `bookmark` and appends results until `nextBookmark` is
+      null.
+  - path: .pHive/cycle-state/epic-b-pinterest-integration.yaml
+    relevant_excerpt: |
+      decisions:
+        - id: dd-q1-pin-grid-layout
+          choice: uniform
+        - id: dd-q2-pagination
+          choice: infinite-scroll
+        - id: dd-q3-cn-helper
+          choice: defer
+        - id: dd-q6-render-strategy
+          choice: stream-with-suspense
+
+ui_indicators: 'NEW UI surface — board grid, board card, skeleton, infinite-scroll sentinel, MINIMAL inline 401/403 token-verify placeholders; no pre-supplied wireframe; ui-design step REQUIRED before test-spec; renditions: 3 per wireframe-protocol Touchpoint 1'
+
+# (placeholder wireframes: block removed 2026-04-20 — replaced by populated block at top of file after Touchpoint 1 approval)

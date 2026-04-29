@@ -5,8 +5,8 @@ project:
   name: nail-tech-assistant
   codebase_path: '/Users/don/Documents/GitHub/Nail Tech Assitant'
 
-paths:
-  state_dir: state # Hive state lives at ./state/ (not the .pHive default); resolver reads this for HIVE_STATE_DIR
+metrics:
+  enabled: true # opt-in: unlocks metric-driven meta-optimization in future skills
 
 execution:
   default_methodology: tdd
@@ -46,7 +46,7 @@ agent_routing:
     ui-designer: claude
     analyst: claude
   execution:
-    # TDD step-to-agent mapping (see state/epics/<id>/stories/<id>.yaml → steps[].agent)
+    # TDD step-to-agent mapping (see .pHive/epics/<id>/stories/<id>.yaml → steps[].agent)
     researcher: claude
     tester: claude # initial test author — Claude writes failing tests from spec
     developer: codex # implementation — Codex makes failing tests pass

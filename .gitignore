@@ -65,8 +65,8 @@ playwright/.cache/
 /tmp/
 
 # Hive session-only state (not planning artifacts)
-state/interrupts/
-state/cycle-state/
-state/insights/
-state/team-memories/
-state/episodes/
+.pHive/interrupts/
+.pHive/cycle-state/
+.pHive/insights/
+.pHive/team-memories/
+.pHive/episodes/

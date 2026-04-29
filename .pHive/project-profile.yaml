@@ -1,0 +1,151 @@
+project_name: nail-tech-assistant
+type: greenfield
+discovered: '2026-04-17'
+source: 'greenfield discovery conversation'
+
+summary: |
+  A single-user web app (Mother's Day 2026 gift) for a working nail technician.
+  Bridges Pinterest/Instagram inspiration to an AI-generated nail design rendered
+  on a 2D five-nail hand visualizer. Target delivery: 2026-05-10.
+
+tech_stack:
+  languages:
+    - TypeScript
+  frameworks:
+    - Next.js 15 (App Router)
+    - React 19
+    - Tailwind CSS
+  ui_kit:
+    - shadcn/ui
+  runtime:
+    - Node.js 20+
+  build_tools:
+    - pnpm
+    - Turbopack
+  hosting:
+    - Vercel
+  database:
+    - Firebase Firestore # amended 2026-04-17 (sign-off #15; was Supabase Postgres)
+  storage:
+    - Firebase Cloud Storage # amended 2026-04-17 (sign-off #15; was Supabase Storage)
+  auth:
+    - Firebase Auth (email link sign-in, email-allowlisted single-user) # amended 2026-04-17 (sign-off #15; was Supabase Auth)
+  external_apis:
+    - Pinterest API v5 (static access token, single-user — see sign-off #17)
+    - Firebase AI Logic for Gemini 2.5 Flash Image access (sign-off #16)
+  versions: {}
+
+structure:
+  modules: [] # to be populated after scaffold
+  entry_points: []
+
+architecture:
+  pattern: 'TBD (to be decided in architecture phase)'
+  di_framework: 'N/A (React/Next.js — no formal DI)'
+  state_management: 'TBD (React Server Components + useState/Context, or Zustand)'
+  navigation: 'Next.js App Router'
+  data_layer: 'Supabase client + server actions'
+
+conventions:
+  naming: 'TBD — will establish in architecture phase'
+  file_organization: 'Next.js App Router conventions'
+  branching: 'main + feature branches'
+  commit_messages: 'conventional-ish, single-commit-per-PR style'
+
+test_infrastructure:
+  unit:
+    framework: 'Vitest (TBD — finalize in architecture)'
+    location: 'TBD'
+    count: '0 (greenfield)'
+    coverage_tool: 'vitest --coverage (v8 provider)'
+  integration:
+    framework: 'Vitest + Supabase test client'
+    location: 'TBD'
+  e2e:
+    framework: 'Playwright'
+    location: 'TBD'
+    count: '0 (greenfield)'
+  mocking: 'MSW for API mocking'
+  test_commands:
+    - 'pnpm test'
+    - 'pnpm test:e2e'
+
+ci_cd:
+  platform: 'Vercel Preview Deployments + GitHub Actions'
+  workflows: []
+  gating: 'PR checks: typecheck, lint, unit tests'
+
+documentation_found: []
+
+existing_knowledge:
+  mcp_servers:
+    - context7
+    - firecrawl
+    - posthog
+    - firebase
+    - Gmail
+    - Google Calendar
+    - Google Drive
+  existing_skills: []
+  existing_hooks: []
+
+integrations:
+  cli_tools:
+    linearis:
+      status: detected
+      impact: 'Optional Linear task-tracking sync'
+    codex:
+      status: detected
+      impact: 'Adversarial / second-opinion code review via Codex CLI'
+    frame0:
+      status: detected
+      source_path: '/Users/don/Documents/workflow/frame-zero/agent-harness/'
+      app_path: '/Applications/Frame0.app'
+      impact: 'Wireframe generation for UI-heavy stories'
+      notes: 'User prefers CLI over MCP server to reduce token spend'
+    maestro:
+      status: detected
+      impact: 'Not applicable — project is web, not mobile'
+  mcp_servers:
+    context7:
+      status: detected
+      impact: 'Library / SDK documentation lookup'
+    firecrawl:
+      status: detected
+      impact: 'Web scraping and research (Pinterest docs, design inspiration)'
+    posthog:
+      status: detected
+      impact: 'Product analytics (optional, deferred post-v1)'
+    firebase:
+      status: detected
+      impact: 'Firebase project management (not planned — Supabase chosen)'
+    mobile-mcp:
+      status: missing
+      impact: 'Not applicable — project is web'
+  vaults:
+    obsidian:
+      status: not_detected
+
+project_maturity: 'greenfield'
+
+code_quality:
+  linters:
+    - name: eslint
+      config_path: 'TBD (generated with create-next-app)'
+      lint_command: 'pnpm lint'
+      ecosystem: javascript
+  formatters:
+    - name: prettier
+      config_path: '.prettierrc'
+      ecosystem: javascript
+  pre_commit:
+    framework: husky
+    hooks:
+      - lint-staged
+  code_snippets: []
+  test_first_signals:
+    co_located_tests: null
+    test_before_source: null
+    test_runner_in_precommit: null
+    bdd_keywords: null
+    test_absence: true

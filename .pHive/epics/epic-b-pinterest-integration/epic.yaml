@@ -1,0 +1,141 @@
+name: epic-b-pinterest-integration
+title: 'Pinterest Integration — server-only client + boards browse + pin grid + token-remediation views (browse-only, static token)'
+description: |
+  Slice 1 of the Nail Tech Assistant build after Epic A's foundation+auth shipped.
+  Lets the authenticated user browse Pinterest boards and pins inside the
+  Epic A authenticated shell, using one configured static `PINTEREST_ACCESS_TOKEN`
+  env var. Browse-only by design — no OAuth, no token refresh, no client secret,
+  no pin selection persistence, no upload blending, no AI generation, no visualizer.
+  If this epic absorbs those concerns, it has exceeded its role
+  (vertical-plan.md Slice 5 deferred section + design-discussion.md non-goals).
+
+  Sign-off anchors: PRD US-B-1 (use configured account; block on missing/revoked/invalid),
+  US-B-2 (browse boards then pins), US-B-3 (env-stable bearer-token contract).
+
+target_codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+methodology: tdd
+
+planning_artifacts:
+  research_brief: .pHive/epics/epic-b-pinterest-integration/docs/research-brief.md
+  research_raw: .pHive/epics/epic-b-pinterest-integration/docs/research-raw-findings.md
+  design_discussion: .pHive/epics/epic-b-pinterest-integration/docs/design-discussion.md
+  architect_review: .pHive/epics/epic-b-pinterest-integration/docs/architect-review.md
+  horizontal_plan: .pHive/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+  vertical_plan: .pHive/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+  prd: .pHive/planning/prd.md
+  sign_off: .pHive/planning/sign-off.md
+  cycle_state: .pHive/cycle-state/epic-b-pinterest-integration.yaml
+
+slice_covered: 'Slice 1 — Pinterest Browse (Vertical Slices S1–S5)'
+
+agent_routing:
+  researcher: claude
+  tester: claude
+  developer: codex
+  reviewer: claude
+  integrator: claude
+  ui_designer: claude
+  tpm_validator: claude-opus-4-7
+
+quality_gates:
+  typecheck: required
+  lint: required
+  unit_tests: required
+  e2e_tests: recommended
+  bundle_grep_token_absent: required # b1 acceptance — `pina_` must not appear under .next/static/**
+
+acceptance_at_epic_completion: |
+  - PRD US-B-1: With a healthy `PINTEREST_ACCESS_TOKEN`, `/pinterest` and
+    `/pinterest/[boardId]` render the user's boards and pins inside the Epic A
+    authenticated shell with no user OAuth step.
+  - PRD US-B-1: With an unhealthy token (missing/invalid/insufficient-scope),
+    both routes render page-level remediation views (NOT error.tsx — architect
+    MAJOR-1) with terse, wife-test-readable copy referencing the Pinterest
+    developer dashboard + direct Vercel env update steps.
+  - PRD US-B-1: 401 (invalid token) and 403 (insufficient scope) render as
+    SEPARATE views with distinct remediation paths (architect MAJOR-2).
+  - PRD US-B-2: Board grid renders as uniform grid (NOT masonry — dd-q1) with
+    Suspense streaming + IntersectionObserver infinite scroll (dd-q2 override).
+  - PRD US-B-2: Selecting a board navigates to `/pinterest/[boardId]` and
+    renders that board's pin grid with the same uniform grid + Suspense +
+    infinite-scroll pattern. Invalid board IDs render Next 15 `notFound()`.
+  - PRD US-B-3: Pinterest token stays server-side at all times — bundle-grep
+    test in b1 proves `pina_` never appears under `.next/static/**` after a
+    production build. Replace-token guidance is single-sourced in
+    `lib/pinterest/token-replacement-copy.ts`.
+  - Quality gates: typecheck + lint + unit tests pass; the b1 bundle-grep
+    assertion runs as part of the gate that satisfies `security:plan-audit`.
+
+dependencies_external:
+  - Pinterest developer-dashboard `PINTEREST_ACCESS_TOKEN` (dashboard-generated,
+    boards:read + pins:read scopes minimum) — user-owned prerequisite, configured
+    in Vercel env + local `.env.local`
+  - Vercel preview deploy (inherited from Epic A) — used by b5 real-token smoke
+
+risks_applicable:
+  - 'Risk: secret handling regression — addressed by b1 bundle-grep test (`security:plan-audit` escalation)'
+  - 'Risk: working-state gap between b2/b3 deploy and b4 deploy if token unhealthy mid-window — addressed by b2 verifyPinterestToken() inline placeholder per architect option (a) (`architecture:slice-boundary-token-verify` escalation)'
+  - 'Risk: visual decisions retrofitted into already-built code if wireframes lag — addressed by ui-design step inserted into b2/b3/b4 (`ui:major` escalation)'
+  - "Risk: motion quality below Epic A felt-quality bar with Don's infinite-scroll override + Suspense streaming — addressed by animations-specialist sidecar at execute (`ui:animations` escalation, minor)"
+  - 'Risk: Pinterest API response-shape variance (esp. board cover-image fields, pin media variants) — addressed by typed errors.ts discriminated union + b3 explicit response-shape parsing'
+  - 'Risk: rate-limit / network failures in browse path falling through to error.tsx — addressed by b5 inline retryable browse error UI'
+
+stories:
+  - id: b1-pinterest-client-token-boundary
+    title: 'Server-only Pinterest client + typed errors + token boundary with bundle-grep proof'
+    complexity: medium
+    depends_on: [a4-middleware-protected-shell]
+  - id: b2-pinterest-boards-grid
+    title: '/pinterest boards grid with Suspense streaming + IntersectionObserver infinite scroll'
+    complexity: medium
+    depends_on: [b1-pinterest-client-token-boundary]
+  - id: b3-pinterest-pin-grid
+    title: '/pinterest/[boardId] pin grid with Suspense streaming + infinite scroll + notFound() on invalid board'
+    complexity: medium
+    depends_on: [b2-pinterest-boards-grid]
+  - id: b4-pinterest-token-remediation-views
+    title: 'Page-level 401/403 token-remediation render branches + shared terse copy module + error.tsx scoping'
+    complexity: medium
+    depends_on: [b3-pinterest-pin-grid]
+  - id: b5-pinterest-polish-and-smoke
+    title: 'Empty-state surfaces + retryable rate-limit/network browse error UI + real-token Vercel smoke'
+    complexity: small
+    depends_on: [b4-pinterest-token-remediation-views]
+
+min_viable_ship_cut:
+  stories:
+    [
+      b1-pinterest-client-token-boundary,
+      b2-pinterest-boards-grid,
+      b3-pinterest-pin-grid,
+      b4-pinterest-token-remediation-views,
+    ]
+  rationale: "S1+S2+S3+S4 satisfies US-B-1 + US-B-2 + US-B-3 in full. b5 is deferred-eligible if Mother's Day 2026-05-10 pressure hits."
+
+escalations_carrying_into_execute:
+  - trigger: security:plan-audit
+    severity: major
+    target_stories: [b1-pinterest-client-token-boundary]
+    satisfied_by: b1 bundle-grep test asserting `pina_` absent from .next/static/**
+  - trigger: architecture:slice-boundary-token-verify
+    severity: moderate
+    target_stories: [b2-pinterest-boards-grid, b3-pinterest-pin-grid]
+    satisfied_by: b2 acceptance criterion adopting architect option (a) — verifyPinterestToken() server-side + inline 401/403 placeholder; b4 upgrades placeholder to styled views
+  - trigger: ui:major
+    severity: major
+    target_stories:
+      [
+        b2-pinterest-boards-grid,
+        b3-pinterest-pin-grid,
+        b4-pinterest-token-remediation-views,
+      ]
+    satisfied_by: ui-design step inserted between research and test-spec in b2/b3/b4 (lighter addendum step in b5); blocking on Touchpoint 1 wireframe approval before implement
+  - trigger: ui:animations
+    severity: minor
+    target_stories:
+      [
+        b2-pinterest-boards-grid,
+        b3-pinterest-pin-grid,
+        b4-pinterest-token-remediation-views,
+      ]
+    satisfied_by: animations-specialist sidecar review at execute time for skeleton transitions, IntersectionObserver append stagger, prefers-reduced-motion handling

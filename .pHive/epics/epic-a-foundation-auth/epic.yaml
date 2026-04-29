@@ -1,0 +1,86 @@
+name: epic-a-foundation-auth
+title: 'Foundation + Auth — Next.js scaffold, Firebase wiring, allowlisted email-link login, protected shell, baseline Firestore rules'
+description: |
+  Slice 0 of the Nail Tech Assistant build. Establishes a thin, production-shaped
+  foundation where the allowed user (wife's email) can sign in via Firebase email-link,
+  land in a protected shell, and rely on env validation, baseline Firestore
+  rules/indexes, and a CI test harness that all later epics build on.
+
+  Intentionally thin: no Pinterest logic, no Gemini, no design domain, no visualizer.
+  If this epic absorbs those concerns, it has exceeded its role
+  (vertical-plan.md Slice 0 + structured-outline.md Risk #3).
+
+  Sign-off anchors: sign-off #15 (Firebase replaces Supabase),
+  #1 (single-user allowlist), #6 (Claude-spec / Codex-implement / Claude-review).
+
+target_codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+methodology: tdd
+
+planning_artifacts:
+  design_discussion: .pHive/planning/design-discussion.md
+  horizontal_plan: .pHive/planning/horizontal-plan.md
+  vertical_plan: .pHive/planning/vertical-plan.md
+  structured_outline: .pHive/planning/structured-outline.md
+  prd: .pHive/planning/prd.md
+  sign_off: .pHive/planning/sign-off.md
+
+slice_covered: 'Slice 0 — Foundation Scaffold'
+
+agent_routing:
+  researcher: claude
+  tester: claude
+  developer: codex
+  reviewer: claude
+  integrator: claude
+  ui_designer: claude
+  tpm_validator: claude-opus-4-7
+
+quality_gates:
+  typecheck: required
+  lint: required
+  unit_tests: required
+  e2e_tests: recommended
+
+acceptance_at_epic_completion: |
+  - Allowlisted email can request an email link, establish a session, and land in the protected shell.
+  - Non-allowlisted email is rejected SERVER-SIDE before any Firebase send action occurs.
+  - Unauthenticated access to protected routes redirects to /login without auth loops.
+  - /api/health remains public.
+  - tests/e2e/auth.spec.ts (Playwright) passes end-to-end.
+  - Allowlist unit test passes.
+  - Firestore baseline rules/indexes load cleanly in the emulator; rules test suite green.
+  - CI runs typecheck + lint + unit tests as required gates on PRs.
+  - Vercel preview deploy is green.
+
+dependencies_external:
+  - Firebase project (Auth, Firestore, Storage) — user-owned prerequisite
+  - Vercel project — user-owned prerequisite
+  - Required env vars: APP_URL, ALLOWED_EMAIL, PINTEREST_APP_ID, PINTEREST_ACCESS_TOKEN, Firebase config (client + admin)
+
+risks_applicable:
+  - 'Risk #3: timeline collapses if Slice 0 becomes a platform sprint — enforce thin-foundation NFR'
+  - 'Risk #4: spec-implementation drift starts at seam level — TDD + Claude-spec/Codex-impl/Claude-review contract'
+  - 'Risk #6: single-user shortcuts create future migration pain — profiles.id MUST equal Firebase Auth uid'
+  - 'Risk #13: user-owned prereqs (Firebase/Vercel setup) can block the first PR'
+
+stories:
+  - id: a1-scaffold-tooling
+    title: 'Next.js 15 + React 19 scaffold with TypeScript, Tailwind tablet breakpoints, shadcn/ui, test harness, CI'
+    complexity: medium
+    depends_on: []
+  - id: a2-firebase-env-wiring
+    title: 'Firebase client/admin/middleware helpers, env validation, shared types'
+    complexity: medium
+    depends_on: [a1-scaffold-tooling]
+  - id: a3-auth-allowlist-login
+    title: 'Server-enforced email allowlist + Firebase email-link login page with sent-state UX'
+    complexity: medium
+    depends_on: [a2-firebase-env-wiring]
+  - id: a4-middleware-protected-shell
+    title: 'Auth middleware, authenticated shell layout, dashboard placeholder, public /api/health'
+    complexity: medium
+    depends_on: [a3-auth-allowlist-login]
+  - id: a5-firestore-profiles-baseline
+    title: 'Baseline Firestore rules + indexes for profiles collection aligned with Firebase Auth uid'
+    complexity: medium
+    depends_on: [a2-firebase-env-wiring]

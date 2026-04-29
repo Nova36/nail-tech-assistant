@@ -1,0 +1,329 @@
+id: b1-pinterest-client-token-boundary
+epic: epic-b-pinterest-integration
+title: 'Server-only Pinterest client + typed errors + token boundary with bundle-grep proof'
+status: completed
+completed_at: '2026-04-27'
+completed_commit: '72d134d' # epic-b/pinterest-client-token-boundary
+complexity: medium
+methodology: tdd
+depends_on: [a4-middleware-protected-shell]
+escalations_addressed:
+  - trigger: security:plan-audit
+    severity: major
+    placement: pre-exec
+    raised_by: architect
+    addressed_by: 'tests/security/bundle-grep.test.ts asserts `pina_` is absent from .next/static/** client chunks; review step verifies `import "server-only";` boundary in lib/pinterest/client.ts'
+
+description: |
+  Vertical Slice 1 of Epic B. Establish the secret-safe Pinterest integration seam
+  BEFORE any UI exists: a server-only `lib/pinterest/` module trio (`client.ts`,
+  `types.ts`, `errors.ts`) that owns the bearer-token fetch posture, exposes
+  `verifyPinterestToken()` against `GET /v5/user_account`, and normalizes Pinterest
+  failures into a 6-arm discriminated union (`invalid_token`, `insufficient_scope`,
+  `not_found`, `rate_limit`, `network`, `unknown`).
+
+  Also performs the env hygiene work that unblocks later slices: removes the stale
+  `PINTEREST_APP_ID` from `.env.example` (runtime contract stays authoritative in
+  `lib/env.ts`), and adds `i.pinimg.com` to `next.config.ts`
+  `images.remotePatterns` so later board/pin media renders.
+
+  The load-bearing assertion of this slice is a bundle-grep test that confirms the
+  string `pina_` does not appear anywhere under `.next/static/**` after a production
+  build. This proves the architect's pre-exec `security:plan-audit` invariant: the
+  Pinterest token cannot cross any client import boundary.
+
+  Scope discipline: NO UI, NO routes, NO list functions yet (`listPinterestBoards`
+  and `listPinterestBoardPins` ship in B2/B3 respectively). This slice ends with a
+  green typecheck, green unit tests for the verifier, and a green bundle-grep test.
+  Uses `import 'server-only'` at the top of `lib/pinterest/client.ts`.
+
+acceptance_criteria:
+  - 'Given the configured `PINTEREST_ACCESS_TOKEN` is valid, when `verifyPinterestToken()` runs against `GET /v5/user_account`, then it returns `{ ok: true }`.'
+  - "Given the configured token is missing or rejected with HTTP 401, when `verifyPinterestToken()` runs, then it returns `{ ok: false, reason: 'invalid_token' }` and does NOT throw."
+  - "Given the token is valid but rejected with HTTP 403 (insufficient scope), when `verifyPinterestToken()` runs, then it returns `{ ok: false, reason: 'insufficient_scope' }` distinct from the 401 reason."
+  - "Given a network failure (fetch reject) when calling Pinterest, when `verifyPinterestToken()` runs, then it returns `{ ok: false, reason: 'network' }` without throwing."
+  - 'Given the project is built for production (`pnpm build` or equivalent), when a bundle-grep test scans `.next/static/**` (or the equivalent client-bundle output), then the string `pina_` is absent from every chunk.'
+  - 'Given the runtime env validation in `lib/env.ts` is the authoritative source for `PINTEREST_ACCESS_TOKEN`, when `.env.example` is inspected, then `PINTEREST_APP_ID` is no longer present.'
+  - 'Given `next.config.ts` is loaded, when the image config is evaluated, then `images.remotePatterns` includes `i.pinimg.com` so later board/pin media can render.'
+  - "Given the server-only client module, when any client component attempts to import it, then the import fails at build time (because of `import 'server-only'`)."
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Pinterest API v5 — exact response shape for `GET /v5/user_account` on
+      success and on 401/403 failures. Confirm the 401 vs 403 distinction is
+      reliable (architect baked decision MAJOR-2 depends on this) and what header
+      / body fields disambiguate them. Use `firecrawl` against the Pinterest dev
+      docs if context7 lacks it.
+      (2) `import 'server-only'` mechanics in Next 15 — what build error appears
+      when a client component imports the module, and how do we write an
+      assertion that this stays true (the bundle-grep test is the runtime check;
+      what is the build-time check)?
+      (3) Bundle-grep test pattern — best way to scan `.next/static/**` for a
+      forbidden string in a Vitest or Playwright test, including how to avoid
+      false positives from sourcemaps. Confirm whether `next build` is required
+      before the test runs and how to wire that into CI.
+      Read `lib/env.ts` (already validates `PINTEREST_ACCESS_TOKEN`),
+      `next.config.ts` (already exposes empty `images.remotePatterns`), and the
+      horizontal/vertical plan docs at
+      `.pHive/epics/epic-b-pinterest-integration/docs/`.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Tests target BEHAVIOR, not
+      implementation detail.
+
+      - tests/unit/pinterest/client.test.ts — verifyPinterestToken unit tests:
+        (1) Mocked 200 response → `{ ok: true }`
+        (2) Mocked 401 response → `{ ok: false, reason: 'invalid_token' }`
+        (3) Mocked 403 response → `{ ok: false, reason: 'insufficient_scope' }`
+        (4) Mocked network reject → `{ ok: false, reason: 'network' }` (no throw)
+        (5) Bearer header is set to `Bearer ${env.PINTEREST_ACCESS_TOKEN}`
+        (6) Default fetch posture is `cache: 'no-store'`
+        (7) Request URL is `https://api.pinterest.com/v5/user_account`
+        Use `vi.fn()` to mock global fetch; do NOT hit real Pinterest in unit
+        tests.
+
+      - tests/unit/pinterest/errors.test.ts — discriminated union shape:
+        (1) `invalid_token` arm exists with no extra fields
+        (2) `insufficient_scope` arm exists distinct from invalid_token
+        (3) `not_found`, `rate_limit`, `network`, `unknown` arms exist
+        (4) Type-narrowing test: a `switch` on `reason` is exhaustive
+
+      - tests/security/bundle-grep.test.ts — secret-boundary security test:
+        (1) Run after `next build` (or skip if no `.next/static/` exists, with
+            a clear error message)
+        (2) Walk `.next/static/**/*.js` recursively
+        (3) Assert no file contains the substring `pina_`
+        (4) Skip sourcemap files (`*.map`) to avoid false positives
+        This is THE canonical Epic B security test referenced by the architect's
+        pre-exec `security:plan-audit` escalation.
+
+      - tests/unit/env-example.test.ts — env hygiene assertion:
+        (1) Read `.env.example`
+        (2) Assert it does NOT contain `PINTEREST_APP_ID`
+        (3) Assert it DOES contain `PINTEREST_ACCESS_TOKEN`
+
+      DO NOT write tests for `listPinterestBoards` or `listPinterestBoardPins`
+      — those land in B2 and B3. DO NOT write route-level tests — no routes
+      exist in this slice.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass. Pure backend slice — NO UI work.
+
+      Files to produce / modify:
+
+      - lib/pinterest/types.ts — Pinterest response shapes:
+        - `PinterestBoard` (id, name, description, privacy, pin_count,
+          follower_count, created_at, board_pins_modified_at, media,
+          owner.username — keep cover-image typing flexible)
+        - `PinterestPin` (id, title, description, alt_text, link, board_id,
+          board_section_id, board_owner.username, created_at, creative_type,
+          dominant_color, has_been_promoted, is_owner, is_product, is_standard,
+          parent_pin_id, media.media_type, media.images variants)
+        - `PinterestPaginated<T>` = `{ items: T[]; bookmark: string | null }`
+        - `PinterestUserAccount` (only the fields verifyPinterestToken needs)
+
+      - lib/pinterest/errors.ts — discriminated union:
+        ```ts
+        export type PinterestError =
+          | { reason: 'invalid_token' }
+          | { reason: 'insufficient_scope' }
+          | { reason: 'not_found' }
+          | { reason: 'rate_limit'; retryAfterMs?: number }
+          | { reason: 'network' }
+          | { reason: 'unknown'; status?: number };
+        ```
+        Plus a helper `normalizePinterestResponse(res: Response): PinterestError | null`
+        that maps HTTP status → error or returns null on 2xx.
+
+      - lib/pinterest/client.ts — server-only module:
+        - First line: `import 'server-only';`
+        - Constant: `PINTEREST_API_BASE = 'https://api.pinterest.com/v5'`
+        - Read `env.PINTEREST_ACCESS_TOKEN` only inside this module.
+        - Helper `pinterestFetch(path, init)` that:
+          - sets `Authorization: Bearer ${token}` header
+          - sets `cache: 'no-store'` by default (init can override)
+          - returns `Response`
+        - Export `verifyPinterestToken(): Promise<{ ok: true } | { ok: false; reason: 'invalid_token' | 'insufficient_scope' | 'network' }>`
+          (only those three arms — unknown / not_found / rate_limit don't apply to
+          /user_account; collapse them into 'unknown' by mapping to network if
+          desired or treat as throw — choose the simplest shape that makes the
+          test contract green)
+
+      - .env.example — REMOVE the `PINTEREST_APP_ID=...` line. Keep
+        `PINTEREST_ACCESS_TOKEN=...` and any other existing entries.
+
+      - next.config.ts — extend the existing empty `images.remotePatterns`:
+        ```ts
+        images: {
+          remotePatterns: [
+            { protocol: 'https', hostname: 'i.pinimg.com' },
+          ],
+        }
+        ```
+
+      - package.json — if needed, add a script that runs `next build && vitest run tests/security/bundle-grep.test.ts` so CI can gate on the bundle assertion. Coordinate with existing scripts; do NOT duplicate.
+
+      Do NOT add `listPinterestBoards`, `listPinterestBoardPins`,
+      `lib/pinterest/token-replacement-copy.ts`, route segments, components,
+      Suspense boundaries, or pagination wiring. Those live in later slices.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the security boundary is real and the slice scope held.
+
+      - `lib/pinterest/client.ts` first line is `import 'server-only';` — no
+        exceptions.
+      - The token (`env.PINTEREST_ACCESS_TOKEN`) is read ONLY inside
+        `lib/pinterest/client.ts`. Grep the codebase for other consumers — if
+        any exist outside `lib/env.ts` and `lib/pinterest/client.ts`, fail.
+      - Bundle-grep test runs against a real `next build` output, not a mocked
+        directory. Confirm CI wiring runs the build before the test.
+      - 401 vs 403 normalization is distinct in `errors.ts` — a single
+        catch-all reason here would silently break the architect's MAJOR-2
+        decision when B4 lands.
+      - `.env.example` cleanup is complete: no `PINTEREST_APP_ID`, no comment
+        residue referencing it, no orphaned line in any docs.
+      - `next.config.ts` allowlist entry uses `https` protocol and exact
+        `i.pinimg.com` hostname (no broader `*.pinimg.com` unless the
+        researcher confirms it's needed).
+      - NO scope creep into UI, routes, components, list functions, or copy
+        module — these are explicitly later-slice work.
+      - All tests pass: unit/pinterest/client, unit/pinterest/errors,
+        security/bundle-grep, unit/env-example.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit `feat(b1): server-only Pinterest client + token boundary + bundle-grep proof`.
+      Branch: `epic-b/pinterest-client-token-boundary`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router (server-only modules + import "server-only" boundary)'
+    runtime: 'Node 20+; pnpm; Vitest for unit + security tests'
+    external_api: 'Pinterest API v5 — GET /v5/user_account (token sanity check only in this slice)'
+  key_files:
+    - path: lib/env.ts
+      purpose: 'Already validates PINTEREST_ACCESS_TOKEN — authoritative env contract'
+    - path: next.config.ts
+      purpose: 'Currently empty images.remotePatterns — extended in this slice'
+    - path: .env.example
+      purpose: 'Cleanup target — remove stale PINTEREST_APP_ID entry'
+    - path: .pHive/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+      purpose: 'Layer 1 (Env/Config) + Layer 2 (Server-only Pinterest Client) + Layer 8 (Tests) — exhaustive requirements list'
+    - path: .pHive/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+      purpose: 'Slice 1 — full WHAT WORKS / VERIFIED BY / NOT YET specification'
+    - path: .pHive/epics/epic-b-pinterest-integration/docs/architect-review.md
+      purpose: 'Pre-exec security:plan-audit escalation target — bundle-grep is the verification artifact'
+
+files_to_modify:
+  - file: lib/pinterest/client.ts
+    change: 'Create; server-only fetch layer + verifyPinterestToken'
+  - file: lib/pinterest/types.ts
+    change: 'Create; PinterestBoard / PinterestPin / PinterestPaginated / PinterestUserAccount shapes'
+  - file: lib/pinterest/errors.ts
+    change: 'Create; 6-arm PinterestError discriminated union + normalizePinterestResponse helper'
+  - file: .env.example
+    change: 'Remove stale PINTEREST_APP_ID entry; keep PINTEREST_ACCESS_TOKEN'
+  - file: next.config.ts
+    change: 'Extend images.remotePatterns with i.pinimg.com'
+  - file: tests/unit/pinterest/client.test.ts
+    change: 'Created in test-spec'
+  - file: tests/unit/pinterest/errors.test.ts
+    change: 'Created in test-spec'
+  - file: tests/security/bundle-grep.test.ts
+    change: 'Created in test-spec — canonical security:plan-audit verification'
+  - file: tests/unit/env-example.test.ts
+    change: 'Created in test-spec'
+  - file: package.json
+    change: 'Optionally add a CI script that builds before running the bundle-grep test'
+
+design_decisions:
+  - decision: '`lib/pinterest/client.ts` is the single token consumer; first line is `import "server-only";`'
+    rationale: 'Architect MAJOR escalation security:plan-audit pre-exec — the boundary must be enforceable at build time AND verifiable at test time'
+  - decision: '6-arm discriminated union from day one (even though /user_account only emits 401/403/network in this slice)'
+    rationale: 'B4 needs 401 vs 403 distinct + B2/B3 need not_found / rate_limit normalization — building the full union now avoids retrofit churn'
+  - decision: 'Bundle-grep test gates on the literal substring `pina_` in `.next/static/**` JS output'
+    rationale: 'Pinterest tokens always begin with `pina_` — the most specific, unambiguous canary string available'
+  - decision: '`PINTEREST_APP_ID` removal happens in the same slice as the client module'
+    rationale: 'Resolved decision dd-q4 from cycle-state; the runtime contract is now fully consolidated in `lib/env.ts` so the env-example drift gets corrected before any other slice references it'
+  - decision: 'No `lib/pinterest/token-replacement-copy.ts` in this slice'
+    rationale: 'Copy module ships in B4 alongside the views that consume it — Tailwind-first principle (cycle-state dd-q3) extends to deferring shared modules until they have real consumers'
+
+cross_cutting: []
+
+risks:
+  - severity: high
+    description: 'Bundle-grep test passes on first run because `next build` was never executed in CI — false-green security signal'
+    mitigation: 'Test must `fs.existsSync(".next/static")` and fail loudly if absent; CI script chain is `next build && vitest run tests/security/bundle-grep.test.ts` (verify in review step)'
+  - severity: high
+    description: 'A future contributor imports `env.PINTEREST_ACCESS_TOKEN` in a client component; build still passes if the import is dynamic or string-templated'
+    mitigation: '`import "server-only"` at the top of the client module is the build-time guard; bundle-grep is the runtime guard. Together they cover both static and dynamic-import escape paths.'
+  - severity: medium
+    description: '401 vs 403 normalization wrong in `verifyPinterestToken` — Pinterest sometimes returns 403 for missing-token cases (or 401 for scope cases); architect MAJOR-2 split breaks downstream'
+    mitigation: 'Researcher step #1 must confirm the exact status mapping from Pinterest dev docs. If ambiguous, fall back to body-field-based disambiguation (e.g., `code` field in error JSON) and document the rule in `errors.ts` comments.'
+  - severity: medium
+    description: 'Sourcemaps in `.next/static/**` contain the literal token string and bundle-grep flags them as a leak'
+    mitigation: 'Test explicitly skips `*.map` files; reviewer confirms scan path is JS-only'
+  - severity: low
+    description: '`i.pinimg.com` is not the only Pinterest CDN host — some pin variants may use a different subdomain'
+    mitigation: 'Research step confirms current host coverage; if multi-host, `remotePatterns` accepts an array — easy to extend in B3 when pin media first renders'
+
+references:
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      US-B-1: Use the configured Pinterest account. Given I am logged into the app
+      and the Pinterest env token is configured, when I open the Pinterest surface,
+      then the app uses that token and shows an authenticated browse view without
+      a user OAuth step. Given the token is missing, revoked, or invalid, when the
+      browse route processes the request, then the app blocks the flow and shows
+      token-replacement guidance instead of treating Pinterest as available.
+      US-B-3: Keep Pinterest access stable through env configuration. Given the env
+      token is valid, when a Pinterest request occurs, then the integration sends
+      it as a bearer token and boards/pins load without per-user token lookup.
+  - path: .pHive/epics/epic-b-pinterest-integration/docs/horizontal-plan.md
+    relevant_excerpt: |
+      Layer: Server-only Pinterest Client. Start `lib/pinterest/client.ts` with
+      `import 'server-only';`. Read `env.PINTEREST_ACCESS_TOKEN` only inside this
+      server-only module. Centralize the Pinterest base URL as
+      `https://api.pinterest.com/v5`. Centralize bearer-header request construction.
+      Default fetch posture to `cache: 'no-store'`. Implement
+      `verifyPinterestToken()` against `GET /v5/user_account`.
+      Layer: Tests. Add a bundle-grep check that `pina_` does not appear in client
+      chunks. Verify the Pinterest token cannot cross a client import boundary.
+      Support the architect's pre-exec `security:plan-audit` escalation topic.
+  - path: .pHive/epics/epic-b-pinterest-integration/docs/architect-review.md
+    relevant_excerpt: |
+      Architect MAJOR-2: Split 401 (invalid/missing token) and 403 (insufficient
+      scope) handling at the client + render layer. Different operator remediation
+      paths: 401 → rotate token; 403 → re-issue token with correct scopes.
+  - path: .pHive/epics/epic-b-pinterest-integration/docs/vertical-plan.md
+    relevant_excerpt: |
+      Step 1 — Token boundary + server-only client. WHAT WORKS AFTER THIS STEP:
+      `lib/pinterest/{client,types,errors}.ts` exists, `verifyPinterestToken()`
+      resolves correctly against mocked 200/401/403/network responses,
+      `lib/env.ts` already-validated `PINTEREST_ACCESS_TOKEN` is the only token
+      consumer, and a bundle-grep test proves `pina_` does not appear in any
+      client chunk produced by the build. No UI yet. No routes yet.
+  - path: .pHive/cycle-state/epic-b-pinterest-integration.yaml
+    relevant_excerpt: |
+      escalations:
+        - trigger: security:plan-audit
+          placement: pre-exec
+          severity: major
+          stories: [pinterest-client-token-boundary]
+          reason: "architect: secret handling is the only high-impact failure
+            mode; verify the Pinterest token cannot cross any client import
+            boundary before implementation starts"
+          raised_by: architect
+
+ui_indicators: 'pure backend slice — server-only client module, types, errors, bundle-grep security test; NO UI work; no ui-design step needed'

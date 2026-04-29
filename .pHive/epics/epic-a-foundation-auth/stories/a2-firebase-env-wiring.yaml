@@ -1,0 +1,178 @@
+id: a2-firebase-env-wiring
+epic: epic-a-foundation-auth
+title: 'Firebase client/admin/middleware helpers + env validation + shared types'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [a1-scaffold-tooling]
+
+description: |
+  Stand up the Firebase integration surface — a browser Firebase client, a server-side
+  Firebase Admin surface for SSR and route handlers, a middleware auth/session helper,
+  early env validation, and shared types for auth/profile/nail-shape enums.
+
+  This story produces NO user-facing UI and NO routes. It produces the libraries
+  everything else in Epic A imports from. Env validation fails fast on missing
+  secrets so later Pinterest/generation slices don't debug missing-secret errors.
+
+  Firebase SDK pattern (flagged `[confirm Firebase SDK detail]` in structured-outline):
+  the research step must resolve this — we expect Firebase JS SDK v10+ on the client
+  and `firebase-admin` with session-cookie SSR pattern on the server, but the
+  researcher must confirm the current-stable approach for Next 15 App Router.
+
+acceptance_criteria:
+  - 'Given missing required env vars, when server code imports `lib/env.ts`, then it throws a descriptive error naming which var is missing — BEFORE any Firebase SDK call.'
+  - 'Given valid env, when a server component calls `createServerFirebaseAdmin()`, then it returns a memoized FirebaseAdminApp (no double init).'
+  - 'Given valid env, when a client component calls `createBrowserFirebaseClient()`, then it returns a memoized FirebaseApp using the public Firebase config.'
+  - 'Given a request with a session cookie, when middleware calls the Firebase session helper, then it returns either a validated session or null — never throws into an unhandled middleware error.'
+  - 'Given the codebase, when `pnpm typecheck` runs, then `lib/types.ts` exports `NailShape`, `AuthUser`, `Profile` types that compile with zero `any`.'
+
+steps:
+  - id: research
+    description: |
+      Resolve the [confirm Firebase SDK detail] flag via context7.
+      Max 3 focused questions:
+      (1) For Next 15 App Router + RSC + middleware, what is the current recommended
+      Firebase Auth server-side session pattern — session cookies via `firebase-admin`,
+      `firebase-functions` auth, or the newer `firebase/auth` SSR helpers?
+      (2) What are the exact env var names used by Firebase client SDK vs admin SDK?
+      (3) What is the minimal set of permissions/service-account fields needed for
+      `firebase-admin.initializeApp()` in a Vercel serverless environment?
+      Scope boundary: do NOT research Firestore data-model patterns or Security Rules —
+      those belong to a5.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing unit tests BEFORE implementation:
+      - tests/unit/env.test.ts — `getRequiredEnv()` throws with missing APP_URL,
+        throws with missing ALLOWED_EMAIL, throws with missing PINTEREST_ACCESS_TOKEN,
+        throws with missing Firebase config, returns typed object when all present.
+        Each missing-var test asserts the error MESSAGE names the missing var.
+      - tests/unit/firebase/client.test.ts — `createBrowserFirebaseClient()` is memoized
+        (two calls return same instance); uses `NEXT_PUBLIC_FIREBASE_*` vars only.
+      - tests/unit/firebase/server.test.ts — `createServerFirebaseAdmin()` is memoized;
+        uses server-only env; does NOT leak into client bundle (Next.js `server-only`
+        import assertion).
+      - tests/unit/firebase/middleware.test.ts — session helper returns null for
+        absent cookie, returns validated session object for valid cookie, returns
+        null (does NOT throw) for malformed cookie.
+      Use Firebase emulator via `@firebase/rules-unit-testing` or equivalent for the
+      server tests. Mock network calls in client tests.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass WITHOUT modifying them. Create:
+      - lib/env.ts — `getRequiredEnv()` with zod schema OR manual assertion; throws
+        on missing with named error
+      - lib/firebase/client.ts — memoized `createBrowserFirebaseClient()`
+      - lib/firebase/server.ts — memoized `createServerFirebaseAdmin()` using
+        `firebase-admin` (marked `import 'server-only'`)
+      - lib/firebase/middleware.ts — session helper for middleware.ts (middleware.ts
+        itself is a4; this is just the helper)
+      - lib/types.ts — `NailShape` enum (almond/coffin/square/round/oval), `AuthUser`,
+        `Profile` types aligned with Firebase Auth uid (FR-A-7)
+      - .env.example — update with exact Firebase + Pinterest var names from research
+      Do NOT write firestore.rules here (a5) and do NOT write middleware.ts here (a4).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify against silent-break risks flagged in structured-outline:
+      - `profiles.id` type alignment with Firebase Auth `uid` — is the type contract
+        in `lib/types.ts` unambiguous? (Risk #6)
+      - Is `lib/firebase/server.ts` protected from client bundle inclusion
+        (`server-only` import)?
+      - Does env validation run early enough — i.e., imported by lib/firebase/server.ts
+        at module-load time?
+      - Zero `any` in lib/types.ts per acceptance criterion.
+      - Middleware session helper never throws (middleware errors cause auth loops).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Commit `feat(a2): firebase wiring + env validation + shared types`.
+      Branch: `epic-a/a2-firebase-env-wiring`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    firebase_client: 'firebase (JS SDK) — version confirmed in research step'
+    firebase_admin: 'firebase-admin (Node) — version confirmed in research step'
+    env_validation: 'zod or manual type guards'
+  key_files:
+    - path: .pHive/planning/structured-outline.md
+      purpose: 'Slice 0 interface contracts lines 107-118 — defines exact function signatures'
+    - path: .pHive/epics/epic-a-foundation-auth/stories/a1-scaffold-tooling.yaml
+      purpose: 'Dependency — A1 must complete first to have package.json + vitest.config'
+
+files_to_modify:
+  - file: lib/env.ts
+    change: 'Create; validates runtime env presence with named-error messages'
+  - file: lib/firebase/client.ts
+    change: 'Create; memoized browser Firebase client factory'
+  - file: lib/firebase/server.ts
+    change: 'Create; memoized Firebase Admin factory with server-only import'
+  - file: lib/firebase/middleware.ts
+    change: 'Create; session cookie validation helper for middleware use'
+  - file: lib/types.ts
+    change: 'Create; NailShape enum, AuthUser, Profile types'
+  - file: .env.example
+    change: 'Update with exact Firebase var names from research'
+  - file: tests/unit/env.test.ts
+    change: 'Created in test-spec step'
+  - file: tests/unit/firebase/client.test.ts
+    change: 'Created in test-spec step'
+  - file: tests/unit/firebase/server.test.ts
+    change: 'Created in test-spec step'
+  - file: tests/unit/firebase/middleware.test.ts
+    change: 'Created in test-spec step'
+
+design_decisions:
+  - decision: 'Firebase AI Logic access for Gemini (sign-off #16) is NOT wired here'
+    rationale: 'That belongs to Slice 4 (generation pipeline). A2 is auth/env surface only.'
+  - decision: 'profiles.id === Firebase Auth uid (FR-A-7)'
+    rationale: 'Structured-outline silent-break risk — misalignment breaks Security Rules across all later epics'
+  - decision: 'Env validated at module-load time, not lazy'
+    rationale: 'FR-A-5 — fail early, not during first Pinterest/generation call'
+
+cross_cutting: []
+
+risks:
+  - severity: high
+    description: 'Firebase SDK pattern for Next 15 App Router SSR is underspecified in inputs ([confirm Firebase SDK detail])'
+    mitigation: 'Research step is gated; DO NOT proceed to test-spec until a concrete SDK pattern is chosen and documented in the research output'
+  - severity: medium
+    description: 'Client bundle leak if firebase-admin is imported from a client module'
+    mitigation: "Mark lib/firebase/server.ts with `import 'server-only'`; add a build-time assertion in test-spec"
+  - severity: medium
+    description: 'Env validation too strict — blocks CI where not all secrets are available'
+    mitigation: 'Provide a test-mode env that stubs secrets; validation runs only in runtime context, not pure build'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      `lib/firebase/client.ts` — create the browser Firebase client.
+      `lib/firebase/server.ts` — create the server-side Firebase Admin surface for
+      SSR and route handlers. [confirm Firebase SDK detail]
+      `lib/firebase/middleware.ts` — centralize auth/session helper glue for
+      middleware. [confirm Firebase SDK detail]
+      `lib/env.ts` — validate runtime env presence early to avoid debugging
+      missing-secret errors later in Pinterest or generation slices.
+      Interfaces: `getRequiredEnv(): { APP_URL: string; ALLOWED_EMAIL: string;
+      PINTEREST_APP_ID: string; PINTEREST_ACCESS_TOKEN: string; firebaseConfig: [...] }`
+  - path: .pHive/planning/sign-off.md
+    relevant_excerpt: |
+      #15 — Persistence + Auth + Storage = Firebase (not Supabase). Firebase Auth
+      replaces Supabase Auth (email link sign-in, email-allowlist enforced via Security
+      Rules + server check). #16 — Gemini access = Firebase AI Logic (not direct
+      Gemini API) — No separate GEMINI_API_KEY env var — auth flows through Firebase
+      project config and App Check.
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      FR-A-5: Required environment variables and baseline Firebase rules/index setup
+      must be validated early enough to prevent hidden downstream failures.
+      FR-A-7: The `profiles` persistence model must align with Firebase Auth `uid` so
+      downstream profile access and Security Rules contracts do not drift.
