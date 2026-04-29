@@ -1,7 +1,10 @@
 id: b5-pinterest-polish-and-smoke
 epic: epic-b-pinterest-integration
 title: 'Empty-state surfaces + retryable rate-limit/network browse error UI + real-token Vercel smoke'
-status: pending
+status: completed
+shipped_at: '2026-04-29'
+shipped_in_commit: '2feae0f'
+shipped_on_branch: 'epic-b/pinterest-polish-empty-states'
 complexity: small
 methodology: tdd
 depends_on: [b4-pinterest-token-remediation-views]
