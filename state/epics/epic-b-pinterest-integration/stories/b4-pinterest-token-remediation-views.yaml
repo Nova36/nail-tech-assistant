@@ -1,7 +1,7 @@
 id: b4-pinterest-token-remediation-views
 epic: epic-b-pinterest-integration
 title: 'Upgrade S2/S3 token-verify placeholders to styled 401/403 page-level views + shared terse copy module + error.tsx scoping'
-status: pending
+status: completed
 complexity: medium
 methodology: tdd
 depends_on: [b3-pinterest-pin-grid]
