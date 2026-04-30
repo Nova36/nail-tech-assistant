@@ -30,6 +30,9 @@ export default defineConfig({
       // Storage emulators (Pinterest is still MSW-mocked via a per-test
       // setupServer instance — c2's global MSW setup is jsdom-lane-only).
       'tests/integration/references/**/*.test.ts',
+      // c10 createDesignDraft end-to-end test runs in this lane against
+      // the Firestore emulator booted by `firebase emulators:exec`.
+      'tests/integration/designs/**/*.test.ts',
     ],
     testTimeout: 30_000,
     hookTimeout: 30_000,
