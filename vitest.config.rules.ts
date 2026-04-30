@@ -11,11 +11,22 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
+      // c5 storage helper imports `server-only`. Mirror the main vitest
+      // config's shim so the rules-lane doesn't blow up when the helper
+      // is exercised against the storage emulator.
+      'server-only': path.resolve(__dirname, 'tests/__mocks__/server-only.ts'),
     },
   },
   test: {
     environment: 'node',
-    include: ['tests/rules/**/*.test.ts'],
+    include: [
+      'tests/rules/**/*.test.ts',
+      // c5 storage helper integration tests run in this lane because they
+      // need the storage emulator that `firebase emulators:exec` already
+      // boots for the rules tests. They use the production Admin SDK
+      // (NOT @firebase/rules-unit-testing) — separate concern from rules.
+      'tests/integration/firebase/**/*.test.ts',
+    ],
     testTimeout: 30_000,
     hookTimeout: 30_000,
     // Storage emulator (added in c4) does not handle concurrent rules loads
