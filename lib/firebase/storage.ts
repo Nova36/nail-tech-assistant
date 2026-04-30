@@ -204,3 +204,38 @@ export async function uploadGenerationBytes(input: {
     return { ok: false, reason: 'storage_failure', message };
   }
 }
+
+export async function readReferenceBytes(storagePath: string): Promise<
+  | { ok: true; bytes: Buffer; contentType: string }
+  | {
+      ok: false;
+      reason: 'not_found' | 'storage_failure';
+      message: string;
+    }
+> {
+  try {
+    const bucket = getServerFirebaseStorage();
+    const file = bucket.file(storagePath);
+    const [bytes] = await file.download();
+    const [metadata] = await file.getMetadata();
+    return {
+      ok: true,
+      bytes,
+      contentType: metadata.contentType ?? 'application/octet-stream',
+    };
+  } catch (err) {
+    const code =
+      (err as { code?: string | number }).code?.toString() ?? 'unknown';
+    const message = (err as Error).message ?? String(err);
+    console.error('[storage] readReferenceBytes failed', {
+      storagePath,
+      code,
+      message,
+    });
+    const reason =
+      code === 'storage/object-not-found' || code === '404'
+        ? 'not_found'
+        : 'storage_failure';
+    return { ok: false, reason, message };
+  }
+}
