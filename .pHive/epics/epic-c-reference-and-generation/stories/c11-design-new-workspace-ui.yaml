@@ -1,0 +1,593 @@
+id: c11-design-new-workspace-ui
+epic: epic-c-reference-and-generation
+title: 'app/(authenticated)/design/new/page.tsx workspace + ReferencePanel + UploadZone + PromptInput (Pinterest selection embedded; primary/secondary affordance; disabled-Generate on invalid state)'
+status: pending
+complexity: high
+methodology: tdd
+depends_on:
+  [c9-select-pin-action, c7-upload-ingest-route, c10-create-design-action]
+renditions: 3
+
+wireframes:
+  touchpoint_1_status: APPROVED
+  approved_at: '2026-04-29'
+  approved_by: don
+  approved_rendition: .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v2-wizard.html
+  supersedes: .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v1-single-screen.html
+  rationale: |
+    v2-wizard adopted after v1 single-screen reviewed as overwhelming for the
+    non-power-user audience (home use; wife as primary user). Progressive
+    disclosure: Step 1 = "this is interesting" (just pick refs), Step 2 =
+    "now make decisions" (mark primary, order, prompt, shape). v1 retained
+    as historical reference; v2-wizard is canonical implementation source.
+  references:
+    - .pHive/wireframes/epic-b-pinterest-integration/_base-template.md
+    - .pHive/wireframes/epic-b-pinterest-integration/_animations-spec.md
+    - .pHive/wireframes/epic-b-pinterest-integration/_a11y-spec.md
+  implementation_notes: |
+    - 3-step wizard: Step 1 (Inspiration), Step 2 (Direction), Step 3 (Confirm — c17).
+    - Single page at /design/new for Steps 1+2; Step 3 lives at /design/[designId]
+      and is owned by c17 (which reuses c11's <WizardProgressStrip>).
+    - State preserved across "← Back" via React component state (no URL hashing).
+    - Step 1 → Step 2: client-side state transition only; no createDesign.
+    - Step 2 → Step 3: clicking "Generate →" fires c10 createDesign + routes to
+      /design/[designId] for c17 pending state; createDesign is the seam between
+      c11 and c17.
+    - Step 2 hides Pinterest browse + upload tile — working set is locked from
+      Step 1 selections; primary marking + ordering happens against that frozen set.
+    - Default nail shape: Almond (per wireframe Step 2 frame).
+    - Soft cap of ~8 references in Step 1 (warning, not block) per wireframe annotation.
+
+wireframe_approval:
+  touchpoint_1:
+    status: approved
+    approved_by: don
+    approved_at: '2026-04-29'
+    canonical_artifact: .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v2-wizard.html
+    supersedes: .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v1-single-screen.html
+
+escalations_addressed:
+  - trigger: ui:major
+    severity: major
+    placement: pre-exec
+    raised_by: ui-designer
+    addressed_by: |
+      ui-design step inserted between research and test-spec per
+      references/wireframe-protocol.md Touchpoint 1; renditions: 3 at
+      .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/v{1,2,3}.html;
+      blocking on Don approval before execute. Reuses Epic A/B warm-shell
+      visual language; brand tokens locked at .pHive/brand/brand-system.yaml.
+  - trigger: ui:scope-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Acceptance criteria explicitly forbid: 5-nail hand layout, shape
+      mask compositing, save-to-library button, regenerate button, design
+      detail page navigation, library grid. Raw image preview is c17's
+      surface — c11 stops at "design draft created"; user lands on
+      generation flow handled in c17.
+  - trigger: testing:harness-prereq
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Playwright e2e for `/design/new` happy path (mixed Pinterest+upload
+      reference assembly → createDesign → returns designId) deferred to
+      c18; this story ships unit + integration coverage of components +
+      action wiring.
+
+description: |
+  Vertical Slice 3 user-facing surface. A 3-step wizard at `/design/new`
+  with progressive disclosure — chosen after Don reviewed an earlier
+  single-screen draft and called it overwhelming for the non-power-user
+  audience (home use; wife as primary user). Each step has one decision
+  class.
+
+  **Step 1 — Inspiration** (`/design/new`, internal state `step=1`):
+  Pinterest browse panel + upload tile. User picks any number of pins
+  and/or upload references with NO primary/secondary marking, NO prompt,
+  NO shape selector. Soft cap of ~8 references (warning, not block per
+  wireframe annotation). "Continue →" gates on ≥1 reference picked.
+
+  **Step 2 — Direction** (same `/design/new` URL, internal state `step=2`):
+  Pinterest browse + upload tile are HIDDEN. Step 1 selections become
+  the working set displayed as a strip/grid of reference cards. User
+  marks ONE primary, orders supporting refs, optional prompt, optional
+  nail shape (Almond default; Coffin/Square/Stiletto). Footer "← Back"
+  preserves all selections; right CTA reads "Generate →" since clicking
+  it fires c10 createDesign + transitions to Step 3.
+
+  **Step 3 — Confirm** (`/design/[designId]`): owned by c17. Step 2 →
+  Step 3 transition fires `createDesign` (c10), then routes to the new
+  designId URL where c17 renders pending → success | failure. c17
+  reuses c11's `<WizardProgressStrip>` chrome.
+
+  US-C-1 (mixed-source reference assembly — Step 1), US-C-2 (prompt as
+  first-class input — Step 2), US-C-3 (durable draft create — Step 2 →
+  Step 3 transition) are SHIPPED at end of this story. US-C-4 / US-C-5
+  (actual generation, raw preview, guided failure) are c17.
+
+  Pinterest integration is **embedded** in Step 1's browse panel, not
+  navigated-to. Per c12 user decision: `/pinterest/*` routes stay
+  reachable by direct URL but are unsurfaced from sidebar; pin selection
+  lives INSIDE the Studio reference picker, not as a separate
+  destination.
+
+  This is a high-complexity story because it ties together c6/c7/c8/c9/
+  c10 (every persistence + action surface in batch 2), produces the
+  wizard shell + step components, and locks the seam to c17. Wireframe
+  Touchpoint 1 is APPROVED (`wireframe-v2-wizard.html`); implement
+  against that artifact with no deviation.
+
+acceptance_criteria:
+  # ── Wizard chrome (both steps) ───────────────────────────────────────
+  - 'Given an authenticated user navigates to `/design/new`, when the page renders, then `<WizardProgressStrip>` shows three steps (1 Inspiration · 2 Direction · 3 Confirm) with Step 1 active and Steps 2 + 3 inactive. URL stays `/design/new` across Step 1 ↔ Step 2 transitions; no URL hashing.'
+  - 'Given the user is on Step 2 and clicks "← Back", when state transitions, then Step 1 renders with all previously-selected references still in the working set (state preserved; no re-fetching).'
+  # ── Step 1 — Inspiration (US-C-1: mixed-source reference assembly) ──
+  - 'Given Step 1 renders, when the user inspects the page, then it shows: (a) embedded Pinterest browse panel reusing b2/b3 components via `<SelectablePinCard>`, (b) `<UploadZone>` drag-drop tile, (c) selection counter ("0 references"), (d) footer "Continue →" button DISABLED with hint "Pick at least 1 reference".'
+  - 'Given Step 1 with 0 references, when the user clicks a Pinterest pin and c9 `selectPinterestPin` returns `{ ok: true; reference }`, then the reference is added to the working set, the selection counter increments, the pin shows a selected check overlay, and "Continue →" enables.'
+  - 'Given Step 1 and the user drops a JPEG into the upload tile, when c7 `/api/references/upload` returns `{ ok: true; reference }`, then the reference is added to the working set; "Continue →" enables (or stays enabled).'
+  - 'Given Step 1 with 4 references picked (mix of pins + uploads), when the selection counter is observed, then it shows "4 references" + "Continue →" enabled.'
+  - 'Given Step 1 with 9 references picked (above ~8 soft cap), when state updates, then a non-blocking warning banner advises ~8 is recommended; "Continue →" remains enabled (soft cap, not hard block).'
+  - 'Given Step 1 upload returns `{ ok: false; reason: "file_too_large" }`, when the UI handles it, then it shows an inline error naming the 10 MB cap; working set unchanged.'
+  - 'Given Step 1 c9 returns `{ ok: false; reason: "invalid_token" }`, when the UI handles it, then it inlines `tokenInvalidCopy` from `lib/pinterest/token-replacement-copy.ts` (b4 reuse); working set unchanged.'
+  - 'Given Step 1 with ≥1 reference, when the user clicks "Continue →", then state transitions to Step 2 (no createDesign fired yet); URL remains `/design/new`.'
+  # ── Step 2 — Direction (US-C-2: prompt; US-C-3: durable draft create) ─
+  - 'Given Step 2 entered with 4 working-set references, when the page renders, then Pinterest browse + upload tile are HIDDEN. The 4 references display as a strip/grid of reference cards. NO primary marker yet. "Generate →" DISABLED with hint "Mark one reference as primary".'
+  - 'Given Step 2 and the user clicks one reference card to mark it primary, when state updates, then that card shows the primary marker (visually distinct per wireframe), the other cards remain available as supporting refs, and "Generate →" enables.'
+  - 'Given Step 2 with primary set, when the user clicks a different reference, then primary swaps to that reference (single-primary invariant; no clicking-promotes-secondary auto-shuffle).'
+  - 'Given Step 2 with primary set + 3 supporting refs, when the user reorders via drag or up/down arrow per wireframe, then `secondaryReferenceIds` order in component state updates to match the new visual order.'
+  - 'Given Step 2 prompt input accepts text up to 1000 chars, when the user types ≤1000 chars, then prompt is preserved in component state; above 1000 chars, the input shows "1001 / 1000 — too long" and "Generate →" disables with reason "Prompt too long".'
+  - 'Given Step 2 nail shape selector, when the page first renders Step 2, then the default selected shape is `almond`. Clicking a different shape (coffin / square / stiletto) updates state. (`round`/`oval` preserved per `lib/types.ts` NailShape; wireframe locks visible shapes.)'
+  - 'Given Step 2 with primary set + 3 supporting + prompt + shape (valid), when the user clicks "Generate →", then c10 `createDesign` fires with `{ primaryReferenceId, secondaryReferenceIds: [...ordered], promptText, nailShape }`; on `{ ok: true; designId }`, the UI routes to `/design/[designId]` for c17 pending state.'
+  - 'Given Step 2 c10 returns `{ ok: false; reason: "rules_denied" }`, when the UI handles it, then an inline "Permission denied — please sign in again" banner appears with a link to `/login`; working set + primary + prompt + shape state are preserved (user does not lose work).'
+  - 'Given Step 2 user removes the primary marker, when state updates, then primary returns to null and "Generate →" disables with the original "Mark one reference as primary" hint. NO secondary is auto-promoted.'
+  # ── A11y + breakpoints ──────────────────────────────────────────────
+  - 'Given screen-reader use, when wizard step transitions or working-set updates, then `aria-live="polite"` announces the change. `<WizardProgressStrip>` exposes step state via `aria-current="step"`. Touch targets meet tablet sizing convention from `_a11y-spec.md`.'
+  - 'Given a tablet-landscape viewport (1280×800 typical), when the page renders, then layout adapts per `wireframe-v2-wizard.html` Step 1 + Step 2 frames (specific column count + breakpoints locked by wireframe).'
+  # ── Boundary discipline ─────────────────────────────────────────────
+  - 'Given grep across `app/**` and `components/**`, when searching for direct `firebase-admin` imports in client components, then NONE are found — all data flows through c9/c7/c10 only.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Embedded Pinterest browse — can we reuse `app/(authenticated)/
+      pinterest/page.tsx` server component output as a slot inside
+      `/design/new` via an `import` of the inner component? Or do we
+      need to refactor `components/pinterest/BoardGrid.tsx` etc to be
+      embeddable without the route shell? Read the b2/b3 component files
+      to confirm reusability shape.
+      (2) Pin click → c9 action wiring — `PinCard.tsx` from b3 currently
+      has no click handler (browse-only). Do we ADD a click handler in
+      this story (modifying b3 component) or wrap in a higher-order
+      `<SelectablePinCard>`? Recommendation: HOC wrapper at
+      `components/design-new/SelectablePinCard.tsx` to keep Epic B
+      browse code stable.
+      (3) Routing on createDesign success — does the user land on a
+      `/design/{designId}` route (not yet built; c17's domain) or stay
+      on `/design/new` with a "generation in progress" overlay?
+      Wireframe decides; placeholder is `console.log` until c17 lands.
+
+      Read `references/wireframe-protocol.md` Touchpoint 1 protocol.
+      Read existing b2/b3 components for the pattern this story extends:
+      - `components/pinterest/BoardGrid.tsx`, `BoardCard.tsx`
+      - `components/pinterest/PinGrid.tsx`, `PinCard.tsx`,
+        `PinGridSkeleton.tsx`, `InfiniteScrollSentinel.tsx`
+      - `app/(authenticated)/pinterest/page.tsx`,
+        `app/(authenticated)/pinterest/[boardId]/page.tsx`
+    agent: researcher
+  - id: ui-design
+    description: |
+      COMPLETE — Touchpoint 1 APPROVED 2026-04-29 by Don.
+
+      Canonical artifact: `.pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v2-wizard.html` (1198 lines).
+      Supersedes: `wireframe-v1-single-screen.html` (preserved for history; do
+      NOT reference from implementation).
+
+      The implement step takes wireframe-v2-wizard.html as the AUTHORITATIVE
+      visual + interaction source — including:
+      - Wizard progress strip (1 Inspiration → 2 Direction → 3 Confirm) with
+        ✓ marks on completed steps + clickable revisit (state-preserving)
+      - Step 1 frames (1.1 empty, plus the populated states shown in the
+        wireframe) — Pinterest browse panel + upload tile + selection
+        counter + footer "Continue →"
+      - Step 2 frames (2.x — working-set strip, primary marker affordance,
+        prompt input, shape selector with Almond default + Coffin/Square/
+        Stiletto, footer "← Back" + "Generate →")
+      - Brand tokens (`--primary: #6b3f5e`, etc.) per wireframe `<style>`
+        block — same as Epic A/B
+      - All copy strings in the wireframe are canonical for v1 ship.
+
+      No deviation from the approved wireframe without TPM + Don sign-off.
+      The ui-designer role for c11 is now record-keeping; substantive design
+      is locked.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. UI-heavy story = lots of
+      RTL component tests + a few integration tests.
+
+      AUTHORITATIVE VISUAL SOURCE:
+      - .pHive/design/briefs/design-new-workspace.md (+ approved HTML)
+
+      - tests/unit/components/design-new/ReferencePanel.test.tsx —
+        (1) Empty state — no primary, no secondaries → "Choose a primary
+            reference to begin"
+        (2) Primary set → primary card renders, label "Primary"
+        (3) Primary + 2 secondaries → primary on top, secondaries in
+            input order
+        (4) Click "Remove" on primary → calls onRemovePrimary callback
+        (5) Click "Remove" on secondary → calls onRemoveSecondary(refId)
+        (6) Click "Make primary" on secondary → calls onPromoteSecondary
+        (7) aria-live="polite" on the panel root
+
+      - tests/unit/components/design-new/UploadZone.test.tsx —
+        (8) Idle state → "Drop photo or click to upload"
+        (9) Drag enter → hover state class applied
+        (10) Drop a JPEG → calls onFileSelected(file)
+        (11) Drop a PDF → onFileSelected NOT called; inline error shown
+        (12) Drop file > 10 MB → inline error "max 10 MB"; onFileSelected NOT called
+
+      - tests/unit/components/design-new/PromptInput.test.tsx —
+        (13) Type 500 chars → input value matches
+        (14) Char count shows "500 / 1000"
+        (15) Type 1001 chars → input shows "1001 / 1000 — too long";
+             onValid(false) called
+        (16) Helper text visible: "text overrides visual cues"
+
+      - tests/unit/components/design-new/ShapeSelector.test.tsx —
+        (17) Renders all 5 shapes; default selected: almond
+        (18) Click "coffin" → calls onChange("coffin")
+        (19) Selected state class applied to active shape
+
+      - tests/unit/components/design-new/GenerateButton.test.tsx —
+        (20) Disabled when reasonInvalid is non-empty; tooltip / inline
+             reason text matches
+        (21) Enabled when reasonInvalid === null
+        (22) Click when enabled → calls onGenerate
+        (23) Click when disabled → onGenerate NOT called
+
+      - tests/unit/components/design-new/SelectablePinCard.test.tsx —
+        (24) Wraps b3 PinCard
+        (25) Click → calls onPinSelected(pinId)
+        (26) Pending state (during c9 call) → button disabled
+
+      - tests/integration/design-new/page-orchestration.test.tsx —
+        (Big integration test using vitest jsdom + RTL):
+        (27) Initial render — workspace empty, Generate disabled
+        (28) Mock c9 selectPinterestPin → click pin → primary appears
+        (29) Click second pin → secondary appears
+        (30) Mock c7 upload route → drop JPEG → reference appears
+        (31) Type prompt → state updates
+        (32) Click "coffin" shape → state updates
+        (33) Mock c10 createDesign → click Generate → action called
+             with assembled state; routes/logs designId
+        (34) Mock c10 returns `rules_denied` → banner shown,
+             reference state preserved
+        (35) Mock c9 returns `invalid_token` → tokenInvalidCopy shown
+             in Pinterest panel inline
+
+      DO NOT write tests for the actual generation flow (c17). DO NOT
+      write tests for navigation to `/design/{designId}` post-create
+      (c17 owns that route).
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Make failing tests pass. UI work — translate the approved wireframe
+      brief into Tailwind + brand tokens.
+
+      Files to produce:
+
+      - `app/(authenticated)/design/new/page.tsx` — server component
+        entry. Authenticated shell. Renders the workspace client
+        component. May fetch initial Pinterest boards via
+        `verifyPinterestToken()` + `listPinterestBoards()` (reuse b2
+        pattern) for the embedded panel's first paint.
+
+      - `app/(authenticated)/design/new/Workspace.tsx` — client
+        component (`'use client'`). Manages state:
+        ```ts
+        const [primary, setPrimary] = useState<Reference | null>(null);
+        const [secondaries, setSecondaries] = useState<Reference[]>([]);
+        const [promptText, setPromptText] = useState('');
+        const [nailShape, setNailShape] = useState<NailShape>('almond');
+        const [pendingAction, setPendingAction] = useState<string | null>(null);
+        const [topLevelError, setTopLevelError] = useState<string | null>(null);
+        ```
+        Composes `<EmbeddedPinterestPanel>` + `<UploadZone>` +
+        `<ReferencePanel>` + `<PromptInput>` + `<ShapeSelector>` +
+        `<GenerateButton>`. Computes `reasonInvalid` for the Generate
+        button. On Generate click: calls c10 `createDesign` with the
+        assembled state.
+
+      - `components/design-new/EmbeddedPinterestPanel.tsx` — client
+        component wrapping b2/b3 BoardGrid + PinGrid in an inline panel
+        (NOT navigating to `/pinterest/*` routes). Manages its own
+        boardId state. Each rendered pin uses
+        `<SelectablePinCard>` instead of plain `<PinCard>`.
+
+      - `components/design-new/SelectablePinCard.tsx` — client
+        component. Imports `b3 PinCard`. On click, calls
+        `selectPinterestPin(pin.id)` (from c9) wrapped in
+        `startTransition`. On `{ ok: true; reference }`, calls
+        `onReferenceAdded(reference)` from props. On
+        `{ ok: false; reason }`, calls `onError(reason, message)`.
+
+      - `components/design-new/ReferencePanel.tsx` — client component.
+        Renders primary card (bigger) + secondary list (ordered).
+        Remove + promote callbacks per acceptance criteria. `aria-live`.
+
+      - `components/design-new/UploadZone.tsx` — client component.
+        Drag-and-drop or click-to-upload. POSTs FormData to
+        `/api/references/upload` (c7 route) via plain `fetch`.
+        On `{ ok: true; reference }`, calls `onReferenceAdded`.
+        On error, shows inline error.
+
+      - `components/design-new/PromptInput.tsx` — client component.
+        Textarea + char count + onChange / onValid callbacks.
+
+      - `components/design-new/ShapeSelector.tsx` — client component.
+        5-button row.
+
+      - `components/design-new/GenerateButton.tsx` — client component.
+        Disabled state with inline reason text.
+
+      Reuse b2/b3 components UNMODIFIED:
+      - `components/pinterest/BoardGrid.tsx`, `BoardCard.tsx`,
+        `PinGrid.tsx`, `PinCard.tsx`, `InfiniteScrollSentinel.tsx`,
+        `PinGridSkeleton.tsx`
+      - `lib/pinterest/token-replacement-copy.ts` (`tokenInvalidCopy`,
+        `insufficientScopeCopy`)
+
+      DO NOT modify b2/b3 components. If a prop is missing
+      (e.g., PinCard needs an `onClick` slot), wrap in
+      SelectablePinCard rather than retrofit.
+
+      DO NOT add: 5-nail visualizer, save-to-library button, regenerate,
+      design detail page, library grid, generation pending overlay (c17).
+
+      DO NOT call firebase-admin from any client component.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the workspace ships a complete US-C-1 / US-C-2 / US-C-3
+      flow without bleeding into US-C-4 / US-C-5 territory.
+
+      - `/design/new` renders the four primary surfaces (Pinterest,
+        upload, reference panel, prompt+shape+generate) per wireframe.
+      - Pinterest is EMBEDDED (no navigation to `/pinterest/*`).
+        Reviewer manually verifies BoardGrid + PinGrid render inside
+        the panel.
+      - SelectablePinCard wraps b3 PinCard without modifying b3.
+      - All client components use `'use client'` directive.
+      - All actions/routes called through c9, c7, c10 only — no
+        firebase-admin imports in client components. Reviewer grep.
+      - Generate button disabled-reason text is descriptive (not just
+        "disabled").
+      - Removing primary does NOT auto-promote a secondary (per
+        acceptance criterion 10). Test (5) covers.
+      - Token-invalid surfaces use existing copy from b4 (no duplicated
+        copy strings). Reviewer grep.
+      - 10 MB upload cap matches c7 (no client-side cap drift).
+      - Prompt 1000-char cap matches c8 (no drift).
+      - Wireframe decisions present in code: column count, breakpoints,
+        spacing, brand tokens.
+      - All vitest unit + integration tests pass.
+      - Reviewer manually loads the page in `pnpm dev` and walks
+        through:
+        a. Pin click → reference appears
+        b. Upload → reference appears
+        c. Remove primary → empty state restored (secondaries preserved)
+        d. Generate when invalid → button disabled with inline reason
+        e. Generate when valid → action called, response logged/routed
+      - The dual-persona review fires animations-specialist sidecar via
+        `ui:animations append` for: pending-state shimmer on
+        SelectablePinCard during c9 call, upload progress, generate
+        button transition, prefers-reduced-motion handling.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c11-design-new-workspace-ui`.
+      Commit: `feat(c11): /design/new workspace + reference panel + upload + prompt + shape selector`.
+      Pre-commit: `pnpm test`, `pnpm test:rules`, `pnpm typecheck`,
+      `pnpm lint` must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router (server component shell + client component workspace)'
+    runtime: 'React 19 client components for interactive surfaces; Tailwind-first'
+    testing: 'Vitest jsdom + RTL for components; integration tests with mocked actions'
+  key_files:
+    - path: app/(authenticated)/design/new/page.tsx
+      purpose: 'CREATE; server component shell — renders Workspace client component'
+    - path: app/(authenticated)/design/new/Workspace.tsx
+      purpose: 'CREATE; client component orchestrator — manages state, calls c9/c7/c10'
+    - path: app/(authenticated)/design/actions.ts
+      purpose: 'Consumed (c9 + c10) — selectPinterestPin + createDesign'
+    - path: app/api/references/upload/route.ts
+      purpose: 'Consumed (c7) — UploadZone POSTs FormData here'
+    - path: components/pinterest/PinGrid.tsx
+      purpose: 'Consumed (b3) — embedded inside Pinterest panel'
+    - path: components/pinterest/PinCard.tsx
+      purpose: 'Consumed (b3) — wrapped by SelectablePinCard, NOT modified'
+    - path: components/pinterest/BoardGrid.tsx
+      purpose: 'Consumed (b2) — embedded inside Pinterest panel'
+    - path: components/pinterest/InfiniteScrollSentinel.tsx
+      purpose: 'Consumed (b2) — pagination in embedded panel'
+    - path: lib/pinterest/token-replacement-copy.ts
+      purpose: 'Consumed (b4) — tokenInvalidCopy + insufficientScopeCopy'
+    - path: lib/types.ts
+      purpose: 'Consumed — Reference, NailShape'
+    - path: app/(authenticated)/pinterest/page.tsx
+      purpose: 'Pattern reference — shape of authenticated server component with verifyPinterestToken'
+    - path: .pHive/design/briefs/design-new-workspace.md
+      purpose: 'Produced by ui-design step — authoritative wireframe brief'
+
+files_to_modify:
+  - file: app/(authenticated)/design/new/page.tsx
+    change: 'CREATE; server component shell — renders Wizard client orchestrator (single page handles Step 1 + Step 2)'
+  - file: app/(authenticated)/design/new/Wizard.tsx
+    change: 'CREATE; client component (`use client`) — manages wizard state machine (`step: 1 | 2`), working-set, primary, ordered secondaries, prompt, shape, errors. Composes <WizardProgressStrip> + <WizardStep1Inspiration> + <WizardStep2Direction>. On Step 2 "Generate →" calls c10 createDesign + routes to /design/[designId].'
+  - file: components/studio/WizardProgressStrip.tsx
+    change: 'CREATE; presentational chrome — 1 Inspiration · 2 Direction · 3 Confirm with ✓ marks, active state, clickable revisit (state-preserving). EXPORTED for c17 reuse on /design/[designId]; do NOT duplicate the strip in c17.'
+  - file: components/studio/WizardStep1Inspiration.tsx
+    change: 'CREATE; renders Pinterest browse panel + upload tile + selection counter + footer "Continue →". Hosts <SelectablePinCard> + <UploadZone> + selection state callbacks back to <Wizard>.'
+  - file: components/studio/WizardStep2Direction.tsx
+    change: 'CREATE; renders working-set strip (Pinterest browse + upload tile HIDDEN), primary marker affordance, ordering controls, <PromptInput>, <ShapeSelector>, footer "← Back" + "Generate →". Receives working set from <Wizard> as props; never re-fetches.'
+  - file: components/studio/EmbeddedPinterestPanel.tsx
+    change: 'CREATE; embedded BoardGrid + PinGrid + breadcrumb inside Step 1. Renders <SelectablePinCard> instead of plain <PinCard>. Inlines b4 tokenInvalidCopy / insufficientScopeCopy on c9 token errors (no full-page redirect).'
+  - file: components/studio/SelectablePinCard.tsx
+    change: 'CREATE; wraps b3 PinCard with selection click handler that calls c9 selectPinterestPin via startTransition. Pending state during c9 call. b3 PinCard NOT modified.'
+  - file: components/studio/ReferenceCard.tsx
+    change: 'CREATE; reusable working-set card (Step 2). Variants: primary marker, supporting (with reorder/remove affordances). Used in Step 2 strip; also a fit for c17 confirm display per wireframe.'
+  - file: components/studio/UploadZone.tsx
+    change: 'CREATE; drag-drop + click-to-pick upload tile. POSTs FormData to /api/references/upload (c7). Inline error states (file_too_large, unsupported_file_type, etc.).'
+  - file: components/studio/PromptInput.tsx
+    change: 'CREATE; multi-line textarea + char count "X / 1000". onValid(false) when >1000 chars. Helper text: "Optional. Add notes — text overrides visual cues from references."'
+  - file: components/studio/ShapeSelector.tsx
+    change: 'CREATE; nail shape button row. Default Almond. Wireframe shows Almond / Coffin / Square / Stiletto as visible options.'
+  - file: tests/unit/components/studio/WizardProgressStrip.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/WizardStep1Inspiration.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/WizardStep2Direction.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/SelectablePinCard.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/UploadZone.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/PromptInput.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/ShapeSelector.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/studio/ReferenceCard.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/integration/design-new/wizard-step-transitions.test.tsx
+    change: 'CREATE in test-spec — Step 1 → Step 2 → "Generate →" → c10 createDesign → router.push /design/[designId] integration with mocked actions'
+
+design_decisions:
+  - decision: '3-step wizard (Inspiration → Direction → Confirm), NOT a single overwhelming workspace'
+    rationale: 'Don reviewed the original single-screen draft (`wireframe-v1-single-screen.html`) and called it overwhelming for the non-power-user audience (home use, wife as primary user). Wizard with progressive disclosure means each step has ONE decision class — Step 1 is just "what looks interesting", Step 2 is "now make decisions". v2-wizard.html is the approved canonical artifact.'
+  - decision: 'Wizard state lives in React component state, NOT URL state or hash routing'
+    rationale: 'Simpler "← Back" preservation; no `/design/new#step=2` complexity; entire flow stays at `/design/new` URL. Reference assembly is ephemeral until createDesign succeeds anyway. Future epic could persist drafts to localStorage or auto-save; out of v1 scope.'
+  - decision: 'Step 2 HIDES Pinterest browse + upload tile — working set frozen from Step 1'
+    rationale: 'Working set is locked when user advances to Step 2; primary marking + ordering happens against that frozen set only. Reduces cognitive load: Step 2 is a Direction decision, not an Inspiration revisit. "← Back" returns to Step 1 with state preserved if user wants to add/remove.'
+  - decision: '`createDesign` (c10) fires at Step 2 → Step 3 transition, NOT at Step 1 → Step 2'
+    rationale: 'Design draft only persists once user has committed direction (primary chosen + ordered secondaries + prompt + shape). Step 1 → Step 2 is purely client-side; no Firestore write yet. This avoids stranded draft Design docs from users who explore Step 1 but never commit.'
+  - decision: 'Step 2 → Step 3 transitions to `/design/[designId]` (c17 owns that route)'
+    rationale: 'Clear seam between c11 (compose) and c17 (generate). After createDesign succeeds, c11 calls `router.push(\`/design/${designId}\`)` and Step 3 (Confirm + pending + result) lives entirely in c17''s territory. c17 reuses c11''s `<WizardProgressStrip>` to keep wizard chrome continuous; no chrome duplication.'
+  - decision: 'Pinterest pin selection EMBEDDED inside Step 1 (NOT a separate destination)'
+    rationale: 'Locked per c12 user decision (option B): Pinterest unsurfaced from sidebar; pin selection lives inside Studio reference picker. Embedding reuses b2/b3 components without page-level navigation.'
+  - decision: '`SelectablePinCard` wrapper over b3 `PinCard` — NO modification of b3 component'
+    rationale: "Slice scope discipline. b3 is shipped + green; modifying its props for c11 would invite drift. Wrapper composition keeps Epic B browse-only stable AND adds selection behavior cleanly. Future stories follow the same pattern (compose, don't modify)."
+  - decision: 'Removing the primary marker in Step 2 does NOT auto-promote a supporting reference'
+    rationale: 'Auto-promotion surprises the user. The single-primary invariant resets to null; "Generate →" disables with the original "Mark one reference as primary" hint. User explicitly clicks the next reference to promote.'
+  - decision: 'Default nail shape: Almond'
+    rationale: 'Per `wireframe-v2-wizard.html` Step 2 frame. Almond is the most common starting shape; Coffin / Square / Stiletto are visible alternatives. (`round` and `oval` remain in lib/types.ts NailShape union but are not surfaced in the v1 wireframe.)'
+  - decision: 'Soft cap of ~8 references in Step 1 (warning, NOT block)'
+    rationale: 'Per wireframe annotation. Bounded list keeps c8 reference-set builder happy + Gemini request payload reasonable. Warning preserves user agency; if they really want 9+, they can proceed and c14 buildGeminiRequest decides what to send.'
+  - decision: 'Wireframe Touchpoint 1 APPROVED — implement against v2-wizard.html with NO deviation'
+    rationale: 'Touchpoint 1 closed 2026-04-29 by Don. ui-design step is now record-keeping; substantive design is locked. Deviation requires TPM + Don sign-off as a separate change.'
+  - decision: 'Upload uses plain `fetch` (NOT a server action) per c7 route lock'
+    rationale: 'c7 explicitly chose route handler for multipart. UploadZone constructs FormData and POSTs via fetch. Acceptable client-server boundary deviation from the otherwise-server-actions stack.'
+  - decision: 'Prompt 1000-char cap consistent with c8 builder'
+    rationale: 'Keeps client UX in sync with server validation. c11 disables "Generate →" when over cap (UX friendly); c8 rejects when over cap (defense in depth). Single source of truth: const exported from c8.'
+  - decision: '`<WizardProgressStrip>` exported from `components/studio/` so c17 can reuse it'
+    rationale: 'Wizard chrome continuity across Steps 1-2 (c11) and Step 3 (c17). Avoids duplicating the strip in c17 with a different active state. c17 imports and renders it with `step={3}`.'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'Workspace never constructs Firestore paths or Storage paths. All persistence flows through c9/c7/c10 actions/route. c4 firestore + storage rules bounce any forged userId at the rules layer.'
+  - concern: 'error-handling'
+    notes: 'Three error surfaces: top-level toast/banner (rules_denied, network), inline (Pinterest token errors using b4 copy, upload errors), inline-disabled (Generate button reason). Reviewer enforces no fall-through to generic "An error occurred".'
+  - concern: 'ui-major'
+    notes: 'Wireframe Touchpoint 1 gates implement. ui-design step in TDD sequence handles approval flow.'
+  - concern: 'animations-pending-states'
+    notes: 'Animations-specialist sidecar at review step. Concerns: pin selection pending shimmer, upload progress envelope, generate button click transition, prefers-reduced-motion handling. Reuses b2/b3 motion language where applicable.'
+
+risks:
+  - severity: high
+    description: 'Wireframe rendition 1 / 2 / 3 all rejected by Don → story blocked indefinitely'
+    mitigation: "ui-designer iterates with Don through TPM. Touchpoint 1 protocol allows requesting changes / new options. Mother's Day deadline pressure: if all 3 rejected, escalate to scope cut (defer this story's polish, ship MVP layout, iterate post-launch)."
+  - severity: high
+    description: 'Embedded BoardGrid + PinGrid breaks because b2/b3 components assume route-segment context (e.g., reading boardId from `params`)'
+    mitigation: "Researcher question (1) confirms reusability shape. If params-bound, refactor `BoardCard` / `PinGrid` to accept `boardId` as prop instead of `params` — additive prop, doesn't break b2/b3 routes. Test b2/b3 still pass after the prop change."
+  - severity: medium
+    description: "Drag-and-drop upload doesn't work on tablets (iOS Safari) — drop event fires inconsistently"
+    mitigation: '`<UploadZone>` provides BOTH drag-drop AND click-to-pick fallback. Click-to-pick uses standard `<input type="file">` which works everywhere. Researcher confirms.'
+  - severity: medium
+    description: 'Pinterest token expires mid-session → first pin click returns invalid_token → user confused'
+    mitigation: 'c11 inlines b4 tokenInvalidCopy / insufficientScopeCopy when c9 returns those reasons. Same UX language as the page-level views. User has remediation steps right where the error happens.'
+  - severity: medium
+    description: 'createDesign succeeds but the user does not realize it because c17 navigation is not yet built; success banner is unclear'
+    mitigation: 'Placeholder: explicit "Design draft created — generation flow will land in next slice" success banner. Replace when c17 ships. Acceptable interim UX since c11 + c17 ship in the same release cycle.'
+  - severity: low
+    description: 'Mixed Pinterest + upload state shows visual inconsistency (Pinterest pins from i.pinimg.com, uploads from Firebase Cloud Storage signed URL or proxied)'
+    mitigation: 'ReferencePanel renders all references through `next/image` with the same card vocabulary regardless of source. Storage download approach decided in this story or c17 (signed URLs vs proxied).'
+  - severity: low
+    description: 'Workspace state lost on accidental reload → user reassembles from scratch'
+    mitigation: 'Out of v1 scope. Future epic adds draft auto-save or localStorage persistence. Acceptable residual since v1 is single-user single-session typical.'
+
+references:
+  - path: .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v2-wizard.html
+    relevant_excerpt: |
+      Step 1 — Inspiration · Step 2 — Direction · Step 3 — Confirm (separate wireframe).
+      Top progress strip on every frame: 1 Inspiration → 2 Direction → 3 Confirm.
+      ✓ on completed steps (clickable to revisit, preserves state).
+      Footer row: ← Back (hidden on Step 1) · Continue → (Step 1) / Generate → (Step 2).
+      Step 1 = "this is interesting" — no primary marking, no order, soft cap of ~8
+      (warning, not block). Step 2 enters with all Step 1 picks locked as the working
+      set; Pinterest browse + upload tile are *hidden*. Removing in Step 2 returns
+      the item to "available" (re-includable via ← Back) — never deletes from app state.
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #3-#6 (lines 232-235): components/ReferencePanel.tsx,
+      UploadZone.tsx, PromptInput.tsx; app/(authenticated)/design/new/page.tsx
+      — create the first real "new design" workspace combining Pinterest
+      selection, upload, and prompt entry.
+      Slice 3 Validation: Verify the UI never allows zero or multiple
+      primary references. Verify secondary references preserve explicit
+      user order. Verify uploaded images and Pinterest images both become
+      docs in the same `references` collection shape.
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      US-C-1: Build a reference set from Pinterest and uploads.
+      Acceptance: Given I am in the new-design workspace with access to
+      Pinterest browse and upload, when I choose one Pinterest pin as
+      primary and add optional secondary pins and/or uploads, then the
+      app assembles them into a single reference panel.
+      Acceptance: Given I try to proceed without exactly one primary,
+      then the app blocks the transition with a clear correction path.
+      US-C-2: Capture prompt intent alongside references. Acceptance:
+      Given I enter a prompt that conflicts with a reference cue, when
+      the design input set is built, then the app preserves the prompt
+      as a first-class input that the generation path treats as able to
+      override visual cues.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > UI Surface: Epic C adds the first authenticated
+      `design/new` workspace that combines Pinterest selection, upload,
+      prompt entry, and generation state in one surface. New
+      reference-building affordances include visible primary/secondary
+      selection state in the pin browser, an upload tile or drop zone, a
+      reference panel, and prompt helper text that explicitly explains
+      override semantics.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: Pinterest pin selection is EMBEDDED inside
+      `/design/new`, not navigated-to. Per c12 user decision:
+      `/pinterest/*` routes stay reachable by direct URL but are
+      unsurfaced from sidebar.
+      §What Could Go Wrong (HIGH): Wireframe rendition rejection blocks
+      story.
+
+ui_indicators: 'NEW UI surface — 3-step wizard at /design/new (Steps 1+2; Step 3 owned by c17 at /design/[designId]); ~10 new components under components/studio/; wireframe Touchpoint 1 APPROVED 2026-04-29 (canonical: wireframe-v2-wizard.html, supersedes v1 single-screen); embedded Pinterest panel reuses b2/b3 unmodified via SelectablePinCard wrapper; <WizardProgressStrip> exported for c17 reuse'

@@ -1,0 +1,623 @@
+id: c17-generation-ui
+epic: epic-c-reference-and-generation
+title: '<GenerateButton> + <GenerationPreview> + <GenerationErrorState> — polished pending state, raw image preview, 5-state error taxonomy with adjust-inputs CTA'
+status: pending
+complexity: high
+methodology: tdd
+depends_on: [c16-generate-design-surface, c11-design-new-workspace-ui]
+renditions: 3
+
+wireframes:
+  touchpoint_1_status: APPROVED
+  approved_at: '2026-04-29'
+  approved_by: don
+  approved_rendition: .pHive/wireframes/epic-c-reference-and-generation/c17-generation-ui/wireframe.html
+  rationale: |
+    Single approved wireframe shows Step 3 — Confirm at /design/[designId].
+    Implements the wizard chrome continuity (sidebar + <WizardProgressStrip>
+    showing Step 1 ✓ + Step 2 ✓ + Step 3 active) + pending stage + success
+    preview + 5 error branches + inline Discard confirm. Brand tokens locked.
+  references:
+    - .pHive/wireframes/epic-b-pinterest-integration/_base-template.md
+    - .pHive/wireframes/epic-b-pinterest-integration/_animations-spec.md
+    - .pHive/wireframes/epic-b-pinterest-integration/_a11y-spec.md
+    - .pHive/wireframes/epic-b-pinterest-integration/b4-token-invalid-view/v2.html # structural copy precedent
+    - .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v2-wizard.html # wizard chrome source
+  implementation_notes: |
+    - c17 implements Step 3 — Confirm of the c11 wizard at
+      /design/[designId]. Inherits wizard chrome (sidebar + progress strip)
+      from c11 components — c17 imports `<WizardProgressStrip step={3}>`
+      and the page shell layout; no chrome duplication.
+    - Pending stage per wireframe pending-stage frame: 10-15s envelope,
+      polished motion (NOT spinner), prefers-reduced-motion fallback.
+    - Success state: <GenerationPreview> renders the signed URL via
+      `next/image` (c18 unblocks the host). Adjust-and-regenerate CTA
+      returns to /design/new Step 2 with state preserved.
+    - 5 error branches mapped to copy variants per wireframe error card:
+      refusal / rate_limit / network / storage_fail / low_quality. All 5
+      LOCKED ship-Epic-C; fallback codes share generic copy. adjust_inputs
+      CTA on every error.
+    - Inline Discard confirm per wireframe — small overlay or inline
+      banner asking confirmation before dropping the design.
+
+wireframe_approval:
+  touchpoint_1:
+    status: approved
+    approved_by: don
+    approved_at: '2026-04-29'
+    canonical_artifact: .pHive/wireframes/epic-c-reference-and-generation/c17-generation-ui/wireframe.html
+
+escalations_addressed:
+  - trigger: ui:major
+    severity: major
+    placement: pre-exec
+    raised_by: ui-designer
+    addressed_by: |
+      ui-design step inserted between research and test-spec; renditions: 3
+      at .pHive/wireframes/epic-c-reference-and-generation/c17-generation-ui/
+      v{1,2,3}.html; blocking on Don approval before execute. Wireframes
+      cover: pending state (10-15s wait), success preview, 5 error branches
+      (refusal / rate_limit-after-retry / post-retry-network /
+      storage-fail / low_quality). Reuses Epic B b4 token-remediation
+      structural language for error states; brand tokens locked.
+  - trigger: ui:animations
+    severity: minor
+    placement: review-step-append
+    raised_by: 'tpm + ui-designer'
+    addressed_by: |
+      Animations-specialist sidecar at REVIEWER step per b2 precedent
+      (memory `feedback_animations_sidecar_review`). Concerns: pending-
+      state shimmer envelope (10-15s), success state-transition,
+      error-state reveal motion, prefers-reduced-motion handling. Caught
+      real prefers-reduced-motion gap on b2; reusing the dual-persona
+      spawn pattern.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      5-state errorCode taxonomy LOCKED ship-Epic-C: refusal /
+      rate_limit / network (post-retry) / storage_fail / low_quality.
+      All 5 mapped exhaustively to copy variants via TypeScript switch
+      with `default: never` exhaustiveness check. UI layer ALSO handles
+      `unauthorized` / `invalid_input` / `design_not_found` /
+      `design_unauthorized` / `unknown` via fallback branches.
+  - trigger: ui:scope-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Acceptance criteria explicitly forbid: 5-nail hand layout, shape
+      mask compositing, save-to-library button, regenerate button (Epic D),
+      design detail page navigation, library grid. Story stops at "raw
+      image preview rendered" + "guided failure rendered". The visualizer
+      is Slice 5; the library is Epic D.
+
+description: |
+  Slice 4 user-facing surface. Implements **Step 3 — Confirm** of the
+  c11 wizard at `app/(authenticated)/design/[designId]/page.tsx`. Step 2
+  → Step 3 transition (in c11) fires `createDesign` (c10) and routes
+  to `/design/[designId]`; this story renders what the user sees
+  there: pending → success | failure.
+
+  Inherits wizard chrome from c11 components — c17 imports
+  `<WizardProgressStrip step={3}>` and the studio shell layout. The
+  progress strip shows Step 1 ✓ + Step 2 ✓ + Step 3 active, keeping
+  the wizard frame continuous across the c11 ↔ c17 seam. No chrome
+  duplication; c17 reuses c11's shell + sidebar exactly.
+
+  Three new client components ship the visible end of generation:
+
+  1. **`<GenerateButton>`** — primary CTA on Step 2 of c11 (lives in
+     c11 as the wizard footer "Generate →" button); c17 renders the
+     pending stage on /design/[designId] after that click. Polished
+     progress affordance for the 10-15s wait per FR-C-8 (NOT a generic
+     spinner; wireframe pending-stage frame locks the motion).
+
+  2. **`<GenerationPreview>`** — rendered on success. Shows the raw
+     generated image via `next/image` referencing the signed URL from
+     c16's envelope. NO visualizer compositing (Slice 5 / Epic D).
+
+  3. **`<GenerationErrorState>`** — rendered on failure. Branches on
+     `errorCode` to one of 5 ship-Epic-C copy variants:
+     - `refusal` — "We couldn''t generate this image. Try simpler
+       references or a different prompt."
+     - `rate_limit` (after retry) — "We''re hitting capacity. Wait a
+       moment and try again, or change your inputs."
+     - `network` (after retry) — "Connection trouble. Check your
+       internet and try again."
+     - `storage_fail` — "We saved the design but couldn''t save the
+       image. Adjust inputs and retry."
+     - `low_quality` — "The result wasn''t up to par. Try refining the
+       prompt or swapping a reference."
+     Plus fallback branches for `unauthorized`, `invalid_input`,
+     `design_not_found`, `unknown` — generic copy with adjust-inputs
+     CTA. All variants include the SAME `adjust_inputs` CTA button
+     that returns the user to the workspace with state preserved.
+
+  These three components plug into c11's `Workspace.tsx` orchestrator.
+  c11 GenerateButton was a placeholder; c17 replaces with the real one
+  wired to c16. c11 had no preview or error UI; c17 adds both.
+
+  Out of scope: visualizer (Slice 5), shape masks, save-to-library,
+  regenerate (Epic D), design detail page (Epic D).
+
+acceptance_criteria:
+  # US-C-5 (see a raw result or guided failure) — c17 is the user-visible end of generation; raw preview + 5-state guided failure
+  # ── Entry from c11 + wizard chrome inheritance ─────────────────────
+  - 'Given the user clicks "Generate →" on c11 Step 2 and c10 createDesign returns `{ ok: true; designId }`, when c11 calls `router.push(`/design/${designId}`)`, then `app/(authenticated)/design/[designId]/page.tsx` (c17) renders with INSTANT transition to the Pending state — no intermediate flash of empty content.'
+  - 'Given /design/[designId] renders, when the page is observed, then `<WizardProgressStrip>` (imported from c11/components/studio/) shows Step 1 ✓ · Step 2 ✓ · Step 3 active. The studio sidebar + shell are inherited from the c11/c12 layout — no duplicated chrome.'
+  - 'Given the user has assembled a valid reference set in `/design/new` (per c11) and reached Step 3 via the c11 wizard, when c17 mounts on /design/[designId], then it (a) renders the Pending state immediately, (b) calls c16 `generateDesign({ designId })` once, (c) on success transitions to `<GenerationPreview>` rendering the imageUrl, (d) on failure transitions to `<GenerationErrorState>` with the appropriate copy variant.'
+  - 'Given pending state, when the UI is observed for 10-15 seconds, then it shows a polished progress affordance — NOT a generic spinner. Specific motion locked by ui-design wireframe + animations-specialist sidecar review.'
+  - 'Given pending state, when `prefers-reduced-motion: reduce` is set in the OS, then the progress affordance falls back to a static "Generating..." indicator with no looping animation.'
+  - 'Given c16 returns `{ status: "success"; imageUrl }`, when `<GenerationPreview>` renders, then it displays the image via `next/image src={imageUrl}` with `alt` describing the generated design (e.g., "Generated nail design — almond shape with rose gold accents per your prompt").'
+  - 'Given c16 returns `{ status: "failure"; errorCode: "refusal" }`, when `<GenerationErrorState>` renders, then the heading reads (per wireframe lock) like "We couldn''t generate this image" and the description suggests simpler references / different prompt.'
+  - 'Given errorCode `rate_limit`, when `<GenerationErrorState>` renders, then copy reflects "we''re hitting capacity, wait a moment and try again, or change your inputs". Mentions the retry already happened (one silent retry exhausted — c14 lock).'
+  - 'Given errorCode `network`, when rendered, then copy reflects "connection trouble, check your internet and try again".'
+  - 'Given errorCode `storage_fail`, when rendered, then copy reflects the partial-save state — design exists, image did not save — and offers retry.'
+  - 'Given errorCode `low_quality`, when rendered, then copy reflects "result wasn''t up to par, try refining prompt or swapping reference".'
+  - 'Given errorCode is one of the fallback codes (`unauthorized`, `invalid_input`, `design_not_found`, `design_unauthorized`, `unknown`), when rendered, then a generic adjust-inputs message appears with the same `adjust_inputs` CTA button.'
+  - 'Given any error state, when the user clicks the `adjust_inputs` CTA, then they are routed back to the `/design/new` workspace with the assembled reference state preserved (URL state OR c11 component state via context).'
+  - 'Given the success state, when the user navigates away and returns, then c17 does NOT re-render the preview (preview is post-generation only — no auto-show). c11 workspace re-renders cleanly.'
+  - 'Given Playwright e2e flow `tests/e2e/generation-flow.spec.ts`, when run, then it covers: (1) happy path (pin selection → upload → prompt → generate → success preview); (2-6) each of 5 error branches with mocked c16 returning each errorCode.'
+  - "Given `<GenerationPreview>` consumes a Firebase Storage signed URL, when `next/image` renders, then `next.config.ts` `images.remotePatterns` allows the host. (THIS IS c18's STORY — c17 unblocks the test, c18 ships the config.)"
+  - 'Given the dual-persona reviewer step (animations-specialist sidecar), when running, then it inspects: pending-state motion timing (10-15s envelope; no exceeding 1.5s loop), success transition (fade-in or slide-up envelope), error reveal (graceful, not jarring), prefers-reduced-motion handling on every animation. Per-pattern memory: `feedback_animations_sidecar_review`.'
+  - 'Given grep across `components/design-new/Generate*.tsx`, when checked, then no firebase-admin imports, no SDK imports — all data flows through c16 envelope.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Pending-state motion language — what does b2/b3 use for
+      "polished waiting" beyond Suspense skeleton? Read
+      `.pHive/wireframes/epic-b-pinterest-integration/_animations-spec.md`
+      for skeleton sweep, append stagger, prefers-reduced-motion.
+      Generation pending is a longer wait (10-15s vs Suspense''s
+      sub-second); needs a different rhythm — possibly a slow shimmer
+      with text rotation ("Generating...", "Refining...", "Almost
+      there..." paced over 12s)?
+      (2) `next/image` with signed URLs — Firebase Storage signed URLs
+      include query parameters; does `next.config.ts` `images.
+      remotePatterns` need to allow the query-param URL or just the
+      host? Confirm via Next.js docs (host match is sufficient; query
+      params aren''t pattern-matched).
+      (3) c11 Workspace state preservation on `adjust_inputs` CTA —
+      does the user return to a fresh workspace or one that retains
+      their reference selections + prompt + shape? Recommendation:
+      retain. Implementation: keep c11 state in sessionStorage or
+      pass via URL/query.
+
+      Read .pHive/wireframes/epic-b-pinterest-integration/b4-token-invalid-view/v2.html
+      for structural copy precedent (heading + paragraph + CTA pattern).
+      Read memory `feedback_animations_sidecar_review` for the dual-
+      persona review pattern.
+    agent: researcher
+  - id: ui-design
+    description: |
+      COMPLETE — Touchpoint 1 APPROVED 2026-04-29 by Don.
+
+      Canonical artifact: `.pHive/wireframes/epic-c-reference-and-generation/c17-generation-ui/wireframe.html` (1089 lines).
+
+      The implement step takes wireframe.html as the AUTHORITATIVE visual +
+      interaction source — including:
+      - Wizard chrome continuity: sidebar + `<WizardProgressStrip>` with
+        Step 1 ✓ + Step 2 ✓ + Step 3 active (imported from c11
+        components/studio/; no chrome duplication).
+      - Pending stage frame: 10-15s envelope, polished motion (slow shimmer
+        + rotating text milestones per wireframe), prefers-reduced-motion
+        fallback to static text + subtle dot pulse.
+      - Success state: `<GenerationPreview>` with `next/image`, "Your
+        design" heading, "Adjust and regenerate" CTA. NO save-to-library,
+        NO regenerate-in-place — those are Epic D.
+      - 5 error branches per wireframe error-card frame: refusal /
+        rate_limit / network / storage_fail / low_quality. Each with
+        heading + description + adjust_inputs CTA. Generic fallback for
+        unauthorized / invalid_input / design_not_found / design_unauthorized
+        / unknown.
+      - Inline Discard confirm per wireframe — small overlay/inline banner
+        before dropping the design.
+      - Brand tokens (`--primary: #6b3f5e`, etc.) per wireframe `<style>`
+        block.
+
+      No deviation from the approved wireframe without TPM + Don sign-off.
+      Animations-specialist sidecar at REVIEWER step (not pre-execute) per
+      memory `feedback_animations_sidecar_review`.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Heavy RTL component
+      coverage + Playwright e2e for the 6 flows.
+
+      AUTHORITATIVE VISUAL SOURCE:
+      - .pHive/design/briefs/generation-ui.md (+ approved HTML)
+
+      - tests/unit/components/design-new/GenerateButton.test.tsx —
+        (1) Idle state: enabled button with text "Generate Design"
+        (2) Pending state (after click): button disabled, polished
+            progress affordance visible, NOT a generic spinner
+        (3) prefers-reduced-motion: pending state shows static text
+            "Generating..." with no looping animation
+        (4) Click → calls onGenerate prop with assembled state
+        (5) Click while pending → onGenerate NOT called again
+        (6) aria-busy="true" during pending; aria-live announces
+
+      - tests/unit/components/design-new/GenerationPreview.test.tsx —
+        (7) Renders `<Image src={imageUrl}>` with the URL from props
+        (8) Renders descriptive `alt` text including nailShape and
+            promptText if present
+        (9) Renders heading "Your design" (or wireframe-locked copy)
+        (10) Adjust-and-regenerate CTA button visible
+
+      - tests/unit/components/design-new/GenerationErrorState.test.tsx —
+        Exhaustive copy mapping:
+        (11) errorCode `refusal` → heading + description match wireframe lock
+        (12) errorCode `rate_limit` → matching copy
+        (13) errorCode `network` → matching copy
+        (14) errorCode `storage_fail` → matching copy
+        (15) errorCode `low_quality` → matching copy
+        (16) errorCode `unauthorized` / `invalid_input` /
+             `design_not_found` / `design_unauthorized` / `unknown` →
+             generic fallback copy + adjust_inputs CTA
+        (17) TypeScript exhaustiveness: a `default: never` branch in
+             the switch ensures any new errorCode added without UI
+             update fails to compile
+
+      - tests/integration/design-new/generation-flow.test.tsx —
+        Workspace + Generate flow integration:
+        (18) Mock c16 to return success → click Generate → pending
+             state → preview state with image URL
+        (19) Mock c16 to return refusal → click → pending → error state
+             with refusal copy
+        (20) Click adjust_inputs CTA → returns to workspace; reference
+             state preserved
+
+      - tests/e2e/generation-flow.spec.ts — Playwright golden + 5 errors:
+        (21) Happy path: log in → /design/new → select pin → upload
+             photo → enter prompt → choose shape → click Generate →
+             pending state → preview renders with image
+        (22) Refusal: same setup; mock c16 to return refusal → error
+             panel renders with refusal copy
+        (23) Rate-limit: mock c16 → rate_limit → matching copy
+        (24) Network: mock c16 → network → matching copy
+        (25) Storage_fail: mock c16 → storage_fail → matching copy
+        (26) Low_quality: mock c16 → low_quality → matching copy
+
+      DO NOT write tests for: visualizer, save-to-library, regenerate,
+      design detail page navigation. Those are Epic D / Slice 5.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Make failing tests pass. Three new client components + workspace
+      integration.
+
+      AUTHORITATIVE VISUAL SOURCE:
+      - .pHive/design/briefs/generation-ui.md (+ approved HTML)
+
+      Files to produce:
+
+      - `components/design-new/GenerateButton.tsx` — client component:
+        ```tsx
+        'use client';
+        import { useState, useTransition } from 'react';
+        import { generateDesign } from '@/app/(authenticated)/design/actions';
+        // (or fetch to /api/designs/generate if route handler path)
+        ...
+        ```
+
+      - `components/design-new/GenerationPreview.tsx` — client
+        component. `next/image` with the signed URL; alt text;
+        adjust-and-regenerate CTA.
+
+      - `components/design-new/GenerationErrorState.tsx` — client
+        component with the exhaustive switch:
+        ```tsx
+        'use client';
+        import type { GenerateDesignResult } from '@/app/(authenticated)/design/actions';
+
+        type FailureEnvelope = Extract<GenerateDesignResult, { status: 'failure' }>;
+
+        const COPY: Record<FailureEnvelope['errorCode'], { heading: string; description: string }> = {
+          refusal: {
+            heading: "We couldn't generate this image",
+            description: "Try simpler references or a different prompt.",
+          },
+          rate_limit: {
+            heading: "We're hitting capacity",
+            description: "Wait a moment and try again, or change your inputs.",
+          },
+          network: {
+            heading: 'Connection trouble',
+            description: "Check your internet and try again.",
+          },
+          storage_fail: {
+            heading: 'Almost there',
+            description: "We saved the design but couldn't save the image. Adjust inputs and retry.",
+          },
+          low_quality: {
+            heading: "The result wasn't up to par",
+            description: "Try refining the prompt or swapping a reference.",
+          },
+          // Fallback branches share generic copy
+          unauthorized: { heading: 'Something went wrong', description: 'Sign in again and try.' },
+          invalid_input: { heading: 'Something went wrong', description: 'Adjust your inputs and try again.' },
+          design_not_found: { heading: 'Something went wrong', description: 'Adjust your inputs and try again.' },
+          design_unauthorized: { heading: 'Something went wrong', description: 'Adjust your inputs and try again.' },
+          unknown: { heading: 'Something went wrong', description: 'Adjust your inputs and try again.' },
+        };
+
+        export function GenerationErrorState({
+          envelope, onAdjust,
+        }: { envelope: FailureEnvelope; onAdjust: () => void }) {
+          const { heading, description } = COPY[envelope.errorCode];
+          // TypeScript exhaustiveness: any new errorCode without entry in COPY = compile error
+          return (
+            <section role="alert" aria-live="polite" className="...">
+              <h2>{heading}</h2>
+              <p>{description}</p>
+              <button onClick={onAdjust} className="...">Adjust and try again</button>
+            </section>
+          );
+        }
+        ```
+
+      - Update `app/(authenticated)/design/new/Workspace.tsx` (c11) to
+        wire `<GenerateButton>` to c16 and orchestrate state
+        transitions: idle → pending → success | failure. State machine
+        managed via `useState<'idle' | 'pending' | 'success' | 'failure'>`
+        + the current envelope.
+
+      - Pending-state motion: implement per wireframe brief +
+        animations-specialist sidecar guidance. Tailwind keyframes for
+        the shimmer envelope OR a CSS-only approach. prefers-reduced-
+        motion handled via `@media (prefers-reduced-motion: reduce)`.
+
+      DO NOT: build visualizer, shape mask, library grid, design
+      detail page, save-to-library button, in-place regenerate. Out
+      of scope.
+
+      DO NOT: import firebase-admin or SDKs from client components.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the 5-state taxonomy ships exhaustively, motion is
+      polished, scope is held.
+
+      **Dual-persona review** (per `feedback_animations_sidecar_review`
+      memory): primary reviewer (claude) + animations-specialist sidecar.
+      Use `ui:animations append` to spawn the sidecar.
+
+      Primary reviewer concerns:
+      - 5 errorCode branches all map to distinct copy variants per
+        wireframe. Test (11)-(15) cover.
+      - Fallback branches (unauthorized, invalid_input,
+        design_not_found, design_unauthorized, unknown) map to generic
+        copy. Test (16) covers.
+      - TypeScript exhaustiveness: removing or adding an errorCode in
+        c16 without updating COPY map = compile error. Reviewer
+        verifies via `tsc --noEmit`.
+      - Adjust-inputs CTA returns to workspace with state preserved.
+        Test (20) covers.
+      - GenerationPreview uses `next/image` with `alt` text.
+      - Pending state shows polished affordance, not generic spinner.
+        Test (2) covers.
+      - All client components use `'use client'`.
+      - No firebase-admin imports in client components. Reviewer grep.
+      - All vitest unit + integration tests pass.
+      - Playwright e2e (21-26) all pass.
+      - Reviewer manually loads `pnpm dev` and walks through:
+        a. Click Generate → pending shimmer for 10-15s → preview renders
+        b. Mock c16 to fail (e.g., dev-only override) → each error
+           variant displays correctly
+
+      Animations-specialist sidecar concerns:
+      - Pending shimmer envelope timing (e.g., 1.2s loop, repeating
+        cleanly for the 10-15s wait without jarring resets)
+      - Success state-transition (fade-in OR slide-up; envelope ≤ 320ms;
+        easing per brand language)
+      - Error-state reveal (gentle, not abrupt; doesn''t feel
+        accusatory)
+      - prefers-reduced-motion: every animation has a static fallback;
+        no looping motion when reduce is set
+      - aria-live announcements for state changes
+      - High-contrast / focus-visible audit on the adjust-inputs CTA
+      - Per-pattern memory: `feedback_animations_sidecar_review` —
+        document any new motion language added
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c17-generation-ui`.
+      Commit: `feat(c17): generation UI — GenerateButton + GenerationPreview + GenerationErrorState (5-state taxonomy)`.
+      Pre-commit: `pnpm test`, `pnpm test:rules`, `pnpm test:e2e` (or
+      recommended), `pnpm typecheck`, `pnpm lint` must pass.
+      The c18 next.config.ts host allowance is required for the e2e
+      `<Image>` test to pass — coordinate with c18 if not already shipped.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 client components; Tailwind-first styling; brand tokens'
+    runtime: 'React 19; client-side state machine; useTransition for pending UI'
+    testing: 'Vitest jsdom + RTL for components; Playwright e2e for golden + 5 error flows'
+  key_files:
+    - path: app/(authenticated)/design/actions.ts
+      purpose: 'Consumed (c16) — generateDesign action; if route-handler path locked, fetch /api/designs/generate'
+    - path: app/(authenticated)/design/new/Workspace.tsx
+      purpose: 'EXTENDED (c11) — wire <GenerateButton> + show preview/error per state'
+    - path: components/design-new/GenerateButton.tsx
+      purpose: 'CREATE; primary CTA + pending UI'
+    - path: components/design-new/GenerationPreview.tsx
+      purpose: 'CREATE; raw image preview'
+    - path: components/design-new/GenerationErrorState.tsx
+      purpose: 'CREATE; 5-state error taxonomy with adjust-inputs CTA'
+    - path: .pHive/wireframes/epic-b-pinterest-integration/b4-token-invalid-view/v2.html
+      purpose: 'Pattern reference — heading/description/CTA structural language for error state'
+    - path: .pHive/wireframes/epic-b-pinterest-integration/_animations-spec.md
+      purpose: 'Pattern reference — Epic B motion vocabulary (skeleton sweep, prefers-reduced-motion)'
+    - path: .pHive/design/briefs/generation-ui.md
+      purpose: 'Produced by ui-design step — authoritative wireframe brief'
+    - path: next.config.ts
+      purpose: 'Modified by c18 — Firebase Storage host added to remotePatterns; required for next/image to render preview'
+
+files_to_modify:
+  - file: components/design-new/GenerateButton.tsx
+    change: 'CREATE; client CTA + pending state'
+  - file: components/design-new/GenerationPreview.tsx
+    change: 'CREATE; success preview'
+  - file: components/design-new/GenerationErrorState.tsx
+    change: 'CREATE; 5-state error mapping with exhaustive switch'
+  - file: app/(authenticated)/design/new/Workspace.tsx
+    change: 'EXTEND (c11) — orchestrate state machine idle → pending → success | failure'
+  - file: .pHive/design/briefs/generation-ui.md
+    change: 'Created in ui-design step'
+  - file: tests/unit/components/design-new/GenerateButton.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/design-new/GenerationPreview.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/components/design-new/GenerationErrorState.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/integration/design-new/generation-flow.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/e2e/generation-flow.spec.ts
+    change: 'CREATE in test-spec — golden + 5 error flows'
+
+design_decisions:
+  - decision: 'c17 reuses c11 wizard chrome — sidebar + `<WizardProgressStrip>` + footer button row pattern. NO chrome duplication.'
+    rationale: 'Wizard is one continuous flow across c11 (Steps 1+2) and c17 (Step 3). Don approved a single canonical wizard frame; duplicating the strip/sidebar in c17 with slight drift would break visual continuity. c17 imports `<WizardProgressStrip>` from `components/studio/` (c11 export) and renders it with `step={3}`. Studio shell is inherited via the (authenticated) layout that c11 + c12 already shape.'
+  - decision: 'Wireframe Touchpoint 1 APPROVED — implement against `wireframe.html` with NO deviation'
+    rationale: 'Touchpoint 1 closed 2026-04-29 by Don. ui-design step is now record-keeping; substantive design is locked. Generation pending state + 5 error branches + inline Discard confirm are the most user-visible Epic C surface; getting copy / motion / layout wrong damages product trust. Deviation requires TPM + Don sign-off.'
+  - decision: 'Animations-specialist sidecar at REVIEWER step (not pre-execute)'
+    rationale: 'Per memory `feedback_animations_sidecar_review` from b2: dual-persona spawn at review caught real prefers-reduced-motion gap. Reuse the pattern. Sidecar concerns: pending shimmer envelope, success/error reveal, reduce-motion fallbacks.'
+  - decision: '5-state errorCode taxonomy LOCKED ship-Epic-C: refusal | rate_limit | network | storage_fail | low_quality'
+    rationale: 'data-model:contract-stability. These 5 are the user-distinguishable failure modes. Fallback codes (unauthorized, etc.) share generic copy; not surfaced as separate variants. Future hardening can add more variants without breaking the 5 locked.'
+  - decision: 'TypeScript `default: never` exhaustiveness check on errorCode switch'
+    rationale: 'Adding a new errorCode in c16 without updating COPY map = compile error in c17. Compile-time guarantee that every code has a copy variant. Catches drift before runtime.'
+  - decision: 'Pending-state motion is "polished" not generic spinner (per FR-C-8)'
+    rationale: 'A generic spinner over 10-15s feels like the app is broken. Wireframe-locked language (shimmer + rotating text) acknowledges the wait. animations-specialist sidecar polishes timing.'
+  - decision: 'prefers-reduced-motion fallback: static text, no looping animation'
+    rationale: 'Memory `feedback_animations_sidecar_review` caught the gap on b2. Repeat the pattern. Reduce-motion users get a clean static state — equally accessible, not deprived of feedback.'
+  - decision: 'adjust_inputs CTA returns to workspace with state preserved'
+    rationale: 'A user who failed generation should not lose their work. State preservation honors US-C-5 acceptance: "guided failure preserves trust". Implementation: c11 Workspace state survives the success/failure render via React state (parent component holds the state machine).'
+  - decision: 'Brand tokens reused; NO new motion language without Don approval'
+    rationale: 'Brand locked at .pHive/brand/brand-system.yaml. Adding a new color or animation token without approval risks inconsistency with Epic A/B work.'
+  - decision: 'No save-to-library, no regenerate, no design detail page in c17'
+    rationale: 'ui:scope-boundary lock. Slice 5 (visualizer) + Epic D (library) own those surfaces. c17 stops at "raw preview rendered" + "guided failure rendered".'
+
+cross_cutting:
+  - concern: 'error-handling'
+    notes: '5-state taxonomy + 5 fallback codes mapped exhaustively. TypeScript exhaustiveness check enforces. CTA consistent across all variants.'
+  - concern: 'ui-major'
+    notes: 'Wireframe Touchpoint 1 gates implement.'
+  - concern: 'ui-animations'
+    notes: 'Reviewer-step append per memory `feedback_animations_sidecar_review`. Concerns: pending envelope, transitions, prefers-reduced-motion.'
+  - concern: 'animations-pending-states'
+    notes: 'FR-C-8 polished pending state. 10-15s wait. Wireframe + sidecar review both load-bearing.'
+  - concern: 'ui-scope-boundary'
+    notes: 'No visualizer, no library, no save, no regenerate, no detail page. Reviewer enforces.'
+
+risks:
+  - severity: high
+    description: 'Pending-state motion looks worse than a generic spinner because shimmer over 10-15s is visually fatiguing'
+    mitigation: 'animations-specialist sidecar concerns timing explicitly. If shimmer fatigues, switch to rotating-text-only or a slow heartbeat pulse. Wireframe Touchpoint 1 lets Don preview before code locks.'
+  - severity: high
+    description: "Wireframe rejection blocks story; Mother's Day deadline pressure"
+    mitigation: 'Same pattern as c11 risk. Touchpoint 1 allows iteration; if all 3 rejected, escalate to scope cut (ship MVP error states, polish post-launch).'
+  - severity: medium
+    description: 'next/image refuses to render the Firebase Storage signed URL because c18 has not shipped (host not in remotePatterns)'
+    mitigation: 'c18 dependency explicit. If c17 ships first, fall back to `<img src={imageUrl} alt="..." />` with `unoptimized={true}` until c18 lands. Acceptable transition state.'
+  - severity: medium
+    description: 'errorCode taxonomy drift: c16 adds a new code (e.g., quota_exceeded) and c17 COPY map silently uses fallback'
+    mitigation: 'TypeScript exhaustiveness via Record<errorCode, ...>. Adding a code without map entry = compile error. Verified by reviewer + CI typecheck.'
+  - severity: medium
+    description: 'State preservation on adjust_inputs CTA: c11 Workspace state lost if c17 unmounts and remounts the workspace'
+    mitigation: 'State machine lives in the parent c11 Workspace component; c17 components are children. Unmount/remount preserves parent state. Test (20) covers.'
+  - severity: low
+    description: 'Playwright e2e flaky on the pending-state assertion because shimmer animation interferes with screenshot stability'
+    mitigation: 'Test asserts on aria-busy or aria-live announcements rather than visual state. animations-specialist may suggest reduced-motion test mode.'
+  - severity: low
+    description: 'next/image alt text is too generic (just "Generated nail design")'
+    mitigation: 'alt synthesizes nailShape + truncated promptText for a more descriptive label. Wireframe brief locks the alt text template.'
+
+references:
+  - path: .pHive/wireframes/epic-c-reference-and-generation/c17-generation-ui/wireframe.html
+    relevant_excerpt: |
+      c17 — /design/new · Step 3 · Confirm.
+      Inherits wizard chrome (sidebar + progress strip showing Step 1 ✓ +
+      Step 2 ✓ + Step 3 active) from c11 components.
+      Pending stage: 10-15s polished motion (slow shimmer + rotating text);
+      prefers-reduced-motion fallback to static text + subtle dot pulse.
+      Success state: <GenerationPreview> via next/image + "Adjust and
+      regenerate" CTA. 5 error-card branches (refusal / rate_limit / network
+      / storage_fail / low_quality) each with heading + description +
+      adjust_inputs CTA. Inline Discard confirm overlay before dropping.
+  - path: .pHive/wireframes/epic-c-reference-and-generation/c11-design-new-workspace/wireframe-v2-wizard.html
+    relevant_excerpt: |
+      Wizard chrome source — `<WizardProgressStrip>` (1 Inspiration → 2
+      Direction → 3 Confirm) is exported from components/studio/ by c11
+      and reused by c17 on /design/[designId] with step={3}. Studio shell
+      (sidebar + layout) is inherited via the (authenticated) layout that
+      c11 + c12 already shape. No chrome duplication.
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 4 Changes #5-#7 (lines 285-287):
+        components/GenerateButton.tsx — submit generation with a polished
+          pending state and disabled-state logic.
+        components/GenerationPreview.tsx — show the raw generated image
+          before the dedicated visualizer slice lands.
+        components/GenerationErrorState.tsx — show retry-adjust messaging
+          after the one silent auto-retry is exhausted. (Source: kickoff-
+          decisions #8)
+      Slice 4 Validation: Verify a hard refusal surfaces the adjust-
+      inputs guidance instead of an opaque generic error. Verify the
+      raw image preview renders from the persisted storage path.
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      US-C-4: Generate a nail-design image. Acceptance: ...
+      US-C-5: See a raw result or guided failure.
+      Acceptance: Given a common failure such as missing or revoked
+      Pinterest token, provider refusal, rate limit, or missing saved
+      design occurs, when the app surfaces the problem, then it provides
+      a clear message and a recovery action instead of a generic error.
+      FR-C-7: Generation failures must use one silent auto-retry and
+      then present an adjust-inputs recovery state.
+      FR-C-8: The raw generated image must be viewable before the
+      dedicated visualizer slice lands.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > UI Surface: New generation-facing affordances
+      include a generate button, polished pending state, raw generated
+      image preview, and guided failure UI with adjust-inputs recovery
+      after the one silent retry budget is exhausted.
+      Open Question §8: What's the exact UI copy for refusal vs
+      rate-limit vs network-fail vs low-quality? My opinion: pass-
+      through to a single GenerationErrorState component with
+      classified copy variants; defer wording until Don decides.
+      [Locked: 5 variants per design-discussion + this story.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: For the silent retry: one retry, only on
+      transient codes. Refusal and unknown failures do *not* retry —
+      they go straight to the adjust-inputs UI.
+      [c17 surfaces those failures as the 5 error branches.]
+  - path: .pHive/wireframes/epic-b-pinterest-integration/b4-token-invalid-view/v2.html
+    relevant_excerpt: |
+      b4 token-invalid view: heading + paragraph + remediation CTA
+      structural language. c17 GenerationErrorState reuses this
+      pattern for the 5 error branches.
+  - path: .pHive/wireframes/epic-b-pinterest-integration/_animations-spec.md
+    relevant_excerpt: |
+      Epic B motion vocabulary: skeleton sweep envelope, infinite-
+      scroll append stagger, prefers-reduced-motion handling. c17
+      pending state extends this language for a longer 10-15s envelope.
+  - path: .pHive/planning/sign-off.md
+    relevant_excerpt: |
+      kickoff-decisions #8: one silent auto-retry on transient failures;
+      adjust-inputs CTA after retry exhaustion. [Honored as 5-state UI
+      taxonomy + adjust_inputs CTA.]
+
+ui_indicators: 'NEW UI surface — Step 3 — Confirm of c11 wizard at /design/[designId] (GenerateButton + GenerationPreview + GenerationErrorState 5-state taxonomy + inline Discard confirm); wireframe Touchpoint 1 APPROVED 2026-04-29 (canonical: c17-generation-ui/wireframe.html); reuses c11 `<WizardProgressStrip>` + studio shell (no chrome duplication); animations-specialist sidecar at REVIEWER step per memory `feedback_animations_sidecar_review`; Playwright e2e covers golden + 5 error branches'

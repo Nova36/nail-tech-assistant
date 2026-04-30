@@ -1,0 +1,439 @@
+id: c4-firestore-storage-rules
+epic: epic-c-reference-and-generation
+title: 'firestore.rules + storage.rules + indexes + firebase.json Storage emulator (per-collection allow/deny matrix; default-deny preserved)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [c3-data-model-types-converters]
+
+escalations_addressed:
+  - trigger: security:plan-audit
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Story writes per-collection + per-path allow/deny matrix tests using
+      @firebase/rules-unit-testing FIRST (TDD red), implements rules to pass.
+      Tests cover: owner allow, non-owner deny, unauth deny, cross-user UID
+      mismatch deny, default-deny on undeclared paths. Both Firestore and
+      Storage rules are written together so the security model is internally
+      consistent across both surfaces.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Rules use the locked field names from c3 (e.g.,
+      `request.resource.data.userId`, `request.resource.data.designId`).
+      If c3 field names change, rules tests fail and this story is recut.
+
+description: |
+  Activate the three new Firestore collections (`references`, `designs`,
+  `generations`) and the two new Firebase Cloud Storage path families
+  (`users/{uid}/references/...`, `users/{uid}/generations/...`) with
+  user-scoped owner rules, while preserving the existing default-deny
+  posture.
+
+  This is the hardening story for the persistence layer. Every rule has a
+  passing allow-test (owner) and at least one passing deny-test (non-owner,
+  unauth, cross-user mismatch, undeclared path). Greenfield Storage means
+  this story also creates `storage.rules` from scratch, registers the
+  Storage emulator block in `firebase.json`, and may need to extend
+  `vitest.config.rules.ts` if the existing config does not cover storage
+  rules unit testing (research step confirms).
+
+  No production code touches the rules. c5 (storage helper) consumes the
+  Storage rules; c6/c8/c9 consume the Firestore rules at the I/O boundary.
+  c4 ships only the rules + their tests + the emulator wiring.
+
+  Default-deny note from existing `firestore.rules`: "Firestore Security
+  Rules are additive (OR). Default is deny; the explicit `if false` below
+  is defensive — it ensures any accidental permissive rule in a later epic
+  must OPT IN rather than inherit a silent allow." This story honors that
+  note — every new rule is explicit; the catchall `if false` stays.
+
+acceptance_criteria:
+  - 'Given an authenticated user `alice` and her own `references/{refId}` document with `userId: "alice"`, when she reads or writes the document, then the operation succeeds.'
+  - 'Given an authenticated user `bob` and a `references/{refId}` document with `userId: "alice"`, when bob attempts read or write, then the operation is denied by rules.'
+  - 'Given an unauthenticated request, when it attempts to read or write any document under `references/`, `designs/`, or `generations/`, then the operation is denied.'
+  - 'Given a write to `references/{refId}` where `request.resource.data.userId !== request.auth.uid`, when the rule is evaluated, then the write is denied (cross-user UID injection prevented).'
+  - 'Given a request to a path NOT explicitly declared (e.g., `chat_turns/{any}`, `random_collection/{any}`), when the rule is evaluated, then the write is denied by the catchall `if false`.'
+  - 'Given Firebase Cloud Storage path `users/alice/references/r1.jpg` and authenticated user `alice`, when she reads or writes that object, then the operation succeeds.'
+  - 'Given Firebase Cloud Storage path `users/alice/references/r1.jpg` and authenticated user `bob`, when bob attempts read or write, then the operation is denied.'
+  - 'Given `firebase.json`, when it is inspected, then the `emulators` block has both `firestore` and `storage` declared. The `storage` block specifies a port (e.g., 9199) and rules file (`storage.rules`).'
+  - 'Given `pnpm test:rules` is run, when the suite executes, then it tests Firestore rules AND Storage rules in the same emulator-wrapped run (or a sibling `pnpm test:rules:storage` lane if research confirms separate wrapping is required).'
+  - 'Given `firestore.indexes.json`, when it is inspected, then it declares any compound indexes required by c6/c9/c16 query patterns (e.g., `designs` ordered by `createdAt desc` with `userId` filter; `generations` by `designId` with `createdAt desc`).'
+  - 'Given the existing `tests/rules/profiles.rules.test.ts`, when this story integrates, then that test still passes — `profiles/{uid}` rules are not modified.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) `@firebase/rules-unit-testing` v5 — does the same
+      `initializeTestEnvironment({ projectId, firestore })` API support
+      `storage` (similar block with `host`, `port`, `rules`)? If yes, we can
+      run firestore + storage rules tests in the same vitest lane
+      (`vitest.config.rules.ts`); if no, we need a sibling config or a
+      separate rules-test entry point. context7 lookup of
+      `@firebase/rules-unit-testing` v5 docs.
+      (2) `firebase.json` schema for the storage emulator block — what's
+      the canonical port (9199 is the v15+ default but confirm) and is
+      `rules: "storage.rules"` the field name?
+      (3) Required compound indexes — read c6 + c9 + c16 outline interfaces
+      and design discussion to enumerate query shapes:
+        - `designs` filtered by `userId` ordered by `createdAt desc` (library)
+        - `generations` filtered by `designId` ordered by `createdAt desc`
+          (latest-generation lookup)
+        - `references` filtered by `userId` ordered by `createdAt desc`
+          (reference picker)
+      Confirm whether each is a single-field (auto-indexed) or compound
+      (requires `firestore.indexes.json` entry). Single-field equality +
+      single-field orderBy = compound; equality on `userId` + orderBy on
+      `createdAt` IS compound.
+
+      Read existing `tests/rules/profiles.rules.test.ts` for the testing
+      idiom this story extends. Read existing `firestore.rules` for the
+      default-deny pattern this story honors.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing rules tests BEFORE writing the rules. TDD red phase.
+
+      Pattern (mirrored from `tests/rules/profiles.rules.test.ts`):
+      ```ts
+      const ALICE_UID = 'alice-uid';
+      const BOB_UID = 'bob-uid';
+      const aliceCtx = testEnv.authenticatedContext(ALICE_UID);
+      const bobCtx = testEnv.authenticatedContext(BOB_UID);
+      const unauthCtx = testEnv.unauthenticatedContext();
+      ```
+
+      - tests/rules/references.rules.test.ts — cover the 4 quadrants:
+        (1) alice writes `references/r1` with `userId: 'alice-uid'` → succeeds
+        (2) alice writes `references/r1` with `userId: 'bob-uid'` → fails
+            (cross-user UID injection)
+        (3) bob reads `references/r1` (alice-owned) → fails
+        (4) unauth reads `references/r1` → fails
+        (5) alice updates `references/r1` to change `userId` → fails
+            (immutability of owner field)
+
+      - tests/rules/designs.rules.test.ts — same 4 quadrants for `designs`.
+        Additional:
+        (6) alice writes `designs/d1` with `secondaryReferenceIds: [...]`
+            of length 0 / 1 / many → succeeds
+        (7) alice writes `designs/d1` referencing `primaryReferenceId: 'r1'`
+            (alice-owned reference) → rules ALLOW (rules don't validate
+            the cross-doc reference; ingest layer in c8/c9 does that)
+
+      - tests/rules/generations.rules.test.ts — same 4 quadrants for
+        `generations`. Additional:
+        (8) alice writes `generations/g1` with `userId: 'alice-uid'`,
+            `designId: 'd1'`, `status: 'pending'` → succeeds
+        (9) alice transitions `status: 'pending' → 'success'` → succeeds
+        (10) bob attempts to read alice's generation → fails
+        (11) Stretch: validate `errorCode` non-null when `status: 'failure'`
+             via rules — research-time confirmed (skip if rules-validation
+             of conditional fields is not idiomatic; let converter validate)
+
+      - tests/rules/storage-references.rules.test.ts — Storage rules:
+        (12) alice writes `users/alice-uid/references/r1.jpg` → succeeds
+        (13) alice writes `users/bob-uid/references/r1.jpg` → fails
+        (14) bob reads `users/alice-uid/references/r1.jpg` → fails
+        (15) unauth reads `users/alice-uid/references/r1.jpg` → fails
+
+      - tests/rules/storage-generations.rules.test.ts — same 4 quadrants
+        for `users/{uid}/generations/g1.png`.
+
+      - tests/rules/default-deny.rules.test.ts —
+        (16) alice writes `chat_turns/c1` → fails (undeclared collection)
+        (17) alice writes `random_collection/x` → fails
+
+      DO NOT write tests against real Firebase. All tests use
+      `@firebase/rules-unit-testing` against the emulator (started by the
+      `firebase emulators:exec` wrapper around vitest).
+
+      DO NOT write tests for `lib/firebase/storage.ts` behavior — that's
+      c5's story. Storage rules tests use `@firebase/rules-unit-testing`'s
+      storage SDK directly, not our helper.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass.
+
+      1. Extend `firestore.rules` — preserve existing `profiles/{uid}` rule
+         and the catchall `if false`:
+         ```
+         rules_version = '2';
+         service cloud.firestore {
+           match /databases/{database}/documents {
+             // Existing — unchanged
+             match /profiles/{uid} {
+               allow read, write: if request.auth != null && request.auth.uid == uid;
+             }
+
+             // Epic C — references collection
+             match /references/{refId} {
+               allow read: if request.auth != null
+                 && resource.data.userId == request.auth.uid;
+               allow create: if request.auth != null
+                 && request.resource.data.userId == request.auth.uid;
+               allow update: if request.auth != null
+                 && resource.data.userId == request.auth.uid
+                 && request.resource.data.userId == resource.data.userId;
+               allow delete: if request.auth != null
+                 && resource.data.userId == request.auth.uid;
+             }
+
+             // Epic C — designs collection
+             match /designs/{designId} {
+               // (mirror references)
+             }
+
+             // Epic C — generations collection
+             match /generations/{generationId} {
+               // (mirror references; userId is denormalized per c3 design_decision)
+             }
+
+             // Catchall default-deny — UNCHANGED from baseline
+             match /{document=**} {
+               allow read, write: if false;
+             }
+           }
+         }
+         ```
+
+      2. Create `storage.rules` from scratch:
+         ```
+         rules_version = '2';
+         service firebase.storage {
+           match /b/{bucket}/o {
+             match /users/{uid}/{path=**} {
+               allow read, write: if request.auth != null
+                 && request.auth.uid == uid;
+             }
+             match /{allPaths=**} {
+               allow read, write: if false;
+             }
+           }
+         }
+         ```
+
+      3. Update `firebase.json` — add `storage` block to `emulators` and
+         top-level `storage` block declaring rules file:
+         ```
+         {
+           "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+           "storage": { "rules": "storage.rules" },
+           "emulators": {
+             "firestore": { "port": 8080 },
+             "auth": { "port": 9099 },
+             "storage": { "port": 9199 }
+           }
+         }
+         ```
+
+      4. Update `firestore.indexes.json` (file likely empty `{ "indexes": [], "fieldOverrides": [] }`).
+         Add compound indexes confirmed by research step:
+         ```json
+         {
+           "indexes": [
+             { "collectionGroup": "designs",
+               "queryScope": "COLLECTION",
+               "fields": [
+                 { "fieldPath": "userId", "order": "ASCENDING" },
+                 { "fieldPath": "createdAt", "order": "DESCENDING" }
+               ] },
+             { "collectionGroup": "generations",
+               "queryScope": "COLLECTION",
+               "fields": [
+                 { "fieldPath": "designId", "order": "ASCENDING" },
+                 { "fieldPath": "createdAt", "order": "DESCENDING" }
+               ] },
+             { "collectionGroup": "references",
+               "queryScope": "COLLECTION",
+               "fields": [
+                 { "fieldPath": "userId", "order": "ASCENDING" },
+                 { "fieldPath": "createdAt", "order": "DESCENDING" }
+               ] }
+           ],
+           "fieldOverrides": []
+         }
+         ```
+
+      5. Update `vitest.config.rules.ts` if research step confirms storage
+         rules need a separate path/config. Default assumption: same lane,
+         no config change — `tests/rules/**/*.test.ts` already covers the
+         new files.
+
+      6. Update `package.json` `test:rules` script if research step
+         confirms storage emulator needs to be added to the
+         `firebase emulators:exec --only` flag:
+         ```
+         "test:rules": "firebase emulators:exec --only firestore,auth,storage 'vitest run --config vitest.config.rules.ts'"
+         ```
+
+      DO NOT: write `lib/firebase/storage.ts` (c5's job). DO NOT: write any
+      ingest, design-create, or generation-lifecycle code. DO NOT: invoke
+      rules from production code paths in this story.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the rules + emulator wiring are consistent and the
+      default-deny posture is preserved.
+
+      - `firestore.rules` retains the existing `profiles/{uid}` rule
+        verbatim and the catchall `if false`. Three new collection blocks
+        are declared. Reviewer manually confirms by diff.
+      - `storage.rules` exists; default-deny catchall present.
+      - `firebase.json` declares `storage` emulator block + `storage.rules`
+        registration. `firestore` block unchanged.
+      - `firestore.indexes.json` has compound indexes for the three queries
+        confirmed by research.
+      - `pnpm test:rules` passes — covers profiles (existing) + references
+        + designs + generations + storage-references + storage-generations
+        + default-deny.
+      - Rules-test profileexisting (tests/rules/profiles.rules.test.ts) still passes.
+      - All cross-user, unauth, undeclared-path deny tests assert via
+        `assertFails(...)`, not `expect(...).toThrow()`.
+      - Owner-immutability tests (alice cannot change `userId` on her own
+        doc) pass.
+      - `package.json` `test:rules` script includes storage emulator if
+        required by research findings.
+      - No production code (`app/**`, `lib/**`) was modified by this story.
+        `git diff` covers only `firestore.rules`, `firestore.indexes.json`,
+        `storage.rules` (new), `firebase.json`, `tests/rules/*.test.ts`,
+        possibly `vitest.config.rules.ts`, possibly `package.json`.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c4-firestore-storage-rules`.
+      Commit: `feat(c4): firestore.rules + storage.rules + indexes + storage emulator wiring`.
+      Pre-commit: run `pnpm test:rules` — must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Firebase Security Rules v2 (Firestore + Storage)'
+    runtime: 'Firebase emulators (firestore, auth, storage); @firebase/rules-unit-testing v5'
+    testing: 'vitest run --config vitest.config.rules.ts wrapped in `firebase emulators:exec`'
+  key_files:
+    - path: firestore.rules
+      purpose: 'Existing — extended additively; profiles + catchall preserved'
+    - path: storage.rules
+      purpose: 'CREATE; greenfield in repo'
+    - path: firebase.json
+      purpose: 'Existing — extended with storage emulator block + storage rules registration'
+    - path: firestore.indexes.json
+      purpose: 'Existing (likely empty); extended with 3 compound indexes for c6/c9/c16 queries'
+    - path: tests/rules/profiles.rules.test.ts
+      purpose: 'Existing — testing idiom this story mirrors for the new collections'
+    - path: vitest.config.rules.ts
+      purpose: 'Existing — node lane for rules tests; may extend if storage rules need separate config'
+    - path: lib/types.ts
+      purpose: 'Consumed — c3 locked the field names the rules reference (userId, designId)'
+
+files_to_modify:
+  - file: firestore.rules
+    change: 'Extend with references, designs, generations collection rules; preserve profiles + catchall'
+  - file: storage.rules
+    change: 'CREATE; user-owner path-derived rules + default-deny catchall'
+  - file: firebase.json
+    change: 'Add storage emulator block + top-level storage rules registration'
+  - file: firestore.indexes.json
+    change: 'Add 3 compound indexes (designs by userId+createdAt, generations by designId+createdAt, references by userId+createdAt)'
+  - file: tests/rules/references.rules.test.ts
+    change: 'CREATE in test-spec — owner allow / non-owner deny / unauth deny / cross-user mismatch deny / immutability'
+  - file: tests/rules/designs.rules.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/rules/generations.rules.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/rules/storage-references.rules.test.ts
+    change: 'CREATE in test-spec — Storage rules quadrants'
+  - file: tests/rules/storage-generations.rules.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/rules/default-deny.rules.test.ts
+    change: 'CREATE in test-spec — catchall behavior on undeclared paths'
+  - file: package.json
+    change: 'Update `test:rules` script to include storage emulator if research confirms required'
+  - file: vitest.config.rules.ts
+    change: 'NO change unless research confirms storage rules need a separate config (default: no change)'
+
+design_decisions:
+  - decision: 'Owner check uses `resource.data.userId == request.auth.uid` (NOT path-derived `match /references/{userId}/{refId}`)'
+    rationale: 'Outline names `references/{refId}` (flat collection), not `users/{uid}/references/{refId}` (nested). Matches structured-outline Slice 3 Changes #1. Document-field-derived owner is the standard Firebase pattern when collections are flat.'
+  - decision: 'Storage paths ARE path-derived: `users/{uid}/references/{refId}.{ext}` and `users/{uid}/generations/{genId}.{ext}`'
+    rationale: 'Storage objects are not documents with field data — only the path provides ownership context. Path-derived rules are the only option. This is also why c5 helper exposes `referencePath(uid, refId)` and `generationPath(uid, genId)` — call sites cannot hand-roll paths.'
+  - decision: "Owner field on `userId` is IMMUTABLE — alice cannot change her own doc's `userId` to bob"
+    rationale: 'Without immutability, alice could chmod her data to bob (or vice versa) by an authorized write. Cheap rule (`request.resource.data.userId == resource.data.userId` on update) closes the gap.'
+  - decision: 'Rules do NOT validate cross-document references (e.g., `designs/d1` referencing alice-owned `references/r1`)'
+    rationale: 'Cross-doc validation requires `get()` calls in rules — expensive (each get() counts against quota; latency penalty). Validation belongs at ingest (c8/c9), not in rules. Rules enforce ownership of the row being written; ingest enforces cross-doc consistency.'
+  - decision: 'Compound indexes ship in c4, NOT lazily on-demand from Firebase console'
+    rationale: 'The console-prompted index creation flow is fine for prototyping but creates implicit production deps. Declarative indexes in the repo make production-vs-emulator parity guaranteed. Migration plan in structured-outline Part 3b explicitly names this.'
+  - decision: 'Storage emulator port 9199 (not 9099, not 9000)'
+    rationale: 'Firebase CLI v15+ default; matches firebase-tools 15.15.0 in package.json. 9099 is auth (already taken).'
+  - decision: 'Single rules-test lane (no separate `vitest.config.rules.storage.ts`)'
+    rationale: '@firebase/rules-unit-testing v5 supports both surfaces in one initializeTestEnvironment call (research step confirms). One lane, one emulator wrap, one CI run. Defer separation if a future epic finds a real reason.'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'This story IS the security audit — every new path has a passing allow + deny test. Default-deny posture preserved by leaving the existing catchall `if false` untouched. Future epics that add collections must follow this pattern (TDD: write deny tests first, then allow tests, then rules).'
+
+risks:
+  - severity: high
+    description: 'Storage rules permit too much (e.g., wildcard write to `users/{uid}/{path=**}` accidentally allows any object name including `../etc/passwd`-style traversal)'
+    mitigation: 'Tests cover cross-user UID mismatch, unauth, and authenticated-but-different-uid. Storage path traversal is not actually possible — Firebase Storage paths are URL-safe strings, not filesystem paths. Risk is theoretical but reviewer step grep-checks for any `{path=**}` allow without a uid prefix guard.'
+  - severity: high
+    description: 'Compound index missing in firestore.indexes.json — production query fails at runtime with "missing index" error after deploy'
+    mitigation: "Research step enumerates all known query shapes from c6/c9/c16. Rules tests don't catch missing indexes (emulator is forgiving), but `pnpm dev` against the deployed Firestore will surface the error early in c9/c16 development. Belt-and-suspenders: add a smoke test in c18 that exercises the library query."
+  - severity: medium
+    description: "firebase emulators:exec --only flag does not support storage in the project's firebase-tools 15.15.0 version"
+    mitigation: 'Research step confirms via firebase-tools docs. If unsupported, `firebase emulators:exec` (without --only) starts all configured emulators; minor performance cost in test:rules but functionally equivalent.'
+  - severity: medium
+    description: 'Owner-field immutability rule (`request.resource.data.userId == resource.data.userId`) breaks legitimate writes if a Firestore SDK call accidentally omits userId from the update payload'
+    mitigation: 'Test (5) covers this. SDKs use merge: false by default for set(), but partial updates (update()) preserve fields not in the payload — Firestore evaluates the rule against the MERGED resulting state, not the partial payload. Unit tests use both set() and update() patterns.'
+  - severity: low
+    description: 'Generation row "errorCode non-null when status === failure" not enforced by rules; converter only enforces it on read, not write'
+    mitigation: 'Rules-side conditional-field validation is awkward (`request.resource.data.status == "failure" ? request.resource.data.errorCode != null : true`). Converter validates on read; lifecycle code in c15 enforces on write. Two-layer defense good enough for v1.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #1: firestore.rules and firestore.indexes.json —
+      extend collection and index coverage for `references` and ordered
+      secondary references.
+      Slice 4 Changes #1: firestore.rules and firestore.indexes.json —
+      activate the `generations` collection contract and any lookup/index
+      support for `designs.latest_generation_id`.
+      Part 3b Migration Plan: Use firestore.rules and firestore.indexes.json
+      plus Firestore converters as the schema gate. Add schema support in
+      slice order. Keep schema changes additive where possible.
+  - path: firestore.rules
+    relevant_excerpt: |
+      // Convention: Firestore Security Rules are additive (OR). Default
+      // is deny; the explicit `if false` below is defensive — it ensures
+      // any accidental permissive rule in a later epic must OPT IN
+      // rather than inherit a silent allow.
+  - path: tests/rules/profiles.rules.test.ts
+    relevant_excerpt: |
+      Existing rules-test idiom — uses initializeTestEnvironment with
+      projectId + firestore { rules, host, port }; reads emulator host
+      from FIRESTORE_EMULATOR_HOST env var; clears state in beforeEach.
+      Mirror this exact pattern for the 3 new collections + storage tests.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      Risk Inventory (Medium): Firebase Cloud Storage is greenfield in
+      this repo: no existing helper, no `storage.rules`, and no storage
+      emulator wiring. Mitigation: treat Firebase Cloud Storage helpers,
+      rules, and emulator support as explicit Epic C surfaces in the
+      manifest and tests.
+  - path: firebase.json
+    relevant_excerpt: |
+      Existing emulators block declares only firestore (8080) + auth
+      (9099). storage emulator must be added with a port (default 9199).
+
+ui_indicators: 'NO new UI surface — security rules + emulator config only; no wireframes; no ui-design step required'

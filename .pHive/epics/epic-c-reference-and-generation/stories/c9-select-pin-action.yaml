@@ -1,0 +1,279 @@
+id: c9-select-pin-action
+epic: epic-c-reference-and-generation
+title: 'selectPinterestPin server action — thin wrapper around ingestPinterestPin with session uid + discriminated envelope'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: [c6-pinterest-ingest, c8-reference-set-builder]
+
+escalations_addressed:
+  - trigger: api:surface-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      LOCKED as server action (NOT route handler). Per epic.yaml
+      api:surface-boundary escalation: server actions are the canonical
+      mutation surface for Epic C; route handlers are reserved for
+      multipart (c7 only) and existing /api/auth/session, /api/health.
+      This story commits the server-action choice for the Pinterest pin
+      ingest flow.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Action returns the c6-defined IngestPinterestPinResult discriminated
+      envelope verbatim. No reshaping at the action boundary. UI in c11
+      pattern-matches on `result.ok` and `result.reason` directly.
+
+description: |
+  Thin server action wrapper around `ingestPinterestPin` from c6. The
+  action's only jobs:
+
+  1. Read session uid from `lib/firebase/session.ts` (`getSession()`).
+  2. Reject if no session (return `{ ok: false; reason: 'unauthorized' }`).
+  3. Validate `pinId` is a non-empty string (defensive; UI should not
+     send empty but be loud about it).
+  4. Call `ingestPinterestPin({ userId: session.uid, pinId })`.
+  5. Return the result envelope verbatim.
+
+  No additional business logic. No retry. No cross-validation against
+  existing references (idempotency is c11's UX problem if it matters).
+
+  This is the smallest story in batch 2. The substantive work is c6 (the
+  ingest function) and c11 (the UI that calls this action). c9 exists as
+  a discrete story so the action surface is reviewed independently of
+  the ingest function — defense in depth on auth context.
+
+acceptance_criteria:
+  - 'Given an authenticated session for `alice` and `selectPinterestPin("p1")` is called from a client component, when the action runs, then it calls `ingestPinterestPin({ userId: "alice-uid", pinId: "p1" })` and returns the result envelope.'
+  - 'Given no authenticated session, when `selectPinterestPin("p1")` is called, then it returns `{ ok: false; reason: "unauthorized"; message }` without invoking `ingestPinterestPin`.'
+  - 'Given an empty `pinId`, when the action validates, then it returns `{ ok: false; reason: "invalid_input"; message }` without invoking `ingestPinterestPin`.'
+  - 'Given the action is exported from a file with the `"use server"` directive, when Next.js compiles, then the action is callable from client components via the server actions binding mechanism.'
+  - 'Given `ingestPinterestPin` returns `{ ok: true; reference }`, when the action propagates, then the returned envelope shape is `{ ok: true; reference }` — no field renaming or stripping.'
+  - 'Given `ingestPinterestPin` returns `{ ok: false; reason: "rate_limit"; message }`, when the action propagates, then the returned envelope is `{ ok: false; reason: "rate_limit"; message }` — c11 UI distinguishes rate_limit from other reasons.'
+  - 'Given the action file is grepped for SDK imports, when inspected, then it does NOT import `firebase-admin/*` or `lib/firebase/server` directly — all I/O goes through `lib/references/ingest`.'
+
+steps:
+  - id: research
+    description: |
+      Max 1 focused question:
+      (1) Server action file placement — the existing pattern is
+      `app/(authenticated)/pinterest/actions.ts` (loadMoreBoards,
+      loadMorePins). Should `selectPinterestPin` live in the same file or
+      in a NEW `app/(authenticated)/design/new/actions.ts`?
+
+      Recommendation: NEW file at `app/(authenticated)/design/actions.ts`
+      (note: not `design/new/actions.ts` — the action surface for design
+      flows lives at the parent route group so c10 createDesign can land
+      in the same file). The Pinterest browse actions stay in their
+      existing file. Confirm during research.
+
+      Read `app/(authenticated)/pinterest/actions.ts` for the existing
+      pattern (it throws raw Error on failure; this story uses the
+      discriminated envelope per c6 pattern, NOT throw).
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Action layer = thin =
+      tests focus on the auth + propagation contract.
+
+      - tests/unit/actions/select-pinterest-pin.test.ts —
+        (1) Mock `getSession()` to return `{ uid: "alice-uid", email: ... }`
+        (2) Mock `ingestPinterestPin` to return `{ ok: true; reference }`
+        (3) Call `selectPinterestPin("p1")`
+        (4) Assert `ingestPinterestPin` was called with `{ userId:
+            "alice-uid", pinId: "p1" }` (NOT a request-body uid)
+        (5) Assert returned envelope is `{ ok: true; reference }`
+            (verbatim propagation)
+
+      - tests/unit/actions/select-pinterest-pin-auth-context.test.ts —
+        (6) Mock `getSession()` to return null → `{ ok: false; reason:
+            "unauthorized" }`, `ingestPinterestPin` NOT called
+        (7) Mock `getSession()` to return `{ uid: "" }` (empty uid) →
+            `unauthorized`, `ingestPinterestPin` NOT called
+        (8) Empty pinId `""` → `{ ok: false; reason: "invalid_input" }`,
+            `ingestPinterestPin` NOT called
+        (9) Whitespace-only pinId `"   "` → `invalid_input`
+
+      - tests/unit/actions/select-pinterest-pin-propagation.test.ts —
+        (10) Each error reason from ingest (`invalid_token`,
+             `insufficient_scope`, `not_found`, `rate_limit`, `network`,
+             `no_image_variant`, `unsupported_media_type`,
+             `image_fetch_failed`, `storage_failure`,
+             `firestore_failure`) propagates verbatim — no reshaping
+        (11) `ingestPinterestPin` happy-path response propagates verbatim
+
+      Tests use vitest's `vi.mock` for the dependencies. No MSW. No
+      emulator (action layer is testable in isolation).
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Single small file.
+
+      ```ts
+      // app/(authenticated)/design/actions.ts
+      'use server';
+
+      import { getSession } from '@/lib/firebase/session';
+      import {
+        ingestPinterestPin,
+        type IngestPinterestPinResult,
+      } from '@/lib/references/ingest';
+
+      export type SelectPinterestPinResult =
+        | IngestPinterestPinResult
+        | { ok: false; reason: 'unauthorized' | 'invalid_input';
+            message: string };
+
+      export async function selectPinterestPin(
+        pinId: string,
+      ): Promise<SelectPinterestPinResult> {
+        const session = await getSession();
+        if (!session?.uid) {
+          return { ok: false, reason: 'unauthorized',
+                   message: 'sign in required' };
+        }
+
+        const trimmed = (pinId ?? '').trim();
+        if (!trimmed) {
+          return { ok: false, reason: 'invalid_input',
+                   message: 'pinId is required' };
+        }
+
+        return ingestPinterestPin({
+          userId: session.uid,
+          pinId: trimmed,
+        });
+      }
+      ```
+
+      DO NOT: import firebase-admin directly (all I/O goes through
+      `lib/references/ingest`). DO NOT: add retry logic (caller decides).
+      DO NOT: add idempotency check (UX problem, not action problem).
+      DO NOT: add rate limiting (defer to a future epic if real abuse
+      emerges).
+
+      If c10 implements `createDesign` in the same file, leave a comment
+      placeholder for it. c10 owns that delivery.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the action is thin and the auth contract is correct.
+
+      - File starts with `'use server'` directive on its own line.
+      - Action reads uid from session ONLY — no `userId` parameter.
+      - Empty / whitespace-only pinId rejected as `invalid_input`.
+      - Empty session uid rejected as `unauthorized`.
+      - `ingestPinterestPin` result is propagated verbatim — no
+        renaming or stripping. Test (10) covers every reason.
+      - Action file does NOT import firebase-admin directly. Reviewer
+        grep.
+      - Result type union includes the action-level reasons
+        (`unauthorized`, `invalid_input`) PLUS all `IngestPinterestPinResult`
+        reasons.
+      - All vitest tests pass.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c9-select-pin-action`.
+      Commit: `feat(c9): selectPinterestPin server action wrapping ingest`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 server action (`use server` directive)'
+    runtime: 'Node 20+ (server actions run in Node runtime)'
+    testing: 'Vitest unit lane only — vi.mock for getSession + ingestPinterestPin'
+  key_files:
+    - path: app/(authenticated)/design/actions.ts
+      purpose: 'CREATE; selectPinterestPin lives here; c10 createDesign lands in same file'
+    - path: app/(authenticated)/pinterest/actions.ts
+      purpose: 'Existing — pattern reference for server action shape (browse-only, throws on error; this story uses envelope instead)'
+    - path: app/(auth)/login/actions.ts
+      purpose: 'Pattern reference — discriminated envelope return shape (loginAction uses useFormState style; this story uses simpler envelope since no form state)'
+    - path: lib/references/ingest.ts
+      purpose: 'Consumed (c6) — ingestPinterestPin + IngestPinterestPinResult'
+    - path: lib/firebase/session.ts
+      purpose: 'Consumed — getSession() reads session uid from cookies'
+
+files_to_modify:
+  - file: app/(authenticated)/design/actions.ts
+    change: 'CREATE; selectPinterestPin server action'
+  - file: tests/unit/actions/select-pinterest-pin.test.ts
+    change: 'CREATE in test-spec — happy path'
+  - file: tests/unit/actions/select-pinterest-pin-auth-context.test.ts
+    change: 'CREATE in test-spec — session validation'
+  - file: tests/unit/actions/select-pinterest-pin-propagation.test.ts
+    change: 'CREATE in test-spec — verbatim propagation of all error reasons'
+
+design_decisions:
+  - decision: 'Server action (NOT route handler) per epic.yaml api:surface-boundary lock'
+    rationale: 'Pinterest pin ingest is a JSON-only mutation; server action is the idiomatic Next.js path with cleaner client integration (`startTransition` + `useFormState`). Route handler reserved for c7 multipart only.'
+  - decision: 'Action file at `app/(authenticated)/design/actions.ts` (NOT `design/new/actions.ts`)'
+    rationale: 'c10 createDesign also lives in this file. Co-locating design-flow actions at the parent route group lets future design-flow actions (c16 generateDesign?) extend the same file. Alternative is per-route-segment files, but the existing repo pattern (`app/(authenticated)/pinterest/actions.ts`) co-locates by feature, not by route.'
+  - decision: 'Discriminated envelope return — NO thrown errors'
+    rationale: 'Existing `pinterest/actions.ts` throws raw `Error` on failure (browse-only, simpler UX). Epic C ingest needs richer error UI (token-invalid vs rate-limit vs no-image-variant), so envelope is mandatory. Aligns with c6/c7/c8/loginAction patterns.'
+  - decision: 'No retry inside the action'
+    rationale: 'FR-C-7 (one silent retry) applies to GENERATION, not reference ingest. c14/c16 own that behavior. Pin ingest failures are explicit user-facing — UI in c11 lets the user retry the click. Adding silent retry here would hide rate-limit signals.'
+  - decision: 'No idempotency / dedup against existing references'
+    rationale: 'A user can validly want two reference docs from the same Pinterest pin (e.g., as inspiration for two different designs). Dedup at action layer prevents that. UX may surface "you already have this pinned" in a future epic; out of v1 scope.'
+  - decision: 'Defensive `pinId` validation at action layer (not just UI)'
+    rationale: 'Server actions are callable by any code with the session cookie + binding ID; defense-in-depth means revalidating inputs at the action even when the UI guarantees them.'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'session uid is the ONLY source of `userId` for the ingest call. Per c4 firestore.rules + storage.rules, any UID drift would deny at the rules layer. Action is the third defense (UI, action, rules).'
+  - concern: 'error-handling'
+    notes: 'Verbatim propagation of `IngestPinterestPinResult` reasons. UI in c11 maps each reason to specific copy. Test (10) ensures no reason gets silently dropped or coerced.'
+
+risks:
+  - severity: low
+    description: 'A future story adds a new reason to `IngestPinterestPinResult` and forgets to update c11 UI mapping → falls through to a generic error message'
+    mitigation: 'c11 UI uses TypeScript exhaustiveness check (`switch` with `default: never`) on the reason union. Adding a reason without updating UI = compile error in c11.'
+  - severity: low
+    description: 'Server action binding leak — the action ID exposed to the client could be invoked with a forged binding'
+    mitigation: "Next.js generates server-action binding IDs that include a hash; cross-origin binding invocation requires the user's session cookie. The action verifies session uid; without auth, returns `unauthorized`. Acceptable residual."
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #10 (line 239): app/api/references/pinterest/select/route.ts
+      — persist selected Pinterest pins into durable reference records if
+      the UI does not post directly through a server action.
+      [Note: planning lists BOTH route + action; epic.yaml api:surface-boundary
+      lock chose action.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > Server Actions: selectPinterestPin(pinId) is the
+      PRD-named mutation surface for selected-pin ingestion into the
+      normalized references model.
+      Open Question §10: PRD-named mutation surfaces (selectPinterestPin,
+      uploadReference, createDesign, generateDesign) — server actions
+      primarily, route handlers, or both? [Locked: server actions only,
+      with c7 multipart route as documented exception.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: For mutation transport, my opinion: server
+      actions are primary, route handlers are unused. The codebase already
+      establishes that pattern (loginAction, loadMoreBoards); the
+      outline's REST routes appear to be vestigial from an earlier draft.
+  - path: app/(authenticated)/pinterest/actions.ts
+    relevant_excerpt: |
+      Existing browse actions pattern — exports loadMoreBoards,
+      loadMorePins. THROWS raw Error on failure. This story does NOT
+      mirror the throw pattern; uses discriminated envelope instead.
+  - path: app/(auth)/login/actions.ts
+    relevant_excerpt: |
+      Existing loginAction — discriminated state envelope ({ status: ...
+      }). Closest pattern to the envelope this story uses. catch block
+      logs `[loginAction] sendSignInLinkToEmail failed` with code+message;
+      this story enforces same pattern in c6 (the ingest layer below).
+
+ui_indicators: 'NO new UI surface — server action only; no wireframes; no ui-design step required'

@@ -1,0 +1,445 @@
+id: c13-ai-env-provider-boundary
+epic: epic-c-reference-and-generation
+title: 'AI credentials env schema + lib/ai/provider.ts boundary scaffold (interface only; provider call site isolated from Firestore + Storage)'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: [c1-gemini-spike-sdk-decision]
+
+escalations_addressed:
+  - trigger: external-integration:provider-boundary
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      lib/ai/provider.ts exports ONE interface — `generateImage(req):
+      Promise<ProviderResult>` — and a single implementation that calls
+      the SDK locked by c1. The provider module is FORBIDDEN from
+      importing firebase-admin, lib/firebase/*, lib/firestore/*. Reviewer
+      grep enforces. If c1 NO-GO and a swap to FLUX.1-kontext or
+      gpt-image-1 happens, only this file's implementation changes — the
+      contract stays.
+  - trigger: provider-boundary
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Story READS c1's spike artifact at .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md
+      to determine the env name AND the SDK to install. If c1 verdict is
+      NO-GO, this story BLOCKS until provider swap is decided. If c1
+      verdict is GO with `@google/generative-ai`, env name is
+      `GOOGLE_GENERATIVE_AI_API_KEY` (architect preference); if firebase/ai,
+      Firebase config already covers; if Vertex AI, ADC config required.
+
+description: |
+  First half of Slice 4 plumbing. Two tight deliverables:
+
+  1. **Env schema extension** in `lib/env.ts`: add the AI credential env
+     var named per c1 spike output. Likely `GOOGLE_GENERATIVE_AI_API_KEY`
+     (architect preference for `@google/generative-ai`); if c1 picks
+     `firebase/ai`, no new env required (uses existing Firebase config);
+     if Vertex AI, ADC handled via service account JSON. Story-time
+     decision based on c1 artifact read at research step.
+
+  2. **Provider boundary scaffold** at `lib/ai/provider.ts`:
+     interface-only delivery. Exports `ProviderRequest` shape (with
+     image-bytes / prompt / nail-shape inputs), `ProviderResult`
+     discriminated envelope, and a single `generateImage(req):
+     Promise<ProviderResult>` function that wraps the SDK call. NO
+     retry, NO request building, NO persistence. Just: serialize the
+     ProviderRequest into the SDK's expected shape, call, normalize the
+     response into `ProviderResult`.
+
+  The provider boundary is the load-bearing seam. design-discussion
+  §My Proposed Approach: "Treat the provider boundary as the load-bearing
+  seam. Everything upstream of lib/ai/generate.ts should be
+  provider-agnostic. buildGeminiRequest is the only function that knows
+  about Gemini's specific multimodal shape." c13 ships `lib/ai/provider.ts`
+  (the SDK-specific call site); c14 ships `lib/ai/generate.ts` (the
+  request builder + retry policy that wraps the provider).
+
+  Out of scope: retry logic (c14 owns), request building from References
+  + prompt + shape (c14), Firestore writes (c15), HTTP surface (c16),
+  UI (c17). c13 is a 100-line module + an env var.
+
+acceptance_criteria:
+  - 'Given c1 spike GO verdict with `@google/generative-ai` SDK lock, when this story reads `.pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md` at research step, then it confirms env name `GOOGLE_GENERATIVE_AI_API_KEY` and installs `@google/generative-ai` as a dep.'
+  - 'Given c1 spike GO verdict with a different SDK (firebase/ai or Vertex AI), when research step reads the artifact, then this story uses the locked env name and SDK; no parallel install of unused SDKs.'
+  - 'Given c1 spike NO-GO verdict, when research step reads the artifact, then this story BLOCKS and SendMessage is sent to team-lead before test-spec runs.'
+  - 'Given the env name is locked, when `lib/env.ts` is updated, then the new env var is in the zod schema with `requiredString` validation, the `Env` interface is extended, and `.env.example` has an empty entry. Existing env vars unchanged.'
+  - 'Given `lib/ai/provider.ts` is imported, when its exports are listed, then `ProviderRequest` type, `ProviderResult` discriminated envelope, and `generateImage(req): Promise<ProviderResult>` async function are exported.'
+  - 'Given `ProviderResult`, when its shape is inspected, then it is `{ ok: true; imageBytes: Buffer; mimeType: string; metadata: unknown } | { ok: false; reason: "refusal" | "rate_limit" | "network" | "low_quality" | "unknown"; message: string }`.'
+  - 'Given grep across `lib/ai/provider.ts`, when searching for forbidden imports, then NO matches for `firebase-admin`, `firebase-admin/firestore`, `firebase-admin/storage`, `@/lib/firebase/`, `@/lib/firestore/`. Provider module is pure SDK ↔ ProviderResult translation.'
+  - "Given `lib/ai/provider.ts` imports `'server-only'` at top, when accidentally bundled into a client component, then build fails loudly."
+  - 'Given the SDK call throws or returns an error response, when `generateImage` catches, then it logs `console.error("[provider] generateImage failed", { code, message, model })` per memory `feedback_silent_catches_cost_time` AND returns `{ ok: false; reason; message }`. No thrown errors escape the function.'
+  - 'Given a unit test mocks the SDK module, when `generateImage` is called with a valid `ProviderRequest`, then it returns `{ ok: true; imageBytes; mimeType; metadata }` and the SDK is called with the expected serialized payload (one assertion per c1-locked SDK shape).'
+  - 'Given a unit test mocks the SDK to throw a transient error (network), when `generateImage` returns, then it returns `{ ok: false; reason: "network" }` (NOT retried — retry is c14''s job).'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) READ c1 spike artifact at `.pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md`.
+      Confirm: GO/NO-GO verdict, locked SDK, locked env name. If NO-GO,
+      STOP and SendMessage team-lead. If GO, proceed.
+      (2) Confirm SDK install + import shape — for `@google/generative-ai`
+      via context7: `import { GoogleGenerativeAI } from '@google/generative-ai'`
+      then `new GoogleGenerativeAI(apiKey).getGenerativeModel({ model:
+      'gemini-2.5-flash-image' }).generateContent(...)`. Confirm exact
+      method names + return shape (`response.candidates[0].content.parts`
+      array with `inlineData.data` base64).
+      (3) Error code mapping — what error.code or response.promptFeedback.
+      blockReason values map to which `reason` in our taxonomy
+      (`refusal | rate_limit | network | low_quality | unknown`)?
+      `RECITATION` / `SAFETY` blockReason → `refusal`. HTTP 429 →
+      `rate_limit`. Network/timeout → `network`. `OTHER` /
+      `BLOCKLIST` → `unknown`. `low_quality` is NOT a provider error —
+      it's a downstream classification (e.g., output too dark / blank);
+      provider just returns the bytes; c14 or c17 may classify further.
+
+      Read .pHive/planning/structured-outline.md:282 (Slice 4 Changes #2:
+      `lib/ai/generate.ts` — references this provider boundary).
+      Read memory `feedback_secret_rotation_no_releak` for env rotation.
+      Read memory `feedback_silent_catches_cost_time` for catch-block
+      logging.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Mock the SDK module
+      cleanly via vi.mock.
+
+      - tests/unit/ai/provider-happy-path.test.ts —
+        (1) Mock `@google/generative-ai` (or whichever SDK c1 locked) to
+            return a successful response with one base64 image part
+        (2) Call `generateImage({ images: [<img1>], promptText: "matte",
+            nailShape: "almond" })`
+        (3) Assert returned `{ ok: true; imageBytes: <Buffer>; mimeType:
+            "image/png" (or per response); metadata }`
+        (4) Assert SDK was called with the c1-locked payload shape (e.g.,
+            `contents: [{ role: 'user', parts: [...] }]`)
+
+      - tests/unit/ai/provider-error-paths.test.ts —
+        (5) SDK throws with `error.code === '429'` or rate-limit message
+            → `{ ok: false; reason: "rate_limit"; message }`
+        (6) SDK throws with network/timeout error → `network`
+        (7) SDK returns `response.promptFeedback.blockReason === "SAFETY"`
+            → `refusal`
+        (8) SDK returns `blockReason === "RECITATION"` → `refusal`
+        (9) SDK throws unexpected error → `unknown`
+        (10) Each catch logs `[provider] generateImage failed` with code+message+model
+
+      - tests/unit/ai/provider-purity.test.ts —
+        (11) Read `lib/ai/provider.ts` source; assert no occurrences of
+             `firebase-admin`, `lib/firebase/`, `lib/firestore/`,
+             `getStorage`, `getFirestore`. Reviewer manual grep is
+             authoritative; this test is best-effort guard.
+
+      - tests/unit/ai/env-schema.test.ts —
+        (12) Importing `lib/env.ts` with the new env var unset throws
+             `EnvValidationError` (existing pattern from Epic A)
+        (13) Importing with the env var set succeeds; `env.GOOGLE_GENERATIVE_AI_API_KEY`
+             (or locked name) is accessible
+
+      DO NOT write tests for retry behavior (c14). DO NOT write tests
+      for request assembly from Reference docs (c14).
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Two file deltas plus one dep install.
+
+      1. `pnpm add @google/generative-ai` (or the c1-locked SDK).
+
+      2. Extend `lib/env.ts` (additive only — preserve existing exports).
+         Mirror the existing zod pattern:
+         ```ts
+         const envSchema = z.object({
+           // ... existing entries ...
+           GOOGLE_GENERATIVE_AI_API_KEY: requiredString,
+           // (or whatever c1 locked; if firebase/ai, NO new entry needed)
+         });
+
+         export interface Env {
+           // ... existing fields ...
+           GOOGLE_GENERATIVE_AI_API_KEY: string;
+         }
+         ```
+         Update `.env.example` with empty entry: `GOOGLE_GENERATIVE_AI_API_KEY=`.
+
+      3. Create `lib/ai/provider.ts`:
+         ```ts
+         import ''server-only'';
+         import { env } from '@/lib/env';
+         import { GoogleGenerativeAI } from '@google/generative-ai';
+         // (or per c1 SDK lock)
+
+         export interface ProviderImageInput {
+           bytes: Buffer;
+           mimeType: 'image/jpeg' | 'image/png' | 'image/heic';
+           role: 'primary' | 'secondary';
+         }
+
+         export interface ProviderRequest {
+           images: ProviderImageInput[];
+           promptText: string | null;
+           nailShape: 'almond' | 'coffin' | 'square' | 'round' | 'oval';
+         }
+
+         export type ProviderResult =
+           | { ok: true;
+               imageBytes: Buffer;
+               mimeType: 'image/png' | 'image/jpeg';
+               metadata: unknown }
+           | { ok: false;
+               reason: 'refusal' | 'rate_limit' | 'network' | 'low_quality' | 'unknown';
+               message: string };
+
+         const MODEL_ID = 'gemini-2.5-flash-image';
+         // Per c1 spike lock; if pivot, only this constant + serializeRequest change
+
+         function serializeRequest(req: ProviderRequest): {
+           contents: Array<{ role: 'user'; parts: Array<unknown> }>;
+         } {
+           // Translates ProviderRequest into the SDK's expected payload shape
+           const parts: Array<unknown> = [];
+           for (const img of req.images) {
+             parts.push({
+               inlineData: {
+                 mimeType: img.mimeType,
+                 data: img.bytes.toString('base64'),
+               },
+             });
+           }
+           const textParts: string[] = [
+             `Nail shape: ${req.nailShape}.`,
+             req.promptText ? `Prompt: ${req.promptText}` : '',
+             'Generate a nail design that incorporates the visual cues from the reference images.',
+           ].filter(Boolean);
+           parts.push({ text: textParts.join(' ') });
+           return { contents: [{ role: 'user', parts }] };
+         }
+
+         function classifyBlockReason(blockReason: string | undefined): 'refusal' | 'unknown' {
+           if (!blockReason) return 'unknown';
+           if (blockReason === 'SAFETY' || blockReason === 'RECITATION') return 'refusal';
+           return 'unknown';
+         }
+
+         export async function generateImage(
+           req: ProviderRequest,
+         ): Promise<ProviderResult> {
+           try {
+             const client = new GoogleGenerativeAI(env.GOOGLE_GENERATIVE_AI_API_KEY);
+             const model = client.getGenerativeModel({ model: MODEL_ID });
+             const result = await model.generateContent(serializeRequest(req));
+             const response = result.response;
+
+             const blockReason = response.promptFeedback?.blockReason;
+             if (blockReason) {
+               return { ok: false,
+                 reason: classifyBlockReason(blockReason),
+                 message: `provider blocked: ${blockReason}` };
+             }
+
+             const part = response.candidates?.[0]?.content?.parts?.[0];
+             // Per c1 spike: response shape varies; defensive extraction
+             const inlineData = (part as { inlineData?: { data: string; mimeType: string } })?.inlineData;
+             if (!inlineData?.data) {
+               return { ok: false, reason: 'unknown',
+                        message: 'provider returned no image bytes' };
+             }
+             return {
+               ok: true,
+               imageBytes: Buffer.from(inlineData.data, 'base64'),
+               mimeType: (inlineData.mimeType ?? 'image/png') as 'image/png' | 'image/jpeg',
+               metadata: response,
+             };
+           } catch (err) {
+             const code = (err as { code?: string; status?: number }).code
+               ?? (err as { status?: number }).status?.toString()
+               ?? 'unknown';
+             const message = (err as Error).message ?? String(err);
+             console.error('[provider] generateImage failed',
+               { code, message, model: MODEL_ID });
+
+             // Map error code → reason
+             let reason: ProviderResult extends { ok: false; reason: infer R } ? R : never;
+             if (code === '429' || message.includes('rate limit')) reason = 'rate_limit';
+             else if (code === 'ECONNRESET' || code === 'ETIMEDOUT'
+                      || message.includes('network') || message.includes('timeout')) reason = 'network';
+             else reason = 'unknown';
+
+             return { ok: false, reason, message };
+           }
+         }
+         ```
+
+      DO NOT: import firebase-admin or anything from lib/firebase/ or
+      lib/firestore/. DO NOT: implement retry (c14). DO NOT: write
+      Firestore docs. DO NOT: build reference fetch logic (c14 reads
+      bytes from Storage and passes them in via ProviderRequest).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the boundary is tight and SDK-isolated.
+
+      - `lib/ai/provider.ts` imports `''server-only''` first.
+      - Reviewer grep across the file: NO firebase-admin, NO
+        `lib/firebase/`, NO `lib/firestore/`, NO `getStorage`, NO
+        `getFirestore`. Test (11) supports.
+      - SDK import is the c1-locked SDK exactly; no parallel SDKs.
+      - `generateImage` is the ONLY exported function (plus types). No
+        helper exports leak SDK shapes (e.g., `MODEL_ID` not exported).
+      - Catch block logs `[provider] generateImage failed` with
+        code+message+model per `feedback_silent_catches_cost_time`.
+      - Error reason mapping covers `rate_limit`, `network`, `unknown`.
+        Refusal (block reason) vs unknown is differentiated.
+      - `low_quality` is NOT returned from this layer (c14 or c17 may
+        classify further if needed; provider just returns bytes).
+      - `ProviderResult.ok: true` includes `imageBytes` (Buffer) + `mimeType`
+        + `metadata`. Caller (c14) does NOT need to know the provider
+        SDK to consume.
+      - `lib/env.ts` updated with the locked env var. `.env.example` has
+        the empty entry. Existing schema unchanged.
+      - `package.json` has the SDK dep pinned.
+      - All vitest tests pass.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c13-ai-env-provider-boundary`.
+      Commit: `feat(c13): AI env schema + provider boundary scaffold`.
+      Pre-commit: `pnpm test`, `pnpm typecheck`, `pnpm lint` must pass.
+      `GOOGLE_GENERATIVE_AI_API_KEY` value MUST NOT appear in commits
+      (rotation pattern from `feedback_secret_rotation_no_releak`).
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 server-only module (no UI; no route)'
+    runtime: 'Node 20+; SDK locked by c1 (likely @google/generative-ai)'
+    testing: 'Vitest unit lane only; vi.mock for SDK; no MSW (provider boundary is a function call, not HTTP)'
+  key_files:
+    - path: .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md
+      purpose: 'Consumed (c1) — GO/NO-GO verdict + SDK lock + env name; this story BLOCKS without it'
+    - path: lib/env.ts
+      purpose: 'EXTENDED — new AI env var added to schema'
+    - path: .env.example
+      purpose: 'EXTENDED — empty entry for new env var'
+    - path: lib/ai/provider.ts
+      purpose: 'CREATE; provider boundary scaffold'
+    - path: lib/firebase/server.ts
+      purpose: 'Pattern reference — Symbol.for hydration; this story does NOT mirror because provider has no app cache (single SDK call per request)'
+    - path: package.json
+      purpose: 'EXTENDED — SDK dep added'
+
+files_to_modify:
+  - file: lib/env.ts
+    change: 'Add new AI env var to zod schema + Env interface (name locked by c1 spike)'
+  - file: .env.example
+    change: 'Add empty entry for new env var'
+  - file: lib/ai/provider.ts
+    change: 'CREATE; ProviderRequest, ProviderResult, generateImage'
+  - file: package.json
+    change: 'Add SDK dep pinned to a specific version (per c1 spike artifact note)'
+  - file: pnpm-lock.yaml
+    change: 'Lockfile update from pnpm add'
+  - file: tests/unit/ai/provider-happy-path.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/provider-error-paths.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/provider-purity.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/env-schema.test.ts
+    change: 'CREATE in test-spec'
+
+design_decisions:
+  - decision: 'Provider module FORBIDDEN from importing firebase-admin / lib/firebase / lib/firestore'
+    rationale: 'external-integration:provider-boundary escalation. design-discussion §My Proposed Approach: lib/ai/generate.ts is the ONLY swap site if Gemini quality fails. Provider module is even tighter — it knows ONLY the SDK shape. This separation lets c14 (request builder + retry) wrap c13 with no SDK knowledge, and lets c1 NO-GO swap to FLUX / gpt-image-1 by replacing only this file.'
+  - decision: 'No retry inside `generateImage` — caller (c14) owns retry policy'
+    rationale: 'kickoff #8: one silent retry budget. Retry policy is a domain concern (which errors are transient), not a provider concern. c14 wraps c13 with retry; c13 stays single-shot.'
+  - decision: '`low_quality` reason NOT returned from provider'
+    rationale: 'Provider returns bytes. Quality is a product judgment (too dark, blank canvas, off-brief). c14 or c17 may add downstream classification if c1 spike found a deterministic signal (e.g., near-uniform color histogram). For v1, low_quality is reserved as a c17 UI branch and a c16 errorCode but does NOT originate from provider.'
+  - decision: 'Env name LOCKED by c1 spike artifact, NOT by this story'
+    rationale: 'c1 spike is the authoritative SDK + auth model decision. This story reads the artifact and uses the locked name. Hard separation of concerns.'
+  - decision: 'No Symbol.for cache for the SDK client'
+    rationale: 'Unlike firebase-admin (singleton App + Firestore), `@google/generative-ai` constructor is cheap (just stores the API key in memory). Per-call instantiation is fine and avoids global state. If perf becomes an issue, easy to add a Symbol.for cache.'
+  - decision: 'MODEL_ID = "gemini-2.5-flash-image" as a constant'
+    rationale: 'Single point of truth for the model name. If c1 spike finds a different model variant (e.g., "gemini-2.5-flash-image-preview"), one-line change. Future provider-version bumps are mechanical.'
+  - decision: '`ProviderRequest.images` accepts `Buffer` bytes (not URLs or storage paths)'
+    rationale: 'Provider should not know about Firebase Storage. Caller (c14) reads bytes from Storage via c5 helper and passes them in. This keeps the provider unit-testable without Storage mocking.'
+  - decision: 'Catch block maps error.code → reason via simple string matching'
+    rationale: 'SDK error code conventions are unstable (varies by SDK version + API status). String-match heuristics catch the common cases (429 → rate_limit; ECONNRESET → network) and fall through to `unknown`. Acceptable for v1; tightening requires real production data.'
+
+cross_cutting:
+  - concern: 'security'
+    notes: "API key from `lib/env.ts`; rotation via `feedback_secret_rotation_no_releak` script. `'server-only'` import prevents client-bundle leak. Reviewer grep verifies."
+  - concern: 'error-handling'
+    notes: 'Discriminated envelope. Catch logs code+message+model. Reason taxonomy (`refusal | rate_limit | network | low_quality | unknown`) is the source-of-truth for c14 retry policy + c17 UI copy mapping.'
+  - concern: 'provider-boundary'
+    notes: 'Single file, single function. Future provider swap = replace this file only. c14 + c15 + c16 + c17 stay unchanged on swap (assuming new provider produces image bytes + similar error taxonomy).'
+
+risks:
+  - severity: high
+    description: 'c1 spike NO-GO and provider swap requires a different SDK with non-Buffer / non-base64 response shape (e.g., URL-returning provider)'
+    mitigation: 'Acceptable architectural debt — `ProviderResult.imageBytes: Buffer` is the v1 contract. If swap requires URL response, the provider implementation downloads the URL bytes inside generateImage and returns Buffer (so caller contract stays). Worst case: ProviderResult shape changes and c14 also updates. Both files change; downstream stays.'
+  - severity: high
+    description: 'SDK install fails or has a peer-dep conflict with existing firebase / next deps'
+    mitigation: 'Check during integrate. If conflict, override or pick alternative SDK. Memory `feedback_codex_exec_quirks` warns about pre-build / install issues — c13 is the canary for this risk.'
+  - severity: medium
+    description: 'Error code mapping misses a real production failure mode (e.g., quota-exceeded comes through as a generic 500)'
+    mitigation: 'Catch fall-through is `unknown` — UI in c17 has a guided-failure branch for `unknown`. Production telemetry (`[provider] generateImage failed` logs) will surface drift; future story adjusts the mapping.'
+  - severity: medium
+    description: 'Provider response shape extracts `inlineData.data` but actual responses use a different field (e.g., `fileData.fileUri`)'
+    mitigation: 'c1 spike implement step writes the sample response payload to the artifact; c13 implementer reads it. Defensive extraction with `unknown` fallback if shape mismatches.'
+  - severity: low
+    description: 'API key accidentally logged in error message via `err.message` containing the request URL with key in query string'
+    mitigation: 'Reviewer manual: scan err.message in catch block for any pattern that includes the API key. SDK should not embed the key in error messages but worth verifying. If found, scrub before logging.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 4 Changes #2 (line 282): lib/ai/generate.ts — build the
+      production multimodal request layer, transient retry logic, error
+      classification, and provider-boundary abstraction on top of
+      Firebase AI Logic.
+      [Note: this story (c13) ships ONLY the abstraction; c14 ships the
+      request layer + retry on top.]
+  - path: .pHive/planning/horizontal-plan.md
+    relevant_excerpt: |
+      Layer: External Integrations > Gemini 2.5 Flash Image. Provider
+      boundary at lib/ai/generate.ts protects future provider pivots
+      (FLUX.1-kontext, gpt-image-1) without disrupting upstream
+      reference-set or downstream visualizer contracts.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > External Integrations: Generation is planned
+      against Firebase AI Logic with Gemini 2.5 Flash Image as the
+      intended production path. The SDK package choice and exact version
+      are not confirmed in the loaded planning inputs. [c1 spike resolves;
+      c13 reads artifact.]
+      Open Question §1, §2: Provider gate + SDK choice — gated by c1 spike.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: Treat the provider boundary as the
+      load-bearing seam. Everything upstream of lib/ai/generate.ts
+      should be provider-agnostic. buildGeminiRequest is the only
+      function that knows about Gemini''s specific multimodal shape. If
+      we have to swap to FLUX or gpt-image-1, that file is the diff.
+      [c13 is one layer below: ONLY the provider call site.]
+  - path: lib/firebase/server.ts
+    relevant_excerpt: |
+      Pattern reference — `''server-only''` import + env hydration. c13
+      mirrors `''server-only''` but does NOT need Symbol.for cache (SDK
+      client is cheap to construct).
+  - path: .pHive/planning/sign-off.md
+    relevant_excerpt: |
+      kickoff-decisions #3: provider-boundary protects future swap to
+      FLUX.1-kontext or gpt-image-1.
+      kickoff-decisions #8: one silent auto-retry on transient failures.
+      [c13 reserves retry for c14 layer; this story is single-shot.]
+
+ui_indicators: 'NO new UI surface — server module + env schema only; no wireframes; no ui-design step required'

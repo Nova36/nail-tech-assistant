@@ -1,0 +1,289 @@
+id: c2-msw-install-harness
+epic: epic-c-reference-and-generation
+title: 'MSW install + vitest setup wiring + Pinterest/Gemini handler stubs (testing harness prerequisite)'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+escalations_addressed:
+  - trigger: testing:harness-prereq
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Story installs MSW as devDep, wires tests/setup/integration.ts to start
+      a node MSW server in beforeAll, adds Pinterest + Gemini handler stubs
+      under tests/__mocks__/handlers/. c14 (provider boundary) and c18 (e2e)
+      depend on this harness being live before their tests can land.
+
+description: |
+  Pure test-infrastructure delta. The Epic C planning stack (research-brief,
+  vertical-plan, horizontal-plan, structured-outline) all assume Pinterest
+  and Gemini behavior is mocked through MSW for unit + integration tests.
+  MSW is NOT installed today; vitest only mocks `server-only` via an alias
+  shim. This story installs and wires the harness so c6, c14, c16, c18 can
+  write tests against deterministic Pinterest + Gemini responses.
+
+  Scope is narrow on purpose. We install MSW, wire `setupServer` into the
+  existing `tests/setup/integration.ts`, add stub handlers for two Pinterest
+  endpoints (boards list, board pins) and one Gemini endpoint (generate).
+  Story-specific handler overrides happen in later stories at test time
+  (`server.use(...)` per test) — this story only ships defaults.
+
+  No production code changes. No `lib/` files touched. No `app/` files
+  touched. The vitest-config alias `'server-only' → tests/__mocks__/server-only.ts`
+  stays as-is (`feedback_codex_exec_quirks` forbids node_modules patches —
+  MSW lives alongside the alias, not replacing it).
+
+  Skipping the `research` step because the codebase is well-known and MSW
+  setup-on-vitest is documented in MSW's own docs. Researcher's job is
+  trivial here.
+
+acceptance_criteria:
+  - 'Given `package.json` is inspected, when devDependencies are listed, then `msw` is present at a version compatible with Node 20+ + vitest 3.x.'
+  - 'Given `tests/setup/integration.ts` is loaded by vitest, when the test process boots, then a MSW node server is started in `beforeAll` with the default handler set, reset between tests via `afterEach(() => server.resetHandlers())`, and torn down in `afterAll(() => server.close())`.'
+  - 'Given a vitest test imports `server` from `tests/__mocks__/msw-server.ts`, when the test calls `server.use(http.get("...", () => HttpResponse.json(...)))`, then that handler overrides the default for the duration of that test only.'
+  - 'Given the default handlers under `tests/__mocks__/handlers/pinterest.ts`, when `lib/pinterest/client.ts` calls `https://api.pinterest.com/v5/boards` or `/v5/boards/{id}/pins`, then MSW intercepts and returns a stub response (one boards page, one pins page, both with `bookmark: null`).'
+  - 'Given the default handler under `tests/__mocks__/handlers/gemini.ts`, when generation code calls the Gemini endpoint (URL determined by c1 SDK lock — `generativelanguage.googleapis.com` for `@google/generative-ai`, `firebaseml.googleapis.com` for `firebase/ai`), then MSW intercepts and returns a stub response containing one base64 PNG output.'
+  - 'Given the existing `vitest.config.ts` `server-only` alias, when MSW is added, then the alias still works (no node_modules patches per `feedback_codex_exec_quirks`). MSW is additive, not replacing.'
+  - 'Given the existing `vitest.config.rules.ts` lane (Firestore rules tests), when MSW is added to the integration setup, then rules-test lane is unaffected (rules tests do not import the MSW server file).'
+  - 'Given a test in `tests/integration/` that exercises `lib/pinterest/client.ts`, when run via `pnpm test`, then it succeeds without hitting the real Pinterest API (no `PINTEREST_ACCESS_TOKEN` required at test time).'
+
+steps:
+  - id: test-spec
+    description: |
+      Write a smoke test that proves the MSW harness is alive BEFORE
+      installing or wiring anything. TDD red phase.
+
+      - tests/integration/msw-harness-smoke.test.ts —
+        (1) Import `server` from `tests/__mocks__/msw-server.ts` (FILE DOES
+            NOT EXIST YET — this import fails at red phase)
+        (2) `server.use(http.get('https://example.test/probe',
+            () => HttpResponse.json({ ok: true })))`
+        (3) `await fetch('https://example.test/probe')` — assert response
+            body matches the override
+        (4) After the test, the override is reset; a second `fetch` to the
+            same URL falls through to MSW's default `onUnhandledRequest`
+            behavior (assert via `server.use(http.get(...,
+            ({ request }) => HttpResponse.error()))`)
+
+      - tests/integration/pinterest-default-handler.test.ts —
+        (1) Without `server.use(...)` overrides, call `listPinterestBoards()`
+            from `lib/pinterest/client.ts`
+        (2) Assert returned shape `{ ok: true; items: [...]; nextBookmark:
+            null }` matches the default handler stub from
+            `tests/__mocks__/handlers/pinterest.ts`
+        (3) Confirms the harness wires into existing Pinterest client code
+            without modification
+
+      DO NOT write a Gemini default-handler test in this story — Gemini
+      consumer code lands in c14. The Gemini handler stub ships here but is
+      asserted against in c14 tests, not c2 tests. Reviewer confirms the
+      stub file exists; no test required.
+
+      DO NOT write tests for `server.use(...)` per-test override patterns
+      beyond the smoke — that's tested implicitly every time later stories
+      use it.
+    agent: tester
+  - id: implement
+    description: |
+      Make the failing tests pass. Pure infrastructure work.
+
+      1. `pnpm add -D msw@^2` (MSW 2.x — uses `setupServer` from
+         `msw/node` and `http`/`HttpResponse` from `msw`).
+
+      2. Create `tests/__mocks__/msw-server.ts`:
+         ```
+         import { setupServer } from 'msw/node';
+         import { handlers } from './handlers';
+         export const server = setupServer(...handlers);
+         ```
+
+      3. Create `tests/__mocks__/handlers/index.ts`:
+         ```
+         import { pinterestHandlers } from './pinterest';
+         import { geminiHandlers } from './gemini';
+         export const handlers = [...pinterestHandlers, ...geminiHandlers];
+         ```
+
+      4. Create `tests/__mocks__/handlers/pinterest.ts` — stub handlers for:
+         - `GET https://api.pinterest.com/v5/user_account` → 200 with
+           minimal user payload (drives `verifyPinterestToken()` ok branch)
+         - `GET https://api.pinterest.com/v5/boards` → 200 with one stub
+           board, `bookmark: null`
+         - `GET https://api.pinterest.com/v5/boards/:boardId/pins` → 200
+           with one stub pin (full `media.images` variants), `bookmark: null`
+         - Reuse fixture data from `lib/pinterest/__fixtures__/boards.ts`
+           and `lib/pinterest/__fixtures__/pins.ts` (already in repo)
+
+      5. Create `tests/__mocks__/handlers/gemini.ts` — stub handler for:
+         - The Gemini endpoint per c1 SDK lock. If c1 has not committed yet
+           (parallel execution permitted — c2 has no dep on c1), use the
+           `@google/generative-ai` endpoint (`https://generativelanguage.
+           googleapis.com/v1beta/models/gemini-2.5-flash-image:generate`)
+           as the placeholder — c14 is responsible for confirming the
+           endpoint matches the SDK lock and adjusting the handler then.
+         - Response stub: one base64-encoded 1x1 PNG (`iVBORw0KGgo...`) +
+           a `finishReason: 'STOP'`-equivalent field
+
+      6. Wire MSW into `tests/setup/integration.ts`:
+         ```
+         import { afterAll, afterEach, beforeAll } from 'vitest';
+         import { server } from '../__mocks__/msw-server';
+
+         beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+         afterEach(() => server.resetHandlers());
+         afterAll(() => server.close());
+         ```
+
+         `onUnhandledRequest: 'error'` is intentional — surfaces missing
+         handlers loudly instead of letting tests silently hit the network.
+
+      7. NO change to `vitest.config.ts` itself. NO change to
+         `vitest.config.rules.ts` (rules tests don't import the MSW server).
+
+      DO NOT: install MSW handlers for endpoints not yet consumed (no
+      Firestore handlers — those use the real emulator via @firebase/rules-
+      unit-testing, not MSW). DO NOT: modify `tests/__mocks__/server-only.ts`.
+      DO NOT: write story-specific handler overrides (those live in later
+      stories' tests).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the harness is live and additive without disturbing existing
+      lanes.
+
+      - `package.json` has `msw` in `devDependencies`. Pinned to `^2.x`.
+      - `tests/__mocks__/msw-server.ts` exists; `tests/__mocks__/handlers/`
+        directory has `index.ts`, `pinterest.ts`, `gemini.ts`.
+      - `tests/setup/integration.ts` starts/resets/closes the server;
+        `onUnhandledRequest: 'error'` is set.
+      - Smoke test passes: `pnpm test tests/integration/msw-harness-smoke.test.ts`.
+      - Default-handler test passes:
+        `pnpm test tests/integration/pinterest-default-handler.test.ts`.
+      - `pnpm test:rules` is unaffected — rules-test lane does not import
+        MSW server file (verify by grep).
+      - `tests/__mocks__/server-only.ts` unchanged.
+      - No production code (`app/**`, `lib/**`) was modified by this story.
+        `git diff` should show only `package.json`, `pnpm-lock.yaml`, and
+        files under `tests/`.
+      - Pinterest handlers reuse existing fixtures from
+        `lib/pinterest/__fixtures__/` rather than duplicating data.
+      - Gemini handler endpoint matches c1 SDK lock if c1 committed first;
+        otherwise placeholder is documented with a comment for c14 to
+        verify.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c2-msw-install-harness`.
+      Commit: `chore(c2): MSW install + vitest setup wiring + Pinterest/Gemini handler stubs`.
+      Files committed: package.json, pnpm-lock.yaml, tests/__mocks__/msw-server.ts,
+      tests/__mocks__/handlers/{index,pinterest,gemini}.ts,
+      tests/integration/{msw-harness-smoke,pinterest-default-handler}.test.ts,
+      tests/setup/integration.ts.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 (no app/ changes — test infrastructure only)'
+    runtime: 'Node 20+; pnpm 10.22.0; vitest 3.2.4'
+    testing: 'MSW 2.x via `msw/node` setupServer; vitest jsdom + node lanes'
+  key_files:
+    - path: tests/setup/integration.ts
+      purpose: 'Existing vitest setup; this story adds MSW server lifecycle hooks'
+    - path: tests/__mocks__/server-only.ts
+      purpose: 'Existing alias-target shim for `server-only` package; UNCHANGED by this story'
+    - path: vitest.config.ts
+      purpose: 'Existing main lane config; UNCHANGED — alias stays as-is'
+    - path: vitest.config.rules.ts
+      purpose: 'Existing rules-test lane config; UNCHANGED — rules tests do not import MSW server'
+    - path: lib/pinterest/__fixtures__/boards.ts
+      purpose: 'Existing fixture data; reused as-is by the Pinterest handler stub'
+    - path: lib/pinterest/__fixtures__/pins.ts
+      purpose: 'Existing fixture data; reused as-is by the Pinterest handler stub'
+    - path: lib/pinterest/client.ts
+      purpose: 'Existing client; consumed by `pinterest-default-handler.test.ts` to verify the harness'
+
+files_to_modify:
+  - file: package.json
+    change: 'Add `msw` to devDependencies (^2.x)'
+  - file: pnpm-lock.yaml
+    change: 'Lockfile update from `pnpm add -D msw`'
+  - file: tests/__mocks__/msw-server.ts
+    change: 'CREATE; exports `server = setupServer(...handlers)`'
+  - file: tests/__mocks__/handlers/index.ts
+    change: 'CREATE; aggregates Pinterest + Gemini handlers'
+  - file: tests/__mocks__/handlers/pinterest.ts
+    change: 'CREATE; default handlers for /v5/user_account, /v5/boards, /v5/boards/:id/pins reusing existing fixtures'
+  - file: tests/__mocks__/handlers/gemini.ts
+    change: 'CREATE; default handler for Gemini generate endpoint with stub base64 PNG'
+  - file: tests/setup/integration.ts
+    change: 'Add server.listen / resetHandlers / close hooks; onUnhandledRequest: "error"'
+  - file: tests/integration/msw-harness-smoke.test.ts
+    change: 'CREATE in test-spec; smoke proves harness is wired'
+  - file: tests/integration/pinterest-default-handler.test.ts
+    change: 'CREATE in test-spec; verifies Pinterest client + default handler stub interop'
+
+design_decisions:
+  - decision: 'MSW server lifecycle lives in `tests/setup/integration.ts`, not a per-test pattern'
+    rationale: 'Existing project pattern uses a single setupFiles entry; per-test setup adds boilerplate to every test that needs MSW. setupFiles owns lifecycle; tests own per-test handler overrides via `server.use(...)`.'
+  - decision: '`onUnhandledRequest: "error"` instead of `"warn"` or `"bypass"`'
+    rationale: 'Memory `feedback_silent_catches_cost_time` analog for testing — silently passing requests through to the real network is the test-time equivalent of a silent catch. Erroring loudly forces every test to declare its dependencies.'
+  - decision: 'Reuse existing `lib/pinterest/__fixtures__/` data in handler stubs instead of duplicating'
+    rationale: 'Single source of truth for Pinterest stub shape; if Pinterest API drift forces fixture updates in c12 (pin selection state) or future epic, MSW handlers update for free.'
+  - decision: 'Gemini default-handler endpoint uses `@google/generative-ai` URL as placeholder if c1 has not committed first'
+    rationale: 'c2 has no dependency on c1; orchestrator may schedule them in parallel. Placeholder documented with a comment instructs c14 to verify. If c1 commits first, c2 implementer reads the SDK lock and uses the locked endpoint.'
+  - decision: 'No story-specific handlers in c2 — only defaults'
+    rationale: 'Each consumer story (c6, c14, c16) knows its own test fixtures best. c2 sets the floor; later stories override per test. Avoids c2 becoming a "kitchen sink" of stale handlers.'
+  - decision: 'Skip `research` step'
+    rationale: 'MSW + vitest setup is well-documented externally; codebase has no MSW prior art (greenfield install). Researcher would have nothing to discover that the docs don''t already say. Step is omitted explicitly per skill spec ("skip research only when codebase is well-known").'
+
+cross_cutting:
+  - concern: 'testing harness'
+    notes: 'MSW becomes the canonical mock layer for external HTTP boundaries (Pinterest, Gemini). Future epics that integrate new external APIs (e.g., payments, email) extend `tests/__mocks__/handlers/` with new stub files. `onUnhandledRequest: "error"` enforces the discipline.'
+
+risks:
+  - severity: medium
+    description: 'MSW 2.x has breaking changes from MSW 1.x; if a future contributor copies a 1.x snippet from external docs, the test will fail with cryptic errors'
+    mitigation: 'tests/__mocks__/msw-server.ts comment block calls out MSW 2.x explicitly; pin major version in package.json (^2 not ^1).'
+  - severity: medium
+    description: 'Gemini handler endpoint placeholder gets out of sync with c1 SDK lock if c2 commits first and c14 forgets to update'
+    mitigation: 'Reviewer step in c14 explicitly checks the handler URL matches the SDK lock; comment in tests/__mocks__/handlers/gemini.ts marks the file with `// VERIFY-IN-C14` so c14 reviewer can grep for it.'
+  - severity: low
+    description: '`onUnhandledRequest: "error"` is too strict and breaks a future test that legitimately wants to fall through (e.g., Firestore emulator HTTP traffic gets caught)'
+    mitigation: "MSW handlers only intercept declared origin URLs; emulator traffic to `127.0.0.1:8080` is not declared in any handler and uses node's native fetch path. If a real false-positive emerges, `onUnhandledRequest` can be relaxed to a function that allowlists localhost."
+  - severity: low
+    description: 'Pinterest fixture drift — `lib/pinterest/__fixtures__/` shape diverges from real Pinterest, and handler stubs train tests against stale data'
+    mitigation: 'Out of scope for c2; the fixture freshness problem is owned by Epic B. c2 consumes whatever shape the fixtures expose. Future fixture updates flow through automatically.'
+
+references:
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      Test Strategy: MSW should be the mocking layer for Pinterest and
+      generation-provider behavior once installed, because the planning docs
+      explicitly depend on mocked success/failure coverage for both external
+      boundaries.
+      Risk Inventory (Medium): MSW-backed integration tests are planned, but
+      `msw` is not installed today.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §What Could Go Wrong (MEDIUM): MSW install changes the test runtime in
+      unexpected ways. We don't have it now and the Vitest setup in
+      tests/setup/integration.ts doesn't expect a service-worker mock layer.
+      Mitigation: install MSW in a single isolated story before any test
+      that depends on it; do not bundle the install with reference logic.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-raw-findings.md
+    relevant_excerpt: |
+      §6 Test infrastructure > MSW: not currently installed (`msw` absent
+      from package.json). Greenfield install required for Epic C.
+  - path: tests/setup/integration.ts
+    relevant_excerpt: |
+      Existing setup file — short. New MSW server hooks land at top of the
+      file; existing logic preserved.
+
+ui_indicators: 'NO new UI surface — pure test-infrastructure delta; no wireframes; no ui-design step required'

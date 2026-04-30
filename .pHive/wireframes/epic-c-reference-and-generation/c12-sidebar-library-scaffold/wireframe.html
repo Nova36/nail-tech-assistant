@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sidebar update + /library empty · NTA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --background: #faf7f2;
+        --foreground: #3d3530;
+        --card: #f0ebe3;
+        --primary: #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint: #d4a5a8;
+        --accent: #c9a96e;
+        --secondary: #efe8de;
+        --muted-foreground: #8c7e78;
+        --destructive: #a8443a;
+      }
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+      html,
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        min-height: 100vh;
+      }
+      .font-fraunces {
+        font-family: 'Fraunces', Georgia, serif;
+      }
+      .text-primary {
+        color: var(--primary);
+      }
+      .text-muted-foreground {
+        color: var(--muted-foreground);
+      }
+
+      .frame {
+        margin: 28px auto;
+        background: var(--background);
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.12);
+        width: 1280px;
+        max-width: calc(100vw - 32px);
+      }
+      .frame-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid rgb(140 126 120 / 0.2);
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .frame-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+      }
+      .frame-bar .dot.b {
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .frame-bar .dot.c {
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      .frame-bar .tag {
+        margin-left: auto;
+        border: 1px solid rgb(140 126 120 / 0.3);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+      }
+
+      .frame-label {
+        margin: 24px auto 0;
+        max-width: 1280px;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 0 4px;
+        flex-wrap: wrap;
+      }
+      .frame-num {
+        font-family: 'Fraunces', serif;
+        font-size: 14px;
+        color: var(--primary);
+        font-style: italic;
+      }
+      .frame-title {
+        font-family: 'Fraunces', serif;
+        font-size: 28px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+      }
+      .frame-sub {
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+
+      aside.anno {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(250, 247, 242, 0.85);
+        border: 1px dashed rgb(140 126 120 / 0.42);
+      }
+      aside.anno::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      aside.anno.pin {
+        position: absolute;
+        top: -11px;
+        left: 14px;
+        z-index: 3;
+      }
+
+      .callout {
+        border: 1px dashed rgb(107 63 94 / 0.4);
+        background: rgb(212 165 168 / 0.12);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 11.5px;
+        line-height: 1.55;
+      }
+      .callout strong {
+        color: var(--primary);
+        font-weight: 500;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 240px;
+        background: var(--background);
+        border-right: 1px solid rgb(140 126 120 / 0.18);
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-height: 100%;
+      }
+      .sb-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+      }
+      .sb-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-tint)
+        );
+        display: grid;
+        place-items: center;
+        color: var(--primary-foreground);
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+      }
+      .sb-name {
+        font-family: 'Fraunces', serif;
+        font-size: 16px;
+      }
+      .sb-name em {
+        color: var(--primary);
+        font-style: italic;
+      }
+      .sb-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .sb-nav a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--foreground);
+        font-size: 14px;
+        text-decoration: none;
+        min-height: 44px;
+        position: relative;
+      }
+      .sb-nav a .ico {
+        width: 18px;
+        height: 18px;
+        color: var(--muted-foreground);
+      }
+      .sb-nav a:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+      .sb-nav a.active {
+        background: rgba(107, 63, 94, 0.12);
+        color: var(--primary);
+        font-weight: 500;
+      }
+      .sb-nav a.active .ico {
+        color: var(--primary);
+      }
+      .sb-nav a.active::before {
+        content: '';
+        position: absolute;
+        left: -14px;
+        top: 8px;
+        bottom: 8px;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--primary);
+      }
+      .new-pip {
+        margin-left: auto;
+        font-size: 9.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        background: var(--accent);
+        color: var(--foreground);
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+
+      .sb-foot {
+        margin-top: auto;
+        border-top: 1px solid rgb(140 126 120 / 0.18);
+        padding-top: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-left: 6px;
+        padding-right: 6px;
+      }
+      .sb-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-tint), var(--accent));
+        display: grid;
+        place-items: center;
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        color: var(--primary-foreground);
+        font-size: 13px;
+      }
+      .sb-meta {
+        font-size: 12.5px;
+        line-height: 1.3;
+      }
+      .sb-meta .who {
+        color: var(--foreground);
+      }
+      .sb-meta .out {
+        color: var(--muted-foreground);
+        font-size: 11px;
+      }
+
+      /* Frame 1 layout */
+      .triple {
+        display: grid;
+        grid-template-columns: 240px 240px 240px 1fr;
+        min-height: 600px;
+      }
+      .triple .col-divider {
+        border-right: 1px dashed rgb(140 126 120 / 0.3);
+      }
+      .triple .col-label {
+        position: absolute;
+        top: 12px;
+        left: 14px;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .triple > div {
+        position: relative;
+      }
+      .legend {
+        padding: 24px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        background: var(--card);
+      }
+
+      /* Frame 2 layout */
+      .shell {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        min-height: 700px;
+      }
+
+      /* Library empty state */
+      .lib-empty {
+        flex: 1;
+        display: grid;
+        place-items: center;
+        padding: 60px 32px;
+      }
+      .lib-empty-card {
+        max-width: 520px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      .lib-illust {
+        width: 200px;
+        height: 140px;
+        position: relative;
+      }
+      .lib-illust .shelf {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 12px;
+        height: 6px;
+        background: var(--primary-tint);
+        opacity: 0.55;
+        border-radius: 4px;
+      }
+      .lib-illust .ghost {
+        position: absolute;
+        bottom: 18px;
+        border-radius: 16px;
+        background: var(--card);
+        border: 1.5px dashed rgb(107 63 94 / 0.35);
+      }
+      .lib-illust .ghost.a {
+        left: 18px;
+        width: 56px;
+        height: 78px;
+        transform: rotate(-4deg);
+      }
+      .lib-illust .ghost.b {
+        left: 76px;
+        width: 56px;
+        height: 92px;
+      }
+      .lib-illust .ghost.c {
+        left: 132px;
+        width: 56px;
+        height: 70px;
+        transform: rotate(3deg);
+      }
+      .lib-illust .sparkle {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        color: var(--accent);
+      }
+      .lib-illust .sparkle.s1 {
+        top: 6px;
+        left: 30px;
+      }
+      .lib-illust .sparkle.s2 {
+        top: 22px;
+        right: 28px;
+        opacity: 0.7;
+      }
+
+      .lib-h {
+        font-family: 'Fraunces', serif;
+        font-size: 38px;
+        font-weight: 300;
+        letter-spacing: -0.025em;
+        line-height: 1.05;
+      }
+      .lib-h em {
+        font-style: italic;
+        color: var(--primary);
+      }
+      .lib-sub {
+        color: var(--muted-foreground);
+        font-size: 15px;
+        line-height: 1.55;
+        max-width: 380px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        min-height: 44px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 160ms;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 6px 16px rgba(107, 63, 94, 0.25);
+      }
+      .btn-primary:hover {
+        background: #58324d;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--foreground);
+        border: 1px solid rgb(140 126 120 / 0.32);
+      }
+
+      .lib-foot-link {
+        color: var(--muted-foreground);
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .lib-foot-link a {
+        color: var(--primary);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      .page-head {
+        padding: 24px 32px 8px;
+        border-bottom: 1px solid rgb(140 126 120 / 0.16);
+      }
+      .page-head h2 {
+        font-family: 'Fraunces', serif;
+        font-size: 26px;
+        font-weight: 300;
+        letter-spacing: -0.015em;
+      }
+      .page-head p {
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+        margin-top: 2px;
+      }
+
+      /* Mobile frame */
+      .mobile {
+        width: 390px;
+        margin: 0 auto;
+        background: var(--background);
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 28px;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.16);
+        overflow: hidden;
+        min-height: 720px;
+      }
+      .mob-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgb(140 126 120 / 0.16);
+      }
+      .icon-btn-mob {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--card);
+        display: grid;
+        place-items: center;
+        color: var(--foreground);
+        border: 0;
+        cursor: pointer;
+      }
+      .mob-mark {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .mob-mark .sb-mark {
+        width: 24px;
+        height: 24px;
+        font-size: 12px;
+      }
+      .mob-mark .sb-name {
+        font-size: 14px;
+      }
+
+      /* Sidebar collapsed (icon-only) */
+      .sidebar.collapsed {
+        width: 72px;
+        padding: 20px 10px;
+        align-items: center;
+      }
+      .sidebar.collapsed .sb-nav a {
+        justify-content: center;
+        padding: 0;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .sidebar.collapsed .sb-nav a .lbl {
+        display: none;
+      }
+      .sidebar.collapsed .sb-nav a .new-pip {
+        display: none;
+      }
+      .sidebar.collapsed .sb-nav a.active::before {
+        left: -10px;
+      }
+      .sidebar.collapsed .sb-logo .sb-name {
+        display: none;
+      }
+      .sidebar.collapsed .sb-foot .sb-meta {
+        display: none;
+      }
+      .sidebar.collapsed .sb-foot {
+        padding-left: 0;
+        padding-right: 0;
+        justify-content: center;
+      }
+
+      .legend-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 16px 20px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+      }
+      .legend-card dt {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        color: var(--primary);
+        font-size: 13px;
+        margin-top: 8px;
+      }
+      .legend-card dd {
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="mx-auto max-w-[1280px] px-4 pt-10 pb-4">
+      <p
+        class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+      >
+        Wireframe · Sidebar update + /library
+      </p>
+      <h1
+        class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+      >
+        Sidebar gets two new entries.
+        <span class="italic text-primary">Library</span> ships empty.
+      </h1>
+      <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-2xl">
+        Three frames: (1) sidebar idle/active states across all three nav
+        entries · (2) the <em>/library</em> empty-state page · (3) mobile
+        collapse + library reflow. Pinterest stays unsurfaced from the sidebar —
+        only reachable by URL or via the embedded picker inside the New Design
+        workspace.
+      </p>
+    </header>
+
+    <section class="mx-auto max-w-[1280px] px-4 mb-10">
+      <div class="legend-card grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+        <dl>
+          <dt>Tokens (locked)</dt>
+          <dd>
+            Fraunces heading · Inter body · semantic Tailwind tokens. Sidebar
+            shape unchanged from existing Dashboard chrome.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Active treatment</dt>
+          <dd>
+            3px primary rail on the left edge of the row + tinted background
+            (<code>rgba(primary/12)</code>) + primary text + 500 weight. Color
+            is reinforced by rail + weight, not color alone.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Out of scope</dt>
+          <dd>
+            No Pinterest entry. No populated library list (future epic). No
+            Dashboard or other surface changes.
+          </dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ FRAME 1 — Sidebar states ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">01.</span>
+      <h2 class="frame-title">
+        Sidebar · <span class="italic text-primary">three nav entries.</span>
+      </h2>
+      <span class="frame-sub"
+        >Active state shown on each entry across three side-by-side
+        instances.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">AppShell · sidebar states</span
+        ><span class="tag">frame 01</span>
+      </div>
+
+      <div class="triple">
+        <!-- Instance A: Dashboard active -->
+        <div class="col-divider relative">
+          <span class="col-label">A · Dashboard active</span>
+          <div style="height: 36px"></div>
+          <aside class="sidebar">
+            <div class="sb-logo">
+              <div class="sb-mark">N</div>
+              <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+            </div>
+            <nav class="sb-nav" aria-label="Primary">
+              <a href="/dashboard" class="active" aria-current="page">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path
+                    d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                  />
+                </svg>
+                <span class="lbl">Dashboard</span>
+              </a>
+              <a href="/design/new">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path d="M10 3v14M3 10h14" />
+                </svg>
+                <span class="lbl">New Design</span>
+                <span class="new-pip" aria-label="New feature">New</span>
+              </a>
+              <a href="/library">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <rect x="3" y="4" width="14" height="13" rx="2" />
+                  <path d="M7 4v13M13 4v13" />
+                </svg>
+                <span class="lbl">Library</span>
+              </a>
+            </nav>
+            <div class="sb-foot">
+              <div class="sb-avatar">A</div>
+              <div class="sb-meta">
+                <div class="who">Amara</div>
+                <button class="out">Sign out</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Instance B: New Design active -->
+        <div class="col-divider relative">
+          <span class="col-label">B · New Design active</span>
+          <div style="height: 36px"></div>
+          <aside class="sidebar">
+            <div class="sb-logo">
+              <div class="sb-mark">N</div>
+              <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+            </div>
+            <nav class="sb-nav" aria-label="Primary">
+              <a href="/dashboard">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path
+                    d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                  />
+                </svg>
+                <span class="lbl">Dashboard</span>
+              </a>
+              <a href="/design/new" class="active" aria-current="page">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path d="M10 3v14M3 10h14" />
+                </svg>
+                <span class="lbl">New Design</span>
+                <span class="new-pip">New</span>
+              </a>
+              <a href="/library">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <rect x="3" y="4" width="14" height="13" rx="2" />
+                  <path d="M7 4v13M13 4v13" />
+                </svg>
+                <span class="lbl">Library</span>
+              </a>
+            </nav>
+            <div class="sb-foot">
+              <div class="sb-avatar">A</div>
+              <div class="sb-meta">
+                <div class="who">Amara</div>
+                <button class="out">Sign out</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Instance C: Library active -->
+        <div class="col-divider relative">
+          <span class="col-label">C · Library active</span>
+          <div style="height: 36px"></div>
+          <aside class="sidebar">
+            <div class="sb-logo">
+              <div class="sb-mark">N</div>
+              <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+            </div>
+            <nav class="sb-nav" aria-label="Primary">
+              <a href="/dashboard">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path
+                    d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                  />
+                </svg>
+                <span class="lbl">Dashboard</span>
+              </a>
+              <a href="/design/new">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path d="M10 3v14M3 10h14" />
+                </svg>
+                <span class="lbl">New Design</span>
+                <span class="new-pip">New</span>
+              </a>
+              <a href="/library" class="active" aria-current="page">
+                <svg
+                  class="ico"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <rect x="3" y="4" width="14" height="13" rx="2" />
+                  <path d="M7 4v13M13 4v13" />
+                </svg>
+                <span class="lbl">Library</span>
+              </a>
+            </nav>
+            <div class="sb-foot">
+              <div class="sb-avatar">A</div>
+              <div class="sb-meta">
+                <div class="who">Amara</div>
+                <button class="out">Sign out</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Spec column -->
+        <div class="legend">
+          <h3 class="font-fraunces text-2xl font-light tracking-[-0.015em]">
+            Spec.
+          </h3>
+          <div class="callout">
+            <strong>Three entries.</strong> Dashboard (idle), New Design (with
+            subtle "New" pip — auto-removed after first click), Library (no
+            pip). Order: top-down by frequency expected — Dashboard for
+            at-a-glance, New Design for primary action, Library for review.
+          </div>
+          <div class="callout">
+            <strong>Active treatment.</strong> 3px primary rail on the left of
+            the row + <code>bg-primary/12</code> tint + primary-color text + 500
+            weight + active icon recolor. <em>Not</em> color-only — the rail +
+            weight reinforce.
+          </div>
+          <div class="callout">
+            <strong>Hover/idle.</strong> Idle = transparent bg, foreground text,
+            muted-foreground icon. Hover =
+            <code>rgba(140,126,120,0.08)</code> bg, no rail. Min hit target
+            44px.
+          </div>
+          <div class="callout">
+            <strong>Pinterest absence.</strong> Intentional. The picker is
+            reachable at <code>/pinterest</code> by URL, and is embedded as a
+            panel inside <code>/design/new</code>. Sidebar avoids the
+            implication that Pinterest is a destination.
+          </div>
+          <div class="callout">
+            <strong>Header + footer.</strong> Logo block unchanged. User chip
+            (avatar + name + Sign out) unchanged. Only the nav middle section
+            changes.
+          </div>
+          <div class="callout">
+            <strong>A11y.</strong> <code>nav aria-label="Primary"</code>. Active
+            row carries <code>aria-current="page"</code>. "New" pip uses
+            <code>aria-label</code> so SR reads "New Design — new feature". Tab
+            order = Dashboard → New Design → Library → user chip → Sign out.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 2 — Library empty state ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">02.</span>
+      <h2 class="frame-title">
+        /library · <span class="italic text-primary">empty state.</span>
+      </h2>
+      <span class="frame-sub"
+        >Above-the-fold only. Future epic owns the populated list.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">/library · empty</span
+        ><span class="tag">frame 02</span>
+      </div>
+
+      <div class="shell">
+        <aside class="sidebar relative">
+          <aside class="anno pin">AppShell · Library active</aside>
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard">
+              <svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              <span class="lbl">Dashboard</span>
+            </a>
+            <a href="/design/new">
+              <svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              <span class="lbl">New Design</span>
+              <span class="new-pip">New</span>
+            </a>
+            <a href="/library" class="active" aria-current="page">
+              <svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              <span class="lbl">Library</span>
+            </a>
+          </nav>
+          <div class="sb-foot">
+            <div class="sb-avatar">A</div>
+            <div class="sb-meta">
+              <div class="who">Amara</div>
+              <button class="out">Sign out</button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="flex flex-col">
+          <div class="page-head relative">
+            <aside class="anno pin">component: PageHeader · Library</aside>
+            <h2>Library</h2>
+            <p>Saved designs and past generations.</p>
+          </div>
+
+          <div class="lib-empty relative">
+            <aside class="anno pin">
+              component: LibraryEmpty · centered · single CTA
+            </aside>
+
+            <div class="lib-empty-card">
+              <!-- Illustration -->
+              <div class="lib-illust" aria-hidden="true">
+                <svg class="sparkle s1" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M8 1l1.4 3 3 .5-2.2 2.2.55 3L8 8.2l-2.75 1.5.55-3L3.6 4.5l3-.5z"
+                  />
+                </svg>
+                <svg class="sparkle s2" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M8 1l1.4 3 3 .5-2.2 2.2.55 3L8 8.2l-2.75 1.5.55-3L3.6 4.5l3-.5z"
+                  />
+                </svg>
+                <div class="ghost a"></div>
+                <div class="ghost b"></div>
+                <div class="ghost c"></div>
+                <div class="shelf"></div>
+              </div>
+
+              <h3 class="lib-h">Nothing <em>saved</em> yet.</h3>
+              <p class="lib-sub">
+                Designs you create will live here once they're generated. Start
+                a new one and it'll be waiting when you come back.
+              </p>
+
+              <a href="/design/new" class="btn btn-primary mt-2">
+                Start a new design
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </a>
+
+              <p class="lib-foot-link">
+                Or <a href="/dashboard">return to your dashboard</a>.
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Above-the-fold simple.</strong> No search bar, no filter
+          chips, no tabs. Those land alongside the populated list view in a
+          future epic; adding them now would imply a list exists.
+        </div>
+        <div class="callout">
+          <strong>Single CTA.</strong> Primary "Start a new design" →
+          <code>/design/new</code>. Secondary "return to your dashboard" is a
+          small text link, not a button — the design is to nudge forward, not
+          sideways.
+        </div>
+        <div class="callout">
+          <strong>Illustration.</strong> Three dashed "ghost" cards on a shelf
+          with two accent sparkles. Drawn from existing tokens (primary-tint
+          shelf, card-tone ghosts, accent sparkles). No mascot, no stock illo.
+        </div>
+        <div class="callout">
+          <strong>Page header consistency.</strong> Same
+          <code>PageHeader</code> shape Dashboard uses (Fraunces title + Inter
+          subline + 1px divider). Reuse, don't reinvent.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 3 — Mobile / narrow ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">03.</span>
+      <h2 class="frame-title">
+        Mobile · <span class="italic text-primary">collapsed nav.</span>
+      </h2>
+      <span class="frame-sub"
+        >Sidebar collapses to a hamburger sheet. Library reflows centered.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/library · &lt; 768px viewport</span
+        ><span class="tag">frame 03 · mobile</span>
+      </div>
+
+      <div
+        style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 32px;
+          padding: 32px;
+          align-items: start;
+        "
+      >
+        <!-- Mobile A: collapsed nav, library page -->
+        <div class="relative">
+          <aside class="anno pin">A · /library · sheet closed</aside>
+          <div class="mobile">
+            <div class="mob-topbar">
+              <button class="icon-btn-mob" aria-label="Open navigation">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <path d="M3 5h12M3 9h12M3 13h12" />
+                </svg>
+              </button>
+              <div class="mob-mark">
+                <div class="sb-mark">N</div>
+                <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+              </div>
+              <button class="icon-btn-mob" aria-label="Account">
+                <div
+                  class="sb-avatar"
+                  style="width: 24px; height: 24px; font-size: 11px"
+                >
+                  A
+                </div>
+              </button>
+            </div>
+
+            <div style="padding: 18px 18px 8px">
+              <h2 class="font-fraunces text-2xl font-light tracking-[-0.01em]">
+                Library
+              </h2>
+              <p class="text-xs text-muted-foreground mt-1">
+                Saved designs and past generations.
+              </p>
+            </div>
+
+            <div
+              style="
+                padding: 28px 22px 32px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 16px;
+              "
+            >
+              <div
+                class="lib-illust"
+                aria-hidden="true"
+                style="transform: scale(0.85)"
+              >
+                <svg class="sparkle s1" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M8 1l1.4 3 3 .5-2.2 2.2.55 3L8 8.2l-2.75 1.5.55-3L3.6 4.5l3-.5z"
+                  />
+                </svg>
+                <svg class="sparkle s2" viewBox="0 0 16 16" fill="currentColor">
+                  <path
+                    d="M8 1l1.4 3 3 .5-2.2 2.2.55 3L8 8.2l-2.75 1.5.55-3L3.6 4.5l3-.5z"
+                  />
+                </svg>
+                <div class="ghost a"></div>
+                <div class="ghost b"></div>
+                <div class="ghost c"></div>
+                <div class="shelf"></div>
+              </div>
+              <h3
+                class="font-fraunces text-3xl font-light tracking-[-0.02em] leading-tight"
+              >
+                Nothing <em class="italic text-primary">saved</em> yet.
+              </h3>
+              <p
+                class="text-sm text-muted-foreground leading-relaxed"
+                style="max-width: 280px"
+              >
+                Designs you create will live here once they're generated.
+              </p>
+              <a href="/design/new" class="btn btn-primary" style="width: 100%">
+                Start a new design
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </a>
+              <a
+                href="/dashboard"
+                class="text-xs text-primary underline underline-offset-4"
+                >Return to dashboard</a
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile B: nav sheet open -->
+        <div class="relative">
+          <aside class="anno pin">B · navigation sheet open</aside>
+          <div class="mobile" style="position: relative">
+            <div class="mob-topbar">
+              <button
+                class="icon-btn-mob"
+                aria-label="Close navigation"
+                style="
+                  background: var(--primary);
+                  color: var(--primary-foreground);
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>
+              <div class="mob-mark">
+                <div class="sb-mark">N</div>
+                <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+              </div>
+              <button class="icon-btn-mob" aria-label="Account">
+                <div
+                  class="sb-avatar"
+                  style="width: 24px; height: 24px; font-size: 11px"
+                >
+                  A
+                </div>
+              </button>
+            </div>
+
+            <!-- Sheet overlay -->
+            <div
+              style="
+                position: absolute;
+                top: 70px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(61, 53, 48, 0.18);
+                backdrop-filter: blur(2px);
+              "
+            >
+              <div
+                style="
+                  background: var(--background);
+                  padding: 18px 14px;
+                  box-shadow: 0 12px 40px rgba(61, 53, 48, 0.18);
+                  border-bottom-left-radius: 24px;
+                  border-bottom-right-radius: 24px;
+                "
+              >
+                <nav class="sb-nav" aria-label="Primary">
+                  <a href="/dashboard">
+                    <svg
+                      class="ico"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <path
+                        d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                      />
+                    </svg>
+                    <span class="lbl">Dashboard</span>
+                  </a>
+                  <a href="/design/new">
+                    <svg
+                      class="ico"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <path d="M10 3v14M3 10h14" />
+                    </svg>
+                    <span class="lbl">New Design</span>
+                    <span class="new-pip">New</span>
+                  </a>
+                  <a href="/library" class="active" aria-current="page">
+                    <svg
+                      class="ico"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <rect x="3" y="4" width="14" height="13" rx="2" />
+                      <path d="M7 4v13M13 4v13" />
+                    </svg>
+                    <span class="lbl">Library</span>
+                  </a>
+                </nav>
+                <div
+                  style="
+                    border-top: 1px solid rgb(140 126 120 / 0.18);
+                    margin-top: 14px;
+                    padding-top: 14px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                  "
+                >
+                  <div class="sb-avatar">A</div>
+                  <div class="sb-meta">
+                    <div class="who">Amara</div>
+                    <button class="out">Sign out</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Sheet, not rail.</strong> On &lt; 768px the persistent rail
+          collapses entirely — a top-bar with hamburger replaces it. Tapping
+          opens a sheet that slides down from below the top-bar (200ms
+          slide+fade). The sheet's link list reuses the exact
+          <code>.sb-nav a</code> styles from desktop.
+        </div>
+        <div class="callout">
+          <strong>Library reflow.</strong> Page header drops to 24px.
+          Illustration scales 0.85. CTA becomes full-width to maintain a 44px
+          hit target with comfortable reach. Secondary "Return to dashboard"
+          stays a text link.
+        </div>
+        <div class="callout">
+          <strong>A11y.</strong> Sheet traps focus while open · Esc closes ·
+          backdrop click closes · returns focus to the hamburger button.
+          <code>aria-expanded</code> on the trigger.
+        </div>
+      </div>
+    </div>
+
+    <footer
+      class="mx-auto max-w-[1280px] px-4 py-10 text-[11px] tracking-[0.22em] uppercase text-muted-foreground"
+    >
+      Sidebar update · Components: AppShell · SidebarNav · LibraryEmpty ·
+      MobileNavSheet · Pinterest stays URL-only
+    </footer>
+  </body>
+</html>

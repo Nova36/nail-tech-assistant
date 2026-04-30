@@ -1,0 +1,439 @@
+id: c5-server-storage-helper
+epic: epic-c-reference-and-generation
+title: 'lib/firebase/storage.ts — server-only Firebase Cloud Storage helper + owner-scoped path API (mirrors lib/firebase/server.ts pattern)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [c4-firestore-storage-rules]
+
+escalations_addressed:
+  - trigger: security:plan-audit
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Helper exposes ONLY owner-scoped path-derived APIs:
+      `referencePath(uid, refId)` and `generationPath(uid, genId)`. Bucket
+      paths cannot be hand-rolled at call sites. Combined with c4 storage
+      rules (path-derived `users/{uid}/...` allow), this guarantees that
+      bypassing the helper to write to a non-owner path is denied at the
+      storage layer.
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Helper provides explicit `uploadReferenceBytes` + `uploadGenerationBytes`
+      surfaces with deterministic error states. c15 lifecycle's two-write
+      pattern relies on this helper returning a discriminated success/failure
+      so persistGenerationResult can transition to `failure` (not `pending`)
+      when the bytes write fails.
+
+description: |
+  Server-only Firebase Cloud Storage helper. Mirrors the existing
+  `lib/firebase/server.ts` Admin SDK init pattern (Symbol.for global cache,
+  inlined service-account hydration) so import-order assumptions stay
+  consistent across per-route Vercel bundles per memory
+  `feedback_env_hydration_import_order`.
+
+  Exposes a tight surface:
+
+  - `getServerFirebaseStorage(): Bucket` — initializes the Admin Storage
+    SDK once per process, returns the configured bucket from
+    `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`. Cached via `Symbol.for(...)`.
+  - `referencePath(uid: string, refId: string, ext: string): string` —
+    returns `users/{uid}/references/{refId}.{ext}`. Single source of truth
+    for the path shape c4 storage rules expect.
+  - `generationPath(uid: string, genId: string, ext: string): string` —
+    returns `users/{uid}/generations/{genId}.{ext}`.
+  - `uploadReferenceBytes(input: { uid; refId; bytes; contentType }):
+    Promise<{ ok: true; storagePath: string } | { ok: false; reason:
+    'storage_failure' | 'unauthorized'; message: string }>` — writes
+    bytes, returns the canonical `storagePath` string for persistence into
+    `references.storagePath`.
+  - `uploadGenerationBytes(input: { uid; genId; bytes; contentType }):
+    Promise<...same shape...>` — same as uploadReferenceBytes, different
+    path family.
+
+  No call site outside this helper is allowed to construct
+  `users/{uid}/...` strings directly. Reviewer enforces this by grep.
+
+  No download API in this story — c10/c11 fetch reference URLs via the
+  client SDK or signed URLs (decided in those stories). Download is not
+  the c5 surface boundary.
+
+acceptance_criteria:
+  - 'Given the helper is imported from a server action, when `import "@/lib/firebase/storage"` runs, then it triggers `''server-only''` package import and fails the build if accidentally pulled into a client bundle.'
+  - 'Given `getServerFirebaseStorage()` is called twice from different routes in the same Next.js process, when both calls resolve, then they return the SAME `Bucket` instance (cached via `Symbol.for("firebase-admin-storage")`).'
+  - 'Given `referencePath("alice-uid", "r1", "jpg")`, when called, then it returns exactly `"users/alice-uid/references/r1.jpg"` — no leading slash, no trailing slash, normalized extension lower-case.'
+  - 'Given `generationPath("alice-uid", "g1", "png")`, when called, then it returns `"users/alice-uid/generations/g1.png"`.'
+  - 'Given `uploadReferenceBytes({ uid: "alice-uid", refId: "r1", bytes, contentType: "image/jpeg" })`, when the bucket write succeeds, then it returns `{ ok: true; storagePath: "users/alice-uid/references/r1.jpg" }`.'
+  - 'Given the bucket write fails (e.g., emulator returns 5xx, network error, permission denied), when `uploadReferenceBytes` catches the error, then it logs `console.error("[storage] uploadReferenceBytes failed", { code, message, uid, refId })` per memory `feedback_silent_catches_cost_time` AND returns `{ ok: false; reason: "storage_failure"; message }`.'
+  - "Given `uploadGenerationBytes(...)` is called with bytes representing a corrupt image, when the write succeeds at the storage layer, then the helper returns `{ ok: true; storagePath }` — image-content validation is NOT this helper's job (caller validates)."
+  - 'Given the helper is imported in a vitest unit test, when the test does NOT start the storage emulator, then any `getServerFirebaseStorage()` call must NOT make a real network request (hydration is lazy; only `uploadReferenceBytes` / `uploadGenerationBytes` actually call the SDK).'
+  - 'Given an integration test that runs against the storage emulator (started by `firebase emulators:exec`), when the test calls `uploadReferenceBytes` with valid inputs, then it succeeds and the bytes are readable from the emulator at the returned `storagePath`.'
+  - 'Given a grep across `app/**` and `lib/**` (excluding `lib/firebase/storage.ts` itself), when searching for the literal string `"users/"`, then no other file constructs storage paths directly — all storage path construction goes through `referencePath()` / `generationPath()`.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Firebase Admin Storage SDK v13 (`firebase-admin/storage`) —
+      confirm `getStorage(app).bucket(bucketName)` returns a `Bucket` from
+      `@google-cloud/storage`, and `bucket.file(path).save(buffer, options)`
+      is the canonical write API. Confirm via context7 lookup of
+      `firebase-admin` v13 docs.
+      (2) Storage emulator connection — does the Admin SDK auto-detect
+      `STORAGE_EMULATOR_HOST` env var (canonical Google Cloud Storage
+      emulator env), or does Firebase use a different mechanism (e.g.,
+      `FIREBASE_STORAGE_EMULATOR_HOST`)? Test in the c4 emulator config to
+      confirm the right env name.
+      (3) Bucket name — `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` is already
+      validated in lib/env.ts. The Admin SDK in emulator mode may need a
+      project-id-derived dummy bucket name (`<projectId>.appspot.com`) or
+      may accept the env value as-is. Confirm via emulator docs.
+
+      Read `lib/firebase/server.ts` end-to-end as the canonical pattern to
+      mirror — every gotcha there (hydration inlining, Symbol.for cache,
+      emulator branch) translates to storage.ts. Memory anchors:
+      `feedback_env_hydration_import_order`,
+      `feedback_silent_catches_cost_time`.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation.
+
+      - tests/unit/firebase/storage-paths.test.ts — pure path helper tests:
+        (1) `referencePath('alice-uid', 'r1', 'jpg')` → `'users/alice-uid/references/r1.jpg'`
+        (2) `referencePath('a', 'b', 'JPEG')` → `'users/a/references/b.jpeg'`
+            (extension normalized lowercase)
+        (3) `referencePath('a', 'b', '.jpg')` → `'users/a/references/b.jpg'`
+            (leading-dot stripped)
+        (4) `generationPath('alice', 'g1', 'png')` → `'users/alice/generations/g1.png'`
+        (5) Empty uid throws — the path API should be defensive
+        (6) Empty refId throws
+
+      - tests/integration/firebase/storage-upload.test.ts — emulator-backed
+        (runs ONLY in `pnpm test:rules` lane after c4 ships emulator):
+        Wait — re-read existing test lanes. Storage helper tests probably
+        belong in a NEW lane:
+        - `vitest.config.storage.ts` (or extend rules-config to also pick
+          up tests/integration/firebase/storage-*.test.ts), wrapped in
+          `firebase emulators:exec --only storage,auth`.
+        - Tester decides at this step whether to add a new lane or extend
+          existing rules-lane. Default: extend rules-lane to include
+          `tests/integration/storage/**/*.test.ts` so one emulator wrap
+          covers all "needs Firebase emulator" tests.
+
+        (1) `uploadReferenceBytes({ uid: "alice", refId: "r1", bytes:
+            new Uint8Array([0xFF, 0xD8, 0xFF]), contentType: "image/jpeg" })`
+            → returns `{ ok: true; storagePath: "users/alice/references/r1.jpg" }`
+            and bytes are readable via `bucket.file(storagePath).download()`.
+        (2) `uploadReferenceBytes` with a bucket name that does NOT exist
+            in the emulator → returns `{ ok: false; reason:
+            "storage_failure"; message }` and console.error contains
+            `code` + `message`.
+        (3) Symbol.for cache — call `getServerFirebaseStorage()` twice;
+            assert returned `Bucket` is the same instance.
+
+      - tests/unit/firebase/storage-grep-guard.test.ts — synthetic test
+        asserting no other file constructs storage paths:
+        Read app/** and lib/** files via fs; assert no occurrence of
+        `'users/'` followed by a `${...}` template variable in TS string
+        literals (heuristic — accepts false negatives, rejects clear
+        violations).
+        Marker: this test is best-effort; reviewer manual grep is the
+        authoritative check.
+
+      DO NOT mock the firebase-admin SDK in unit tests — pure path tests
+      are pure (no SDK touched). SDK-touching tests run against the real
+      emulator.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass. Mirror lib/firebase/server.ts pattern.
+
+      ```ts
+      import ''server-only'';
+      import { getApps, initializeApp, type App, cert } from 'firebase-admin/app';
+      import { getStorage } from 'firebase-admin/storage';
+      import type { Bucket } from '@google-cloud/storage';
+      import { env } from '@/lib/env';
+
+      const STORAGE_BUCKET_KEY = Symbol.for('firebase-admin-storage');
+      type GlobalStorageStore = Record<PropertyKey, unknown>;
+
+      // Inlined hydration — same comment as lib/firebase/server.ts:
+      // Vercel route bundles that don't transitively import lib/env
+      // (e.g. the authenticated layout) otherwise get an undefined
+      // process.env.* read here. Inlining keeps each route's bundle
+      // self-contained.
+      function hydrateFromServiceAccountJson(): void {
+        // ... same body as lib/firebase/server.ts hydrateFromServiceAccountJson
+      }
+
+      function getPrivateKey(): string {
+        return process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
+      }
+
+      function isEmulatorMode(): boolean {
+        return Boolean(
+          process.env.FIREBASE_STORAGE_EMULATOR_HOST ||
+          process.env.STORAGE_EMULATOR_HOST
+        );
+      }
+
+      function ensureAdminApp(): App {
+        // Prefer reusing the same App instance as lib/firebase/server.ts
+        // by going through the same Symbol.for key. If server.ts has not
+        // initialized yet, fall through to local init.
+        // ... mirror server.ts logic
+      }
+
+      export function getServerFirebaseStorage(): Bucket {
+        const globalStore = globalThis as GlobalStorageStore;
+        const cached = globalStore[STORAGE_BUCKET_KEY];
+        if (cached) return cached as Bucket;
+        const app = ensureAdminApp();
+        const bucket = getStorage(app).bucket(env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+        globalStore[STORAGE_BUCKET_KEY] = bucket;
+        return bucket;
+      }
+
+      function normalizeExtension(ext: string): string {
+        return ext.replace(/^\./, '').toLowerCase().replace(/^jpeg$/, 'jpeg');
+      }
+
+      export function referencePath(uid: string, refId: string, ext: string): string {
+        if (!uid) throw new Error('referencePath: uid required');
+        if (!refId) throw new Error('referencePath: refId required');
+        return `users/${uid}/references/${refId}.${normalizeExtension(ext)}`;
+      }
+
+      export function generationPath(uid: string, genId: string, ext: string): string {
+        if (!uid) throw new Error('generationPath: uid required');
+        if (!genId) throw new Error('generationPath: genId required');
+        return `users/${uid}/generations/${genId}.${normalizeExtension(ext)}`;
+      }
+
+      type UploadResult =
+        | { ok: true; storagePath: string }
+        | { ok: false; reason: 'storage_failure' | 'unauthorized'; message: string };
+
+      export async function uploadReferenceBytes(input: {
+        uid: string;
+        refId: string;
+        bytes: Buffer | Uint8Array;
+        contentType: string;
+      }): Promise<UploadResult> {
+        const ext = contentTypeToExt(input.contentType);
+        const storagePath = referencePath(input.uid, input.refId, ext);
+        try {
+          const bucket = getServerFirebaseStorage();
+          await bucket.file(storagePath).save(Buffer.from(input.bytes), {
+            metadata: { contentType: input.contentType },
+            resumable: false,
+          });
+          return { ok: true, storagePath };
+        } catch (err) {
+          const code = (err as { code?: string }).code ?? 'unknown';
+          const message = (err as Error).message ?? String(err);
+          console.error('[storage] uploadReferenceBytes failed', {
+            code, message, uid: input.uid, refId: input.refId,
+          });
+          return { ok: false, reason: 'storage_failure', message };
+        }
+      }
+
+      export async function uploadGenerationBytes(input: {
+        uid: string;
+        genId: string;
+        bytes: Buffer | Uint8Array;
+        contentType: string;
+      }): Promise<UploadResult> {
+        // Mirror uploadReferenceBytes
+      }
+
+      function contentTypeToExt(contentType: string): string {
+        if (contentType === 'image/jpeg') return 'jpg';
+        if (contentType === 'image/png') return 'png';
+        if (contentType === 'image/heic') return 'heic';
+        throw new Error(`unsupported contentType: ${contentType}`);
+      }
+      ```
+
+      DO NOT: import `lib/types.ts` here unless specifically needed
+      (storage helper is layer-below domain types).
+      DO NOT: download / signed-URL / fetch APIs — out of scope.
+      DO NOT: mock or shim firebase-admin in this file. Real SDK only.
+      DO NOT: catch and silently swallow errors. Every catch logs code +
+      message + relevant identifiers per `feedback_silent_catches_cost_time`.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the helper is the only path constructor and mirrors server.ts
+      conventions.
+
+      - `lib/firebase/storage.ts` imports `''server-only''` at top.
+      - Symbol.for cache pattern matches lib/firebase/server.ts byte-for-byte
+        (different symbol key, same shape).
+      - `hydrateFromServiceAccountJson()` is INLINED in this file (not
+        imported from lib/firebase/server.ts) per memory
+        `feedback_env_hydration_import_order`. Reviewer confirms inline.
+      - `getServerFirebaseStorage()` reuses the same App instance as
+        lib/firebase/server.ts (via Symbol.for("firebase-admin-app")) when
+        possible; falls back to local init only if needed.
+      - `referencePath`/`generationPath` reject empty uid/id.
+      - Extension normalization: `JPEG` → `jpeg`, `.jpg` → `jpg`.
+      - `uploadReferenceBytes`/`uploadGenerationBytes` log code+message on
+        failure per `feedback_silent_catches_cost_time`.
+      - `contentTypeToExt` throws on unsupported types — does NOT silently
+        coerce.
+      - Grep across `app/**` and `lib/**` (excluding storage.ts itself)
+        for the literal `'users/'` returns no other matches.
+      - `pnpm test` passes (path helper tests).
+      - `pnpm test:rules` passes (storage emulator integration tests if
+        included in rules lane; otherwise new `pnpm test:storage` lane).
+      - No production code outside `lib/firebase/storage.ts`, related
+        tests, possibly `vitest.config.rules.ts` (if extended), and
+        possibly `package.json` (if a new test lane added).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c5-server-storage-helper`.
+      Commit: `feat(c5): server-only Firebase Cloud Storage helper + owner-scoped path API`.
+      Pre-commit: `pnpm test` + `pnpm test:rules` (or `pnpm test:storage`)
+      must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 (server-only module; never imported from client components)'
+    runtime: 'Node 20+; firebase-admin v13.8.0; @google-cloud/storage (transitive via firebase-admin)'
+    testing: 'Vitest unit (path helpers); vitest+emulator integration (uploads)'
+  key_files:
+    - path: lib/firebase/server.ts
+      purpose: 'Canonical pattern this story mirrors — Symbol.for cache, inlined hydration, isEmulatorMode branch'
+    - path: lib/firebase/storage.ts
+      purpose: "CREATE; this story's subject"
+    - path: lib/env.ts
+      purpose: "Consumed — `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` already validated; no new env required (Slice 1 spike's GEMINI_API_KEY is unrelated)"
+    - path: storage.rules
+      purpose: 'Consumed — c4 wrote the path-derived owner rules this helper must produce paths matching'
+    - path: firebase.json
+      purpose: "Consumed — c4 added storage emulator block; this story's integration tests use the emulator"
+    - path: tests/rules/profiles.rules.test.ts
+      purpose: 'Existing pattern for emulator-backed tests; storage upload tests follow similar shape'
+
+files_to_modify:
+  - file: lib/firebase/storage.ts
+    change: 'CREATE; server-only Storage helper'
+  - file: tests/unit/firebase/storage-paths.test.ts
+    change: 'CREATE in test-spec — pure path tests'
+  - file: tests/integration/firebase/storage-upload.test.ts
+    change: 'CREATE in test-spec — emulator-backed upload tests'
+  - file: tests/unit/firebase/storage-grep-guard.test.ts
+    change: 'CREATE in test-spec — best-effort guard against parallel storage path construction'
+  - file: vitest.config.rules.ts
+    change: 'EXTEND if research confirms storage upload tests fit the rules lane (default: extend include glob to add tests/integration/firebase/**)'
+  - file: package.json
+    change: 'EXTEND if research confirms storage upload tests need a new lane (default: no change; reuse test:rules)'
+
+design_decisions:
+  - decision: 'Helper exposes ONLY owner-scoped path constructors (`referencePath`/`generationPath`); no `bucketPath(uid, kind, id, ext)` generic API'
+    rationale: 'Generic APIs invite hand-rolling at call sites. Tight named functions force every storage write through a known-shape path that aligns with c4 storage rules. Adding a new path family in a future epic = adding a new helper function = forcing reviewer attention.'
+  - decision: 'Helper REUSES the existing `Symbol.for("firebase-admin-app")` from lib/firebase/server.ts'
+    rationale: 'Same Firebase App = same credentials = same emulator detection. Two parallel App instances would double-init, double-cache, and double-bill in production. Reviewer confirms by inspecting both files use the same Symbol.for key.'
+  - decision: 'Hydration is inlined, NOT imported from lib/firebase/server.ts'
+    rationale: 'Memory `feedback_env_hydration_import_order` — per-route Vercel bundles that import storage.ts but not server.ts otherwise miss hydration. Inlining costs ~10 lines of duplication and saves a real production bug.'
+  - decision: 'Upload returns discriminated `{ ok: true; storagePath } | { ok: false; reason; message }` envelope (same shape as Pinterest client)'
+    rationale: 'Matches the existing `lib/pinterest/client.ts` pattern. c15 lifecycle (persistGenerationResult) needs deterministic failure detection without try/catch boilerplate at the call site. Discriminated union is unambiguous.'
+  - decision: 'No download / fetch / signed-URL APIs in this story'
+    rationale: 'YAGNI. c10 reference panel and c17 generation preview decide their own download paths (probably client SDK download URLs since auth context is on the client). Adding a server download API now without a consumer creates an unjustified surface.'
+  - decision: 'contentType → extension mapping is enumerated, not regex-derived'
+    rationale: 'Three formats v1 supports: JPEG, PNG, HEIC. Enum throws on unknown — explicit. Regex parsing of `image/[a-z]+` would silently accept `image/svg+xml` and store it with the wrong extension.'
+  - decision: 'No client-side Storage SDK helper in this story'
+    rationale: 'Browser uploads bypass the server. Decision deferred to c8 (uploadReference action) — likely server-proxied uploads via the action, not direct browser-to-Storage. If c8 picks direct-browser, a CORS config story is added then. c5 only needs the server helper.'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'Helper enforces the path shape that c4 storage.rules ALLOW. If a future epic changes the path shape, both this helper AND the rules must change in lockstep — single-PR atomicity. Reviewer step grep-guard catches parallel path construction.'
+  - concern: 'env hydration'
+    notes: 'Inlined hydration per memory. Future helpers (e.g., a Pub/Sub or Vertex AI helper) follow the same pattern: copy the inline block, do not import from server.ts.'
+  - concern: 'third-party error logging'
+    notes: 'Every catch around bucket.file().save() logs `[storage] <op> failed` with `code`+`message`+identifiers. Memory `feedback_silent_catches_cost_time` enforced.'
+
+risks:
+  - severity: high
+    description: 'Helper accidentally pulled into a client bundle; `server-only` import explodes the build'
+    mitigation: '`server-only` import is the FIRST line of the file. Build will fail loudly at import time, not silently at runtime. Reviewer step verifies import order.'
+  - severity: medium
+    description: 'Two App instances initialize because Symbol.for keys diverge between server.ts and storage.ts'
+    mitigation: 'Reviewer manually compares Symbol.for keys — must use the SAME `Symbol.for("firebase-admin-app")` across both files. Test (3) (Symbol.for cache test) implicitly catches this — second call returns same Bucket, which can only happen if App is shared.'
+  - severity: medium
+    description: 'Storage emulator env var name is wrong (`FIREBASE_STORAGE_EMULATOR_HOST` vs `STORAGE_EMULATOR_HOST`)'
+    mitigation: 'Research step (2) confirms the canonical env name. Helper checks BOTH names defensively. Integration test against emulator is the proof.'
+  - severity: medium
+    description: 'Hand-rolled path construction sneaks in via a c10/c11/c12 story bypassing the helper'
+    mitigation: 'Grep-guard test in this story + reviewer manual grep across app/** and lib/** for `users/` literal. Future stories that need a NEW path family must extend this helper, not bypass it.'
+  - severity: low
+    description: 'Extension normalization disagrees with c8 upload action acceptance (e.g., HEIC normalized to `heic` but c8 expects `heif`)'
+    mitigation: 'design_decisions document the enum explicitly. c8 acceptance criteria reference this helper as source of truth. Disagreement caught at c8 test-spec time, fixed in one place.'
+  - severity: low
+    description: 'Upload size limit not enforced at the helper layer; large uploads hit Vercel function timeout'
+    mitigation: 'Out of c5 scope. c8 (uploadReference action) enforces file-size cap (Open Q5: 10 MB) at the action boundary, before bytes reach the helper. Helper assumes valid input.'
+
+references:
+  - path: lib/firebase/server.ts
+    relevant_excerpt: |
+      const ADMIN_APP_KEY = Symbol.for('firebase-admin-app');
+      type GlobalAdminStore = Record<PropertyKey, unknown>;
+
+      function getPrivateKey(): string {
+        return process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
+      }
+
+      function isEmulatorMode(): boolean {
+        return Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+      }
+
+      export function createServerFirebaseAdmin(): App {
+        const globalStore = globalThis as GlobalAdminStore;
+        const existingGlobalApp = globalStore[ADMIN_APP_KEY];
+        if (existingGlobalApp) return existingGlobalApp as App;
+        hydrateFromServiceAccountJson();
+        const initOptions = isEmulatorMode()
+          ? { projectId: process.env.FIREBASE_PROJECT_ID! }
+          : { credential: cert({...}) };
+        const app = getApps().length === 0
+          ? initializeApp(initOptions)
+          : getApps()[0]!;
+        globalStore[ADMIN_APP_KEY] = app;
+        return app;
+      }
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §Foundation Reuse: lib/firebase/server.ts already exports
+      createServerFirebaseAdmin() and establishes the server-only Admin SDK
+      initialization pattern, including inline service-account hydration
+      and a Symbol.for(...) global cache; any new Firebase Cloud Storage
+      admin helper should mirror that pattern.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-raw-findings.md
+    relevant_excerpt: |
+      §2 Firebase Storage prior art > Closest sibling pattern to model
+      after: lib/firebase/server.ts. Important behaviour to copy:
+      Globalised app key via Symbol.for(...) to survive Next.js HMR +
+      per-route bundle reloads. hydrateFromServiceAccountJson() is INLINED
+      here, not imported — comment in file calls out the rationale.
+  - path: lib/env.ts
+    relevant_excerpt: |
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: requiredString — already
+      validated. No new env required by this story (Gemini env is c1's
+      concern).
+
+ui_indicators: 'NO new UI surface — server helper only; no wireframes; no ui-design step required'

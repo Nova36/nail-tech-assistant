@@ -1,0 +1,2887 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>c11 v2 — /design/new · 3-step wizard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --background: #faf7f2;
+        --foreground: #3d3530;
+        --card: #f0ebe3;
+        --primary: #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint: #d4a5a8;
+        --accent: #c9a96e;
+        --secondary: #efe8de;
+        --muted: #f0ebe3;
+        --muted-foreground: #8c7e78;
+        --border: #8c7e78;
+        --destructive: #a8443a;
+      }
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+      html,
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        min-height: 100vh;
+      }
+      .font-fraunces {
+        font-family: 'Fraunces', Georgia, serif;
+      }
+      .text-primary {
+        color: var(--primary);
+      }
+      .text-muted-foreground {
+        color: var(--muted-foreground);
+      }
+      .text-destructive {
+        color: var(--destructive);
+      }
+      .bg-card {
+        background-color: var(--card);
+      }
+      .bg-primary {
+        background-color: var(--primary);
+      }
+
+      /* Frame chrome */
+      .frame {
+        margin: 28px auto;
+        background: var(--background);
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.12);
+        width: 1280px;
+        max-width: calc(100vw - 32px);
+      }
+      .frame-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid rgb(140 126 120 / 0.2);
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .frame-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+      }
+      .frame-bar .dot.b {
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .frame-bar .dot.c {
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      .frame-bar .tag {
+        margin-left: auto;
+        border: 1px solid rgb(140 126 120 / 0.3);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+      }
+
+      .frame-label {
+        margin: 24px auto 0;
+        max-width: 1280px;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 0 4px;
+        flex-wrap: wrap;
+      }
+      .frame-num {
+        font-family: 'Fraunces', serif;
+        font-size: 14px;
+        color: var(--primary);
+        font-style: italic;
+      }
+      .frame-title {
+        font-family: 'Fraunces', serif;
+        font-size: 28px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+      }
+      .frame-sub {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        letter-spacing: 0.04em;
+      }
+
+      /* Annotations */
+      aside.anno {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(250, 247, 242, 0.85);
+        border: 1px dashed rgb(140 126 120 / 0.42);
+      }
+      aside.anno::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      aside.anno.pin {
+        position: absolute;
+        top: -11px;
+        left: 14px;
+        z-index: 3;
+      }
+      aside.anno.pin.r {
+        left: auto;
+        right: 14px;
+      }
+
+      .callout {
+        border: 1px dashed rgb(107 63 94 / 0.4);
+        background: rgb(212 165 168 / 0.12);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 11.5px;
+        line-height: 1.55;
+      }
+      .callout strong {
+        color: var(--primary);
+        font-weight: 500;
+      }
+
+      /* Pin/photo covers */
+      .cover {
+        position: relative;
+        background: linear-gradient(
+          135deg,
+          rgb(107 63 94 / 0.08),
+          rgb(212 165 168 / 0.22) 60%,
+          rgb(201 169 110 / 0.12)
+        );
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            110% 65% at 30% 25%,
+            rgba(255, 255, 255, 0.55),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            45deg,
+            transparent 0 22px,
+            rgba(61, 53, 48, 0.035) 22px 23px
+          );
+        pointer-events: none;
+      }
+      .cover-photo {
+        background: linear-gradient(
+          135deg,
+          rgb(201 169 110 / 0.25),
+          rgb(212 165 168 / 0.18) 70%,
+          rgb(107 63 94 / 0.15)
+        );
+      }
+      .cover-photo::after {
+        background:
+          radial-gradient(
+            120% 80% at 70% 25%,
+            rgba(255, 255, 255, 0.55),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            135deg,
+            transparent 0 18px,
+            rgba(61, 53, 48, 0.04) 18px 19px
+          );
+      }
+
+      /* Pin card (Step 1 browse) */
+      .pin {
+        position: relative;
+        border-radius: 18px;
+        background: var(--card);
+        overflow: hidden;
+        cursor: pointer;
+        min-height: 44px;
+        box-shadow: 0 6px 18px rgba(61, 53, 48, 0.06);
+        transition:
+          transform 180ms ease-out,
+          box-shadow 180ms ease-out;
+      }
+      .pin:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px rgba(61, 53, 48, 0.12);
+      }
+      .pin .add-overlay {
+        position: absolute;
+        inset: auto 0 0 0;
+        padding: 9px 10px;
+        background: linear-gradient(180deg, transparent, rgba(61, 53, 48, 0.6));
+        color: var(--primary-foreground);
+        font-size: 11.5px;
+        opacity: 0;
+        transition: opacity 160ms;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+      }
+      .pin:hover .add-overlay,
+      .pin:focus-visible .add-overlay {
+        opacity: 1;
+      }
+
+      /* Selected check (Step 1) */
+      .pick-check {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 2px 6px rgba(61, 53, 48, 0.2);
+      }
+      .pin.picked {
+        outline: 2.5px solid var(--primary);
+        outline-offset: -2.5px;
+      }
+      .pin.picked .cover {
+        filter: brightness(0.92) saturate(1.05);
+      }
+
+      /* Reference card (Step 2 working set) */
+      .ref-card {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--card);
+        border: 1px solid rgb(140 126 120 / 0.2);
+        transition:
+          transform 180ms,
+          box-shadow 180ms;
+      }
+      .ref-card .body {
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+      .ref-card .body .src {
+        color: var(--foreground);
+        font-weight: 500;
+      }
+      .ref-card .top {
+        position: relative;
+        aspect-ratio: 4/5;
+      }
+      .ref-card .top > .cover {
+        position: absolute;
+        inset: 0;
+      }
+      .ref-card.is-primary {
+        border: 2px solid var(--primary);
+        box-shadow: 0 12px 30px rgba(107, 63, 94, 0.18);
+        transform: translateY(-2px);
+      }
+      .ref-card.is-supporting {
+        border-color: rgb(201 169 110 / 0.55);
+      }
+      .ref-card .order-pill {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--foreground);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(61, 53, 48, 0.18);
+      }
+      .ref-card .primary-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        font-size: 10.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        padding: 4px 8px;
+        border-radius: 999px;
+        box-shadow: 0 2px 6px rgba(61, 53, 48, 0.18);
+      }
+      .ref-card .remove {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: rgba(61, 53, 48, 0.7);
+        color: var(--background);
+        display: grid;
+        place-items: center;
+        border: 0;
+        cursor: pointer;
+      }
+      .ref-card .grip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-top: 1px solid rgb(140 126 120 / 0.15);
+        background: rgba(250, 247, 242, 0.5);
+        font-size: 11px;
+        color: var(--muted-foreground);
+      }
+      .grip {
+        width: 26px;
+        height: 24px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        color: var(--muted-foreground);
+        cursor: grab;
+        background: rgba(140, 126, 120, 0.06);
+        border: 0;
+      }
+      .grip:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      .set-primary-cta {
+        position: absolute;
+        inset: auto 0 0 0;
+        padding: 8px 10px;
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(61, 53, 48, 0.62)
+        );
+        color: var(--primary-foreground);
+        font-size: 12px;
+        font-weight: 500;
+        text-align: center;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 240px;
+        background: var(--background);
+        border-right: 1px solid rgb(140 126 120 / 0.18);
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .sb-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+      }
+      .sb-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-tint)
+        );
+        display: grid;
+        place-items: center;
+        color: var(--primary-foreground);
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+      }
+      .sb-name {
+        font-family: 'Fraunces', serif;
+        font-size: 16px;
+      }
+      .sb-name em {
+        color: var(--primary);
+        font-style: italic;
+      }
+      .sb-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 6px;
+      }
+      .sb-nav a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--foreground);
+        font-size: 14px;
+        text-decoration: none;
+        min-height: 44px;
+      }
+      .sb-nav a .ico {
+        width: 18px;
+        height: 18px;
+        color: var(--muted-foreground);
+      }
+      .sb-nav a:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+      .sb-nav a.active {
+        background: rgba(107, 63, 94, 0.12);
+        color: var(--primary);
+      }
+      .sb-nav a.active .ico {
+        color: var(--primary);
+      }
+      .sb-section-label {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 0 12px;
+        margin-top: 8px;
+      }
+
+      /* Wizard chrome */
+      .wiz-shell {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        min-height: 820px;
+      }
+      .wiz-main {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-width: 0;
+      }
+      .wiz-progress {
+        padding: 22px 32px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 1px solid rgb(140 126 120 / 0.16);
+        background: var(--background);
+      }
+      .step-pill {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+        background: transparent;
+        border: 1px solid transparent;
+        min-height: 36px;
+        cursor: pointer;
+      }
+      .step-pill .num {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(140, 126, 120, 0.18);
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .step-pill.done .num {
+        background: rgb(201 169 110 / 0.6);
+        color: var(--foreground);
+      }
+      .step-pill.done {
+        color: var(--foreground);
+      }
+      .step-pill.active {
+        background: rgba(107, 63, 94, 0.1);
+        color: var(--primary);
+        border-color: rgb(107 63 94 / 0.25);
+      }
+      .step-pill.active .num {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+      .step-pill .lbl em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+      }
+      .step-rail-arrow {
+        color: rgb(140 126 120 / 0.5);
+        font-size: 14px;
+      }
+
+      .wiz-body {
+        padding: 24px 32px;
+        min-width: 0;
+      }
+      .wiz-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 32px;
+        background: var(--card);
+        border-top: 1px solid rgb(140 126 120 / 0.16);
+      }
+      .wiz-footer .reason {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .wiz-footer .reason.err {
+        color: var(--destructive);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        min-height: 44px;
+        cursor: pointer;
+        transition:
+          background 160ms,
+          transform 120ms;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 6px 16px rgba(107, 63, 94, 0.25);
+      }
+      .btn-primary:hover {
+        background: #58324d;
+      }
+      .btn-primary:disabled,
+      .btn-primary[aria-disabled='true'] {
+        background: rgb(140 126 120 / 0.25);
+        color: var(--muted-foreground);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--foreground);
+        border: 1px solid rgb(140 126 120 / 0.32);
+      }
+      .btn-ghost:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+
+      /* Browse panel (Step 1) */
+      .panel {
+        position: relative;
+        background: var(--card);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+      }
+      .browse-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .upload-tile {
+        border: 1.5px dashed rgb(107 63 94 / 0.35);
+        border-radius: 18px;
+        background: rgb(212 165 168 / 0.08);
+        min-height: 200px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted-foreground);
+        padding: 18px;
+        cursor: pointer;
+      }
+      .upload-tile:hover {
+        background: rgb(212 165 168 / 0.16);
+        border-color: rgb(107 63 94 / 0.55);
+      }
+      .upload-tile h4 {
+        font-family: 'Fraunces', serif;
+        font-size: 18px;
+        font-weight: 400;
+        color: var(--foreground);
+        margin-bottom: 4px;
+      }
+
+      /* Selected count chip */
+      .pick-count {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--card);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        border: 1px solid rgb(140 126 120 / 0.22);
+      }
+      .pick-count .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary);
+      }
+      .pick-count.zero .dot {
+        background: rgb(140 126 120 / 0.5);
+      }
+
+      /* Step 2 strip */
+      .ws-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .ws-strip.ordered {
+        grid-template-columns: 1.4fr repeat(3, 1fr);
+      }
+
+      /* Prompt + shape */
+      .prompt-wrap {
+        background: var(--card);
+        border-radius: 18px;
+        padding: 16px;
+        border: 1px solid rgb(140 126 120 / 0.22);
+      }
+      textarea.prompt {
+        width: 100%;
+        min-height: 88px;
+        background: transparent;
+        border: 0;
+        outline: 0;
+        resize: vertical;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--foreground);
+      }
+      textarea.prompt::placeholder {
+        color: var(--muted-foreground);
+      }
+
+      .shape-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+      }
+      .shape-chip {
+        border: 1px solid rgb(140 126 120 / 0.28);
+        border-radius: 12px;
+        padding: 12px 8px;
+        background: var(--background);
+        text-align: center;
+        cursor: pointer;
+        font-size: 11.5px;
+        color: var(--foreground);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        min-height: 64px;
+      }
+      .shape-chip:hover {
+        background: rgb(212 165 168 / 0.12);
+      }
+      .shape-chip.on {
+        border-color: var(--primary);
+        background: rgba(107, 63, 94, 0.08);
+        color: var(--primary);
+      }
+      .shape-chip svg {
+        color: currentColor;
+        opacity: 0.85;
+      }
+
+      .collapse-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        background: var(--card);
+        border-radius: 12px;
+        border: 1px solid rgb(140 126 120 / 0.2);
+        cursor: pointer;
+        min-height: 44px;
+        font-size: 13px;
+      }
+      .collapse-row .chev {
+        color: var(--muted-foreground);
+        transition: transform 160ms;
+      }
+
+      .toast {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--foreground);
+        color: var(--background);
+        border-radius: 999px;
+        font-size: 13px;
+        box-shadow: 0 12px 32px rgba(61, 53, 48, 0.25);
+      }
+      .toast .check {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: grid;
+        place-items: center;
+        color: var(--foreground);
+      }
+
+      .kbd {
+        font-family: 'Inter', monospace;
+        font-size: 11px;
+        padding: 2px 6px;
+        border: 1px solid rgb(140 126 120 / 0.4);
+        border-radius: 4px;
+        background: var(--background);
+      }
+
+      .legend-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+      }
+      .legend-card dt {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        color: var(--primary);
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      .legend-card dd {
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+
+      .err-banner {
+        display: flex;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgb(168 68 58 / 0.08);
+        border: 1px solid rgb(168 68 58 / 0.32);
+        color: var(--destructive);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .swap-banner {
+        display: flex;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgb(201 169 110 / 0.18);
+        border: 1px solid rgb(201 169 110 / 0.5);
+        color: var(--foreground);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .step-transition {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 12px 0;
+        color: var(--muted-foreground);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .step-transition .line {
+        flex: 1;
+        height: 1px;
+        background: rgb(140 126 120 / 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ════════════════════════ DOC HEADER + LEGEND ════════════════════════ -->
+    <header class="mx-auto max-w-[1280px] px-4 pt-10 pb-4">
+      <p
+        class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+      >
+        Wireframe · c11 v2 · /design/new · 3-step wizard
+      </p>
+      <h1
+        class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+      >
+        Studio New <span class="italic text-primary">Design</span> — wizard
+        refactor.
+      </h1>
+      <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-2xl">
+        Same route, same brand tokens, same a11y/motion conventions — the
+        workspace now flows in three steps.
+        <em>Step 1 — Inspiration</em> · <em>Step 2 — Direction</em> ·
+        <em>Step 3 — Confirm</em> (separate wireframe). Wizard state is
+        internal; the URL never changes. ← Back preserves all selections.
+      </p>
+    </header>
+
+    <section class="mx-auto max-w-[1280px] px-4 mb-10">
+      <div class="legend-card grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+        <dl>
+          <dt>Tokens (unchanged)</dt>
+          <dd>
+            <code>bg-background</code>, <code>bg-card</code>,
+            <code>text-foreground</code>, <code>text-muted-foreground</code>,
+            <code>bg-primary</code>, <code>bg-secondary</code>,
+            <code>bg-accent</code>, <code>destructive</code>. Heading: Fraunces
+            · Body: Inter.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Wizard chrome</dt>
+          <dd>
+            Top progress strip on every frame: 1 Inspiration → 2 Direction → 3
+            Confirm. ✓ on completed steps (clickable to revisit, preserves
+            state). Footer row: ← Back (hidden on Step 1) · Continue → (Step 1)
+            / Generate → (Step 2).
+          </dd>
+        </dl>
+        <dl>
+          <dt>Frame conventions</dt>
+          <dd>
+            Frames 1280×variable. Six total: 1.1, 1.2 · 2.1, 2.2, 2.3, 2.4.
+            Dashed pin-labels mark named regions.
+            <span class="callout inline-block mt-1">Callouts</span> are
+            interaction / a11y / motion notes.
+          </dd>
+        </dl>
+        <dl class="md:col-span-3">
+          <dt>Step boundary semantics</dt>
+          <dd>
+            <strong>Step 1</strong> = "this is interesting" — no primary
+            marking, no order, soft cap of ~8 (warning, not block).
+            <strong>Step 2</strong> enters with all Step 1 picks locked as the
+            working set; Pinterest browse + upload tile are <em>hidden</em>.
+            Removing in Step 2 returns the item to "available" (re-includable
+            via ← Back) — never deletes from app state.
+          </dd>
+        </dl>
+        <dl class="md:col-span-3">
+          <dt>Motion (additions)</dt>
+          <dd>
+            Inter-step transition: 250ms slide-and-fade — left for next, right
+            for back. <em>prefers-reduced-motion</em>: instant, no slide. All
+            previously-noted 200ms slide+fade adds, 150ms fade-outs, 200ms
+            reflow, and 150ms reorder still apply.
+          </dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════ FRAME 1.1 — Step 1 empty ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">1.1</span>
+      <h2 class="frame-title">
+        Step 1 · <span class="italic text-primary">empty.</span>
+      </h2>
+      <span class="frame-sub"
+        >Pick at least one reference to continue. No primary/secondary
+        affordance yet.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 1 of 3 · empty</span
+        ><span class="tag">frame 1.1</span>
+      </div>
+
+      <div class="wiz-shell">
+        <!-- Sidebar -->
+        <aside class="sidebar relative">
+          <aside class="anno pin">AppShell · sidebar (unchanged from v1)</aside>
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+          <div class="sb-section-label mt-auto">v0.4 · Mother's Day '26</div>
+        </aside>
+
+        <!-- Wizard main -->
+        <div class="wiz-main">
+          <!-- Progress -->
+          <div class="wiz-progress relative" aria-label="Wizard progress">
+            <aside class="anno pin">
+              component: WizardProgress · 3 steps · ✓ on completed (clickable)
+            </aside>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">1</span
+              ><span class="lbl"><em>Inspiration</em></span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">2</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">3</span><span class="lbl">Confirm</span>
+            </button>
+            <span class="ml-auto pick-count zero"
+              ><span class="dot"></span> 0 references picked</span
+            >
+          </div>
+
+          <!-- Body -->
+          <div class="wiz-body flex flex-col gap-5">
+            <header>
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+              >
+                Step 1 of 3
+              </p>
+              <h3
+                class="font-fraunces text-4xl font-light tracking-[-0.02em] leading-[1.05]"
+              >
+                Pick your <span class="italic text-primary">inspiration.</span>
+              </h3>
+              <p class="text-sm text-muted-foreground mt-2 max-w-prose">
+                Choose pins from Pinterest or upload your own photos. You can
+                mix both.
+              </p>
+            </header>
+
+            <section class="panel" aria-labelledby="f11-browse-h">
+              <aside class="anno pin">
+                BrowsePinterestPanel · selectable · click toggles selection
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 id="f11-browse-h" class="font-fraunces text-xl font-light">
+                  Browse Pinterest
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >Board · Soft Mauve · 47 pins</span
+                >
+              </div>
+              <div class="browse-grid">
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">+ Pick</div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">+ Pick</div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">+ Pick</div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">+ Pick</div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+              </div>
+              <div class="callout mt-4">
+                <strong>Click semantics on Step 1.</strong> Pin click = toggle
+                selection (no primary/secondary). Hover overlay reads "+ Pick".
+                <strong>SR:</strong> aria-live polite — "Picked pin 2. 1
+                reference selected."
+              </div>
+            </section>
+
+            <section class="panel">
+              <aside class="anno pin">
+                UploadTile · drag-drop + file-picker (parity)
+              </aside>
+              <div
+                class="upload-tile"
+                role="button"
+                tabindex="0"
+                aria-label="Upload reference photo. Drag and drop or click to choose a file."
+              >
+                <div>
+                  <h4>Drop a reference photo</h4>
+                  <div class="text-sm">
+                    or
+                    <span class="text-primary underline underline-offset-4"
+                      >click to choose</span
+                    >
+                    a file (JPG, PNG · up to 12 MB)
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Footer -->
+          <div class="wiz-footer relative">
+            <aside class="anno pin">
+              component: WizardFooter · ← Back hidden · Continue disabled with
+              reason
+            </aside>
+            <span></span>
+            <span class="reason" aria-live="polite">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5M8 11v.01" />
+              </svg>
+              Pick at least one reference to continue.
+            </span>
+            <button class="btn btn-primary" disabled aria-disabled="true">
+              Continue
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Out of scope on Step 1.</strong> No reference panel, no
+          prompt, no nail shape, no primary/secondary marking. Step 1 is purely
+          "this is interesting."
+        </div>
+        <div class="callout">
+          <strong>Soft cap.</strong> 8+ picks shows a non-blocking helper near
+          the count: "Lots of references — generation works best with ~8 or
+          fewer." User can continue regardless.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 1.2 — Step 1 with picks ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">1.2</span>
+      <h2 class="frame-title">
+        Step 1 · <span class="italic text-primary">4 picked.</span>
+      </h2>
+      <span class="frame-sub"
+        >2 pins + 2 uploads. Continue enabled. No primary marking yet.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 1 of 3 · 4 picked</span
+        ><span class="tag">frame 1.2</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill active" aria-current="step">
+              <span class="num">1</span
+              ><span class="lbl"><em>Inspiration</em></span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">2</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">3</span><span class="lbl">Confirm</span>
+            </button>
+            <span class="ml-auto pick-count"
+              ><span class="dot"></span> 4 references picked</span
+            >
+          </div>
+
+          <div class="wiz-body flex flex-col gap-5">
+            <header>
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+              >
+                Step 1 of 3
+              </p>
+              <h3
+                class="font-fraunces text-4xl font-light tracking-[-0.02em] leading-[1.05]"
+              >
+                Pick your <span class="italic text-primary">inspiration.</span>
+              </h3>
+              <p class="text-sm text-muted-foreground mt-2 max-w-prose">
+                Choose pins from Pinterest or upload your own photos. You can
+                mix both.
+              </p>
+            </header>
+
+            <section class="panel">
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 class="font-fraunces text-xl font-light">
+                  Browse Pinterest
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >2 picked from this board</span
+                >
+              </div>
+              <div class="browse-grid">
+                <article class="pin picked">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="pick-check"
+                    ><svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                    >
+                      <path d="M2 6.3l2.6 2.6L10 3.4" /></svg
+                  ></span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin picked">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="pick-check"
+                    ><svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                    >
+                      <path d="M2 6.3l2.6 2.6L10 3.4" /></svg
+                  ></span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel">
+              <aside class="anno pin">
+                component: UploadTile + uploaded thumbnails (2)
+              </aside>
+              <div class="grid grid-cols-3 gap-3">
+                <div
+                  class="upload-tile"
+                  role="button"
+                  tabindex="0"
+                  style="min-height: 160px"
+                >
+                  <div>
+                    <h4 style="font-size: 15px">Drop a photo</h4>
+                    <div class="text-xs">
+                      or
+                      <span class="text-primary underline underline-offset-4"
+                        >click to choose</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <article class="pin picked">
+                  <div class="cover cover-photo aspect-[4/5]"></div>
+                  <span class="pick-check"
+                    ><svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                    >
+                      <path d="M2 6.3l2.6 2.6L10 3.4" /></svg
+                  ></span>
+                  <div
+                    class="absolute bottom-2 left-2 right-2 text-[11px] text-background bg-foreground/70 rounded px-2 py-1 truncate"
+                  >
+                    client_amara_001.jpg
+                  </div>
+                </article>
+                <article class="pin picked">
+                  <div class="cover cover-photo aspect-[4/5]"></div>
+                  <span class="pick-check"
+                    ><svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                    >
+                      <path d="M2 6.3l2.6 2.6L10 3.4" /></svg
+                  ></span>
+                  <div
+                    class="absolute bottom-2 left-2 right-2 text-[11px] text-background bg-foreground/70 rounded px-2 py-1 truncate"
+                  >
+                    tile_chrome_test.png
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <!-- Inline toast preview -->
+            <div class="flex justify-end">
+              <div class="toast" role="status">
+                <span class="check"
+                  ><svg
+                    width="9"
+                    height="9"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M2 6.5l2.5 2.5L10 3.5" /></svg
+                ></span>
+                Uploaded · tile_chrome_test.png
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <button class="btn btn-ghost" style="visibility: hidden">
+              ← Back
+            </button>
+            <span class="reason">4 picked · ready for Step 2 — Direction</span>
+            <button class="btn btn-primary">
+              Continue
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Toggle off.</strong> Clicking a picked pin un-picks it · 150ms
+          fade-out of the check · count decrements with aria-live.
+        </div>
+        <div class="callout">
+          <strong>Continue → step 2.</strong> 250ms slide-and-fade left. Wizard
+          state (4 picks) is locked & passed to Step 2 as the working set.
+          Reduced-motion: instant.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step transition divider -->
+    <div class="mx-auto max-w-[1280px] px-4">
+      <div class="step-transition">
+        <span class="line"></span> Step 1 → Step 2 transition · 250ms
+        slide-and-fade left <span class="line"></span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 2.1 — Step 2 just-arrived ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">2.1</span>
+      <h2 class="frame-title">
+        Step 2 · <span class="italic text-primary">just arrived.</span>
+      </h2>
+      <span class="frame-sub"
+        >Browse + upload hidden. 4 references locked. No designations yet.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 2 of 3 · just arrived</span
+        ><span class="tag">frame 2.1</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">2</span
+              ><span class="lbl"><em>Direction</em></span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">3</span><span class="lbl">Confirm</span>
+            </button>
+            <span class="ml-auto pick-count zero"
+              ><span class="dot"></span> 4 references · 0 primary</span
+            >
+          </div>
+
+          <div class="wiz-body flex flex-col gap-5">
+            <header>
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+              >
+                Step 2 of 3
+              </p>
+              <h3
+                class="font-fraunces text-4xl font-light tracking-[-0.02em] leading-[1.05]"
+              >
+                Set your <span class="italic text-primary">direction.</span>
+              </h3>
+              <p class="text-sm text-muted-foreground mt-2 max-w-prose">
+                Pick one main inspiration to lead the design. Add others as
+                supporting details.
+              </p>
+            </header>
+
+            <section class="panel relative" aria-labelledby="f21-ws-h">
+              <aside class="anno pin">
+                component: WorkingSetGrid · 4 refs from Step 1 · no designation
+              </aside>
+              <div class="flex items-baseline justify-between mb-4">
+                <h4 id="f21-ws-h" class="font-fraunces text-xl font-light">
+                  Your references
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >From Step 1 — Inspiration</span
+                >
+              </div>
+              <div class="ws-strip">
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <div class="set-primary-cta">
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Set as primary
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #2</span><span>—</span>
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <div class="set-primary-cta">
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Set as primary
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #5</span><span>—</span>
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <div class="set-primary-cta">
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Set as primary
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · client_amara_001</span
+                    ><span>—</span>
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <div class="set-primary-cta">
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Set as primary
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · tile_chrome</span><span>—</span>
+                  </div>
+                </article>
+              </div>
+
+              <div class="callout mt-4">
+                <strong>Removed Pinterest browse + upload.</strong> Step 2 is
+                one decision at a time — the working set is locked. To add or
+                remove sources, the user uses ← Back to return to Step 1 (state
+                preserved).
+              </div>
+            </section>
+
+            <!-- Collapsed prompt + shape -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="collapse-row">
+                <div class="flex items-center gap-3">
+                  <span
+                    class="text-muted-foreground text-[11px] tracking-[0.16em] uppercase"
+                    >Optional</span
+                  >
+                  <span class="font-fraunces italic text-primary">Prompt</span>
+                  <span class="text-muted-foreground"
+                    >— add a short brief in plain words</span
+                  >
+                </div>
+                <span class="chev">▾</span>
+              </div>
+              <div class="collapse-row">
+                <div class="flex items-center gap-3">
+                  <span
+                    class="text-muted-foreground text-[11px] tracking-[0.16em] uppercase"
+                    >Optional</span
+                  >
+                  <span class="font-fraunces italic text-primary"
+                    >Nail shape</span
+                  >
+                  <span class="text-muted-foreground"
+                    >— almond, oval, square…</span
+                  >
+                </div>
+                <span class="chev">▾</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <button class="btn btn-ghost">← Back</button>
+            <span class="reason">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 5v3.5M8 11v.01" />
+              </svg>
+              Pick a primary reference to continue.
+            </span>
+            <button class="btn btn-primary" disabled aria-disabled="true">
+              Generate
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>← Back preserves state.</strong> Returning to Step 1 shows all
+          4 picks still selected. Re-entering Step 2 keeps any
+          primary/order/prompt that was already set.
+        </div>
+        <div class="callout">
+          <strong>Right-side button changes label.</strong> Step 1 right =
+          "Continue →". Step 2 right = "Generate →" (signals it fires the gen
+          call and transitions to Step 3).
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 2.2 — Primary chosen ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">2.2</span>
+      <h2 class="frame-title">
+        Step 2 · <span class="italic text-primary">primary chosen.</span>
+      </h2>
+      <span class="frame-sub"
+        >One reference elevated. Others show "Add as supporting". Continue
+        enabled.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 2 · primary chosen</span
+        ><span class="tag">frame 2.2</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">2</span
+              ><span class="lbl"><em>Direction</em></span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">3</span><span class="lbl">Confirm</span>
+            </button>
+            <span class="ml-auto pick-count"
+              ><span class="dot"></span> 4 references · 1 primary</span
+            >
+          </div>
+
+          <div class="wiz-body flex flex-col gap-5">
+            <header>
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+              >
+                Step 2 of 3
+              </p>
+              <h3
+                class="font-fraunces text-4xl font-light tracking-[-0.02em] leading-[1.05]"
+              >
+                Order your
+                <span class="italic text-primary">supporting</span> references.
+              </h3>
+              <p class="text-sm text-muted-foreground mt-2 max-w-prose">
+                Reorder supporting references by dragging or arrow keys. Order =
+                generation weight.
+              </p>
+            </header>
+
+            <section class="panel relative">
+              <aside class="anno pin">
+                WorkingSetGrid · 1 primary, 3 unassigned
+              </aside>
+
+              <!-- Primary, isolated row -->
+              <h4
+                class="text-[11px] tracking-[0.22em] uppercase text-muted-foreground mb-2"
+              >
+                Primary
+              </h4>
+              <div class="grid grid-cols-4 gap-4 mb-5">
+                <article class="ref-card is-primary">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <span class="primary-badge"
+                      ><svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Primary</span
+                    >
+                    <button class="remove" aria-label="Remove primary">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #5</span
+                    ><span
+                      class="text-primary text-[11px] uppercase tracking-[0.16em]"
+                      >Lead</span
+                    >
+                  </div>
+                </article>
+                <div class="col-span-3 self-center">
+                  <p class="text-sm text-muted-foreground">
+                    <strong class="text-foreground font-medium"
+                      >Pinterest #5</strong
+                    >
+                    is leading. Tap "Add as supporting" on others below to
+                    include them in the brief — or set a different primary.
+                  </p>
+                </div>
+              </div>
+
+              <h4
+                class="text-[11px] tracking-[0.22em] uppercase text-muted-foreground mb-2"
+              >
+                Available
+              </h4>
+              <div class="grid grid-cols-4 gap-4">
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <div class="set-primary-cta">+ Add as supporting</div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #2</span
+                    ><span class="text-muted-foreground">·</span>
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <div class="set-primary-cta">+ Add as supporting</div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · client_amara_001</span
+                    ><span class="text-muted-foreground">·</span>
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <div class="set-primary-cta">+ Add as supporting</div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · tile_chrome</span
+                    ><span class="text-muted-foreground">·</span>
+                  </div>
+                </article>
+                <div
+                  class="ref-card flex items-center justify-center text-center text-[12px] text-muted-foreground"
+                  style="background: transparent; border-style: dashed"
+                >
+                  <p style="padding: 16px">
+                    Each card here<br />also shows<br /><span
+                      class="text-primary"
+                      >"Set as primary"</span
+                    ><br />on hover
+                  </p>
+                </div>
+              </div>
+
+              <!-- Floating keyboard hint, anchored to a focused grip simulation -->
+              <div
+                class="callout mt-5"
+                style="display: flex; gap: 10px; align-items: flex-start"
+              >
+                <div
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: var(--foreground);
+                    color: var(--background);
+                    padding: 6px 10px;
+                    border-radius: 8px;
+                    font-size: 11.5px;
+                    box-shadow: 0 8px 18px rgba(61, 53, 48, 0.25);
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                  "
+                >
+                  <span
+                    class="kbd"
+                    style="
+                      background: rgba(255, 255, 255, 0.12);
+                      color: var(--background);
+                      border-color: transparent;
+                    "
+                    >↑</span
+                  >
+                  <span
+                    class="kbd"
+                    style="
+                      background: rgba(255, 255, 255, 0.12);
+                      color: var(--background);
+                      border-color: transparent;
+                    "
+                    >↓</span
+                  >
+                  to reorder
+                </div>
+                <div>
+                  <strong
+                    >Keyboard reorder hint (folded in from v1 frame 5).</strong
+                  >
+                  When a supporting card's grip receives
+                  <code>:focus-visible</code>, this chip surfaces inline beside
+                  it. ↑/↓ move within the supporting list. Primary cannot be
+                  reordered. Each move announces "Moved supporting from position
+                  X to Y" via aria-live. <strong>WCAG 2.1.1.</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="wiz-footer">
+            <button class="btn btn-ghost">← Back</button>
+            <span class="reason"
+              >Ready · 1 primary, 0 supporting · text overrides on
+              conflict</span
+            >
+            <button class="btn btn-primary">
+              Generate
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Promotion mechanics.</strong> Tapping "Set as primary" on an
+          available card promotes it AND demotes the previous primary back to
+          "available" (not removed). 200ms cross-fade between the two cards'
+          badges. Aria-live: "Set Pinterest #2 as primary. Pinterest #5 returned
+          to available."
+        </div>
+        <div class="callout">
+          <strong>Color-not-only.</strong> Primary uses ★ icon + "Primary" label
+          + 2px border + lift, not just hue. Supporting use ① ② ③ pills +
+          "Supporting" label, not just accent fill.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 2.3 — Step 2 fully filled ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">2.3</span>
+      <h2 class="frame-title">
+        Step 2 · <span class="italic text-primary">fully filled.</span>
+      </h2>
+      <span class="frame-sub"
+        >Primary + 3 ordered supporting + prompt typed + nail shape
+        selected.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 2 · ready</span
+        ><span class="tag">frame 2.3</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">2</span
+              ><span class="lbl"><em>Direction</em></span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">3</span><span class="lbl">Confirm</span>
+            </button>
+            <span class="ml-auto pick-count"
+              ><span class="dot"></span> 1 primary · 3 supporting</span
+            >
+          </div>
+
+          <div class="wiz-body flex flex-col gap-5">
+            <header>
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+              >
+                Step 2 of 3
+              </p>
+              <h3
+                class="font-fraunces text-4xl font-light tracking-[-0.02em] leading-[1.05]"
+              >
+                Almost <span class="italic text-primary">there.</span>
+              </h3>
+            </header>
+
+            <section class="panel relative">
+              <aside class="anno pin">
+                WorkingSetGrid · primary + 3 ordered supporting
+              </aside>
+              <h4
+                class="text-[11px] tracking-[0.22em] uppercase text-muted-foreground mb-2"
+              >
+                Primary
+              </h4>
+              <div class="grid grid-cols-4 gap-4 mb-5">
+                <article class="ref-card is-primary">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <span class="primary-badge"
+                      ><svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Primary</span
+                    >
+                    <button class="remove" aria-label="Remove">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #5</span
+                    ><span
+                      class="text-primary text-[11px] uppercase tracking-[0.16em]"
+                      >Lead</span
+                    >
+                  </div>
+                </article>
+                <div class="col-span-3 self-center grid grid-cols-2 gap-3">
+                  <div class="prompt-wrap">
+                    <aside class="anno" style="margin-bottom: 6px">
+                      component: PromptInput · expanded · text typed
+                    </aside>
+                    <textarea class="prompt">
+soft mauve french with one chrome accent finger, almond shape, summer wedding</textarea
+                    >
+                    <p class="text-[11px] text-muted-foreground mt-1">
+                      Optional. If provided, the prompt overrides reference cues
+                      on conflict.
+                    </p>
+                  </div>
+                  <div class="prompt-wrap">
+                    <aside class="anno" style="margin-bottom: 6px">
+                      component: NailShape · single-select
+                    </aside>
+                    <p class="font-fraunces italic text-primary text-sm mb-2">
+                      Nail shape
+                    </p>
+                    <div class="shape-grid">
+                      <button class="shape-chip on" aria-pressed="true">
+                        <svg
+                          width="20"
+                          height="24"
+                          viewBox="0 0 20 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        >
+                          <path d="M5 22 Q5 6 10 2 Q15 6 15 22 Z" />
+                        </svg>
+                        Almond
+                      </button>
+                      <button class="shape-chip">
+                        <svg
+                          width="20"
+                          height="24"
+                          viewBox="0 0 20 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        >
+                          <ellipse cx="10" cy="12" rx="5" ry="10" /></svg
+                        >Oval
+                      </button>
+                      <button class="shape-chip">
+                        <svg
+                          width="20"
+                          height="24"
+                          viewBox="0 0 20 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        >
+                          <rect
+                            x="5"
+                            y="3"
+                            width="10"
+                            height="19"
+                            rx="1.5"
+                          /></svg
+                        >Square
+                      </button>
+                      <button class="shape-chip">
+                        <svg
+                          width="20"
+                          height="24"
+                          viewBox="0 0 20 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        >
+                          <path d="M5 22 V8 Q5 3 10 3 Q15 3 15 8 V22 Z" /></svg
+                        >Squoval
+                      </button>
+                      <button class="shape-chip">
+                        <svg
+                          width="20"
+                          height="24"
+                          viewBox="0 0 20 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        >
+                          <path d="M5 22 L7 4 Q10 2 13 4 L15 22 Z" /></svg
+                        >Coffin
+                      </button>
+                      <button class="shape-chip">
+                        <svg
+                          width="20"
+                          height="24"
+                          viewBox="0 0 20 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                        >
+                          <path d="M5 22 Q8 2 10 1 Q12 2 15 22 Z" /></svg
+                        >Stiletto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <h4
+                class="text-[11px] tracking-[0.22em] uppercase text-muted-foreground mb-2"
+              >
+                Supporting · order = weight
+              </h4>
+              <div class="grid grid-cols-3 gap-4">
+                <article class="ref-card is-supporting">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <span class="order-pill">1</span>
+                    <button class="remove" aria-label="Remove supporting 1">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #2</span
+                    ><span class="text-muted-foreground text-[11px]"
+                      >added 1m ago</span
+                    >
+                  </div>
+                  <div class="grip-row">
+                    <button
+                      class="grip"
+                      aria-label="Reorder supporting 1, position 1 of 3"
+                      aria-keyshortcuts="ArrowUp ArrowDown"
+                    >
+                      <svg
+                        width="10"
+                        height="14"
+                        viewBox="0 0 10 14"
+                        fill="currentColor"
+                      >
+                        <circle cx="2" cy="2" r="1" />
+                        <circle cx="2" cy="7" r="1" />
+                        <circle cx="2" cy="12" r="1" />
+                        <circle cx="8" cy="2" r="1" />
+                        <circle cx="8" cy="7" r="1" />
+                        <circle cx="8" cy="12" r="1" />
+                      </svg>
+                    </button>
+                    <span>Drag · or focus + ↑/↓</span>
+                  </div>
+                </article>
+                <article class="ref-card is-supporting">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <span class="order-pill">2</span>
+                    <button class="remove" aria-label="Remove supporting 2">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · client_amara_001</span
+                    ><span class="text-muted-foreground text-[11px]"
+                      >2.4 MB</span
+                    >
+                  </div>
+                  <div class="grip-row">
+                    <button
+                      class="grip"
+                      aria-label="Reorder supporting 2, position 2 of 3"
+                    >
+                      <svg
+                        width="10"
+                        height="14"
+                        viewBox="0 0 10 14"
+                        fill="currentColor"
+                      >
+                        <circle cx="2" cy="2" r="1" />
+                        <circle cx="2" cy="7" r="1" />
+                        <circle cx="2" cy="12" r="1" />
+                        <circle cx="8" cy="2" r="1" />
+                        <circle cx="8" cy="7" r="1" />
+                        <circle cx="8" cy="12" r="1" />
+                      </svg>
+                    </button>
+                    <span>Drag · or focus + ↑/↓</span>
+                  </div>
+                </article>
+                <article class="ref-card is-supporting">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <span class="order-pill">3</span>
+                    <button class="remove" aria-label="Remove supporting 3">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · tile_chrome</span
+                    ><span class="text-muted-foreground text-[11px]"
+                      >added 18s ago</span
+                    >
+                  </div>
+                  <div class="grip-row">
+                    <button
+                      class="grip"
+                      aria-label="Reorder supporting 3, position 3 of 3"
+                    >
+                      <svg
+                        width="10"
+                        height="14"
+                        viewBox="0 0 10 14"
+                        fill="currentColor"
+                      >
+                        <circle cx="2" cy="2" r="1" />
+                        <circle cx="2" cy="7" r="1" />
+                        <circle cx="2" cy="12" r="1" />
+                        <circle cx="8" cy="2" r="1" />
+                        <circle cx="8" cy="7" r="1" />
+                        <circle cx="8" cy="12" r="1" />
+                      </svg>
+                    </button>
+                    <span>Drag · or focus + ↑/↓</span>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
+
+          <div class="wiz-footer">
+            <button class="btn btn-ghost">← Back</button>
+            <span class="reason"
+              >Ready · 1 primary · 3 supporting · prompt + shape set</span
+            >
+            <button class="btn btn-primary">
+              Generate
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Generate fires from here.</strong> Pressing "Generate →"
+          enters Step 3 (separate wireframe c17): saves draft, redirects
+          internally, fires gen call. 250ms slide-and-fade left.
+        </div>
+        <div class="callout">
+          <strong>Remove → "available".</strong> ✕ on a supporting card sends it
+          back to the available row (frame 2.2 layout) — not deleted. ✕ on the
+          primary returns it to available AND surfaces "Pick a primary to
+          continue" in the footer.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ FRAME 2.4 — Step 2 invalid attempt ═══════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">2.4</span>
+      <h2 class="frame-title">
+        Step 2 · <span class="italic text-primary">primary swap.</span>
+      </h2>
+      <span class="frame-sub"
+        >"Only one primary." Tapping a second swaps — non-destructive, not an
+        error.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 2 · primary swap mid-flight</span
+        ><span class="tag">frame 2.4</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">2</span
+              ><span class="lbl"><em>Direction</em></span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill" disabled>
+              <span class="num">3</span><span class="lbl">Confirm</span>
+            </button>
+            <span class="ml-auto pick-count"
+              ><span class="dot"></span> 1 primary (swapping…)</span
+            >
+          </div>
+
+          <div class="wiz-body flex flex-col gap-5">
+            <header>
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+              >
+                Step 2 of 3
+              </p>
+              <h3
+                class="font-fraunces text-4xl font-light tracking-[-0.02em] leading-[1.05]"
+              >
+                Switching <span class="italic text-primary">primary.</span>
+              </h3>
+            </header>
+
+            <!-- Non-destructive swap banner -->
+            <div class="swap-banner" role="status" aria-live="polite">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                style="margin-top: 1px"
+              >
+                <path
+                  d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3M12 3v3h-3M4 13v-3h3"
+                />
+              </svg>
+              <div>
+                <strong style="color: var(--foreground); font-weight: 500"
+                  >Only one primary.</strong
+                >
+                Tapping <em>"Set as primary"</em> on another reference replaces
+                the current one — no error, no warning. The previous primary
+                returns to <em>available</em> for re-include.
+              </div>
+            </div>
+
+            <section class="panel relative">
+              <aside class="anno pin">
+                WorkingSetGrid · mid-swap visualization
+              </aside>
+
+              <h4
+                class="text-[11px] tracking-[0.22em] uppercase text-muted-foreground mb-2"
+              >
+                Primary (swapping)
+              </h4>
+              <div class="grid grid-cols-4 gap-4 mb-5">
+                <!-- Old primary fading out of primary state -->
+                <article
+                  class="ref-card"
+                  style="
+                    opacity: 0.7;
+                    outline: 1.5px dashed rgb(107 63 94 / 0.4);
+                    outline-offset: -1.5px;
+                  "
+                >
+                  <div class="top">
+                    <div class="cover"></div>
+                    <span
+                      style="
+                        position: absolute;
+                        top: 8px;
+                        left: 8px;
+                        background: var(--muted-foreground);
+                        color: var(--background);
+                        font-size: 10.5px;
+                        letter-spacing: 0.16em;
+                        text-transform: uppercase;
+                        padding: 4px 8px;
+                        border-radius: 999px;
+                      "
+                      >Demoting</span
+                    >
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #5</span
+                    ><span class="text-muted-foreground text-[11px]"
+                      >→ available</span
+                    >
+                  </div>
+                </article>
+                <article
+                  class="ref-card is-primary"
+                  style="animation: pulse 800ms ease-out"
+                >
+                  <div class="top">
+                    <div class="cover"></div>
+                    <span class="primary-badge"
+                      ><svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      New primary</span
+                    >
+                    <button class="remove" aria-label="Remove primary">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #2</span
+                    ><span
+                      class="text-primary text-[11px] uppercase tracking-[0.16em]"
+                      >Lead</span
+                    >
+                  </div>
+                </article>
+                <div
+                  class="col-span-2 self-center text-sm text-muted-foreground"
+                  style="line-height: 1.55"
+                >
+                  <strong class="text-foreground font-medium"
+                    >200ms cross-fade.</strong
+                  >
+                  Old primary loses its border + ★ badge and slides into the
+                  "Available" row below. New primary card lifts with a 1.02 →
+                  1.0 scale settle.<br />
+                  <span class="text-[11.5px]"
+                    >Aria-live (polite): "Set Pinterest #2 as primary. Pinterest
+                    #5 returned to available."</span
+                  >
+                </div>
+              </div>
+
+              <h4
+                class="text-[11px] tracking-[0.22em] uppercase text-muted-foreground mb-2"
+              >
+                Available
+              </h4>
+              <div class="grid grid-cols-4 gap-4">
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover"></div>
+                    <div class="set-primary-cta">
+                      + Set as primary · Add as supporting
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Pinterest · #5</span
+                    ><span class="text-muted-foreground text-[11px]"
+                      >just returned</span
+                    >
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <div class="set-primary-cta">
+                      + Set as primary · Add as supporting
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · client_amara_001</span
+                    ><span class="text-muted-foreground">·</span>
+                  </div>
+                </article>
+                <article class="ref-card">
+                  <div class="top">
+                    <div class="cover cover-photo"></div>
+                    <div class="set-primary-cta">
+                      + Set as primary · Add as supporting
+                    </div>
+                  </div>
+                  <div class="body">
+                    <span class="src">Upload · tile_chrome</span
+                    ><span class="text-muted-foreground">·</span>
+                  </div>
+                </article>
+                <div
+                  class="ref-card flex items-center justify-center text-center text-[12px] text-muted-foreground"
+                  style="background: transparent; border-style: dashed"
+                >
+                  <p style="padding: 16px">
+                    Available cards<br />support both:<br /><span
+                      class="text-primary"
+                      >Set as primary</span
+                    ><br />or<br /><span class="text-primary"
+                      >Add as supporting</span
+                    >
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <div class="callout">
+              <strong>Why no error.</strong> "Two primaries" is structurally
+              impossible — the data model only stores one. Tapping is therefore
+              reinterpreted as <em>swap</em>, the safest non-destructive
+              default. The user's intent was almost certainly to switch, not to
+              create a conflict.
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <button class="btn btn-ghost">← Back</button>
+            <span class="reason">Primary swapped · ready when you are</span>
+            <button class="btn btn-primary">
+              Generate
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path d="M3 8h10M9 4l4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Edge: empty primary.</strong> If user removes the current
+          primary without picking another, footer reason returns to "Pick a
+          primary reference to continue." Generate disables. Same affordance —
+          no banner-error needed.
+        </div>
+        <div class="callout">
+          <strong>Step 3 transition.</strong> Once primary is set + supporting
+          (optional), Generate → fires the gen call and 250ms
+          slide-and-fade-left into Step 3 (c17 wireframe). Reduced motion →
+          instant.
+        </div>
+      </div>
+    </div>
+
+    <footer
+      class="mx-auto max-w-[1280px] px-4 py-10 text-[11px] tracking-[0.22em] uppercase text-muted-foreground"
+    >
+      c11 v2 · Wizard · Components: AppShell · WizardProgress · WizardFooter ·
+      BrowsePinterestPanel · UploadTile · WorkingSetGrid · ReferenceCard ·
+      PromptInput · NailShape · Step 3 = c17
+    </footer>
+  </body>
+</html>
