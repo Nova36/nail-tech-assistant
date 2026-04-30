@@ -26,6 +26,10 @@ export default defineConfig({
       // boots for the rules tests. They use the production Admin SDK
       // (NOT @firebase/rules-unit-testing) — separate concern from rules.
       'tests/integration/firebase/**/*.test.ts',
+      // c6 ingest end-to-end test runs in this lane for the Firestore +
+      // Storage emulators (Pinterest is still MSW-mocked via a per-test
+      // setupServer instance — c2's global MSW setup is jsdom-lane-only).
+      'tests/integration/references/**/*.test.ts',
     ],
     testTimeout: 30_000,
     hookTimeout: 30_000,
