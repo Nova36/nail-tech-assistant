@@ -35,6 +35,9 @@ beforeAll(async () => {
   );
   vi.stubEnv('ALLOWED_EMAIL', 'allowed@example.com');
   vi.stubEnv('APP_URL', 'https://nail-tech.example.com');
+  // c9 added selectPinterestPin to actions.ts which transitively imports
+  // lib/pinterest/client → requires PINTEREST_ACCESS_TOKEN at module load
+  vi.stubEnv('PINTEREST_ACCESS_TOKEN', 'pt-test');
 
   const mod = await import('@/app/(authenticated)/design/actions');
   createDesign = mod.createDesign;
