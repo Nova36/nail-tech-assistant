@@ -72,6 +72,82 @@ function inferContentType(url: string): string {
   return 'image/jpeg';
 }
 
+export type IngestUploadResult =
+  | { ok: true; reference: Reference }
+  | {
+      ok: false;
+      reason: 'storage_failure' | 'firestore_failure' | 'unknown';
+      message: string;
+    };
+
+/**
+ * Server-proxied upload ingestion — the upload counterpart to
+ * `ingestPinterestPin`. Same Storage-first / Firestore-after order, same
+ * orphan log line on Firestore failure. Returns the c3-locked Reference
+ * shape with `source: 'upload'`, `pinterestPinId: null`, `sourceUrl: null`.
+ *
+ * The route handler (app/api/references/upload/route.ts) is the only caller
+ * — see story c7 design_decisions for why uploads are a route handler
+ * exception to the api:surface-boundary server-actions-only lock.
+ */
+export async function ingestUpload(input: {
+  userId: string;
+  bytes: Buffer | Uint8Array;
+  contentType: string;
+  originalFilename: string;
+}): Promise<IngestUploadResult> {
+  const refId = crypto.randomUUID();
+
+  const upload = await uploadReferenceBytes({
+    uid: input.userId,
+    refId,
+    bytes: input.bytes,
+    contentType: input.contentType,
+  });
+  if (!upload.ok) {
+    return {
+      ok: false,
+      reason:
+        upload.reason === 'unauthorized' ? 'storage_failure' : upload.reason,
+      message: upload.message,
+    };
+  }
+
+  const reference: Reference = {
+    id: refId,
+    userId: input.userId,
+    source: 'upload',
+    sourceUrl: null,
+    storagePath: upload.storagePath,
+    pinterestPinId: null,
+    createdAt: new Date().toISOString(),
+  };
+
+  try {
+    const db = getFirestore(createServerFirebaseAdmin());
+    await db
+      .collection('references')
+      .doc(refId)
+      .withConverter(referenceConverter)
+      .set(reference);
+    return { ok: true, reference };
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? 'unknown';
+    const message = (err as Error).message ?? String(err);
+    console.error(
+      '[ingest] firestore write failed after storage write succeeded',
+      {
+        uid: input.userId,
+        refId,
+        storagePath: upload.storagePath,
+        code,
+        message,
+      }
+    );
+    return { ok: false, reason: 'firestore_failure', message };
+  }
+}
+
 export async function ingestPinterestPin(input: {
   userId: string;
   pinId: string;
