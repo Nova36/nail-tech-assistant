@@ -1,4 +1,14 @@
-export type NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval';
+export type NailShape =
+  | 'almond'
+  | 'coffin'
+  | 'square'
+  | 'round'
+  | 'oval'
+  | 'stiletto';
+
+export function assertUnreachableShape(s: never): never {
+  throw new Error(`Unexpected NailShape: ${String(s)}`);
+}
 
 export interface AuthUser {
   uid: string;

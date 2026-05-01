@@ -21,6 +21,7 @@ const NAIL_SHAPES: readonly NailShape[] = [
   'square',
   'round',
   'oval',
+  'stiletto',
 ];
 
 function isNailShape(value: unknown): value is NailShape {

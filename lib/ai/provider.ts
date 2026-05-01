@@ -2,6 +2,8 @@ import 'server-only';
 
 import { GoogleGenAI } from '@google/genai';
 
+import type { NailShape } from '@/lib/types';
+
 export interface ProviderImageInput {
   bytes: Buffer;
   mimeType: 'image/jpeg' | 'image/png' | 'image/heic';
@@ -11,7 +13,7 @@ export interface ProviderImageInput {
 export interface ProviderRequest {
   images: ProviderImageInput[];
   promptText: string | null;
-  nailShape: 'almond' | 'coffin' | 'square' | 'round' | 'oval';
+  nailShape: NailShape;
 }
 
 export type ProviderResult =

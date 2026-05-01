@@ -17,10 +17,11 @@ const _coffin: NailShape = 'coffin';
 const _square: NailShape = 'square';
 const _round: NailShape = 'round';
 const _oval: NailShape = 'oval';
+const _stiletto: NailShape = 'stiletto';
 
 // --- Type-level: invalid NailShape members must NOT be assignable ---
-// @ts-expect-error — 'stiletto' is not a valid NailShape
-const _stiletto: NailShape = 'stiletto';
+// @ts-expect-error — 'banana' is not a valid NailShape
+const _banana: NailShape = 'banana';
 
 // --- Type-level: AuthUser must have uid and email ---
 const _authUser: AuthUser = { uid: 'uid-1', email: 'test@example.com' };
@@ -41,6 +42,7 @@ describe('lib/types — exported types (AC#5)', () => {
     void _round;
     void _oval;
     void _stiletto;
+    void _banana;
     void _authUser;
     void _profile;
   });
