@@ -1,7 +1,7 @@
 id: c18-image-host-config
 epic: epic-c-reference-and-generation
 title: 'next.config.ts — add Firebase Storage host to images.remotePatterns (unblocks <GenerationPreview> next/image rendering)'
-status: pending
+status: shipped
 complexity: low
 methodology: tdd
 depends_on: [c17-generation-ui]
