@@ -1,7 +1,7 @@
 id: c16-generate-design-surface
 epic: epic-c-reference-and-generation
 title: 'generateDesign mutation surface — orchestrates persistGenerationStart → c14.generate → persistGenerationResult; surface choice (action vs route) locked by c1 spike P95'
-status: pending
+status: shipped
 complexity: medium
 methodology: tdd
 depends_on: [c15-generation-lifecycle-state-machine, c14-gemini-request-retry]
