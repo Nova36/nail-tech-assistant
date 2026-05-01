@@ -3,6 +3,7 @@
 import { getFirestore } from 'firebase-admin/firestore';
 
 import { generate } from '@/lib/ai/generate';
+import { resolveImageUrl } from '@/lib/designs/imageUrl';
 import {
   createDesignDraft,
   type CreateDesignDraftResult,
@@ -11,10 +12,7 @@ import {
 } from '@/lib/designs/lifecycle';
 import { createServerFirebaseAdmin } from '@/lib/firebase/server';
 import { getSessionForServerAction } from '@/lib/firebase/session';
-import {
-  generationPath,
-  getServerFirebaseStorage,
-} from '@/lib/firebase/storage';
+import { generationPath } from '@/lib/firebase/storage';
 import {
   designConverter,
   referenceConverter,
@@ -287,13 +285,16 @@ export async function generateDesign(input: {
   }
 
   const ext = mimeTypeToExtension(outcome.mimeType);
-  const bucket = getServerFirebaseStorage();
-  const [imageUrl] = await bucket
-    .file(generationPath(session.uid, started.generationId, ext))
-    .getSignedUrl({
-      action: 'read',
-      expires: Date.now() + 15 * 60 * 1000,
-    });
+  const imageUrl = await resolveImageUrl(
+    generationPath(session.uid, started.generationId, ext)
+  );
+
+  if (!imageUrl) {
+    return generateDesignFailure(
+      'storage_fail',
+      'generation image unavailable'
+    );
+  }
 
   return {
     status: 'success',

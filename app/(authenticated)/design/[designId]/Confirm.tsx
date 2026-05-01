@@ -20,6 +20,7 @@ type ConfirmProps = {
   nailShape?: string | null;
   promptText?: string | null;
   latestGenerationId?: string | null;
+  initialImageUrl?: string | null;
 };
 
 type GenerationState =
@@ -101,11 +102,20 @@ export function Confirm({
   nailShape,
   promptText,
   latestGenerationId,
+  initialImageUrl,
 }: ConfirmProps) {
   const router = useRouter();
   const initialShape = (nailShape ?? 'almond') as NailShape;
   const [state, setState] = useState<GenerationState>(
-    latestGenerationId ? { phase: 'idle' } : { phase: 'pending' }
+    initialImageUrl && latestGenerationId
+      ? {
+          phase: 'success',
+          generationId: latestGenerationId,
+          imageUrl: initialImageUrl,
+        }
+      : latestGenerationId
+        ? { phase: 'idle' }
+        : { phase: 'pending' }
   );
   const [activeShape, setActiveShape] = useState<NailShape>(initialShape);
   const [shapeUpdateError, setShapeUpdateError] = useState<string | null>(null);
