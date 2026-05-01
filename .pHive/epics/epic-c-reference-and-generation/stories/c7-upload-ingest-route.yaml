@@ -1,0 +1,453 @@
+id: c7-upload-ingest-route
+epic: epic-c-reference-and-generation
+title: 'lib/references/ingest.ts upload ingestion + `app/api/references/upload/route.ts` multipart route handler (server-proxied; route-not-action because multipart)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [c5-server-storage-helper]
+
+escalations_addressed:
+  - trigger: api:surface-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      This story is the EXPLICIT exception to the c8/c9/c16 server-actions-only
+      lock from epic.yaml api:surface-boundary escalation. Multipart file
+      upload through Next.js server actions is fragile (FormData encoding,
+      streaming buffer handling). Route handler is the canonical Next.js
+      pattern for multipart bodies. Decision documented in design_decisions
+      so future stories don't re-litigate.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      `ingestUpload` returns the c3-locked `Reference` shape verbatim with
+      `source: "upload"` and `pinterestPinId: null`. Identical envelope to
+      c6 `ingestPinterestPin` — the design-discussion §What Could Go Wrong
+      MEDIUM (Pinterest+upload reference shapes drift) is addressed by
+      keeping both functions in the SAME `lib/references/ingest.ts` module
+      with shared persistence logic.
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Same two-write order as c6: bytes to Storage FIRST, Firestore doc
+      AFTER. Same orphan-on-Firestore-failure logging. Symmetric error
+      surface.
+
+description: |
+  Second half of `lib/references/ingest.ts` plus the multipart route
+  handler that the UI (c11) posts uploads to. Implements:
+
+  1. `ingestUpload({ userId, bytes, contentType, originalFilename }):
+     Promise<IngestUploadResult>` in `lib/references/ingest.ts` — the
+     normalize+persist counterpart to `ingestPinterestPin`. Same Storage
+     write + Firestore doc shape, just with `source: "upload"` and
+     `pinterestPinId: null`.
+
+  2. `app/api/references/upload/route.ts` — Next.js route handler
+     (POST). Accepts `multipart/form-data` with one `file` field. Validates
+     content type ∈ {jpeg, png, heic}, size ≤ 10 MB (locked per
+     research-brief Open Q5 / design-discussion §Open Q5). Reads the file
+     bytes into a Node Buffer server-side, calls `ingestUpload` with the
+     authenticated session uid, returns the discriminated envelope as JSON.
+
+  The route is the ONLY exception to the server-actions-canonical decision
+  in api:surface-boundary. Reason: Next.js server actions accept FormData
+  but in practice multipart streaming is brittle, and a route handler with
+  Node Buffer access is the canonical pattern. Documented in
+  design_decisions so this is a settled exception, not a precedent for
+  every future mutation to defect to routes.
+
+  No client-side direct-to-Storage uploads in v1 (research-brief Open Q5
+  explicit: server-proxied). Bandwidth flows through Vercel; this is
+  acceptable for v1 nail-tech single-user volume.
+
+  Out of scope: upload UI (c11 builds `<UploadZone>`), retry behavior on
+  upload failure (c11/c17 own UX), virus scanning (out of v1 scope —
+  single trusted user).
+
+acceptance_criteria:
+  - 'Given an authenticated session for `alice` and a `POST /api/references/upload` with `Content-Type: multipart/form-data` containing one `file` field of type `image/jpeg` under 10 MB, when the route handles the request, then it calls `ingestUpload({ userId: "alice-uid", bytes, contentType: "image/jpeg", originalFilename })` and returns 200 with `{ ok: true; reference: <Reference> }`.'
+  - 'Given a request with no authenticated session, when the route handles it, then it returns 401 with `{ ok: false; reason: "unauthorized"; message }` and does NOT call `ingestUpload`.'
+  - 'Given a request with `Content-Type` other than `multipart/form-data`, when the route handles it, then it returns 415 with `{ ok: false; reason: "unsupported_content_type"; message }`.'
+  - 'Given a multipart request with NO `file` field, when the route handles it, then it returns 400 with `{ ok: false; reason: "missing_file"; message }`.'
+  - 'Given a multipart request with a `file` field of type `application/pdf`, when the route validates, then it returns 415 with `{ ok: false; reason: "unsupported_file_type"; message: "only image/jpeg, image/png, image/heic accepted" }`.'
+  - 'Given a multipart request with a `file` field exceeding 10 MB, when the route validates, then it returns 413 with `{ ok: false; reason: "file_too_large"; message: "max 10 MB" }`.'
+  - 'Given `ingestUpload` returns `{ ok: true; reference }`, when the route responds, then JSON body is `{ ok: true; reference }` with all c3-locked Reference fields populated. `reference.source === "upload"`, `reference.pinterestPinId === null`, `reference.userId === <session uid>`.'
+  - 'Given `ingestUpload` returns `{ ok: false; reason: "storage_failure" }`, when the route responds, then it returns 500 with the same body. The Reference doc was NOT created.'
+  - 'Given `ingestUpload` returns `{ ok: false; reason: "firestore_failure" }`, when the route responds, then it returns 500 with the same body and the orphan-storage log line is present (from `lib/references/ingest.ts` per c6 pattern).'
+  - 'Given a multipart request where the route accepts the file but `bytes.length` is 0 (empty file), when the route validates, then it returns 400 with `{ ok: false; reason: "empty_file"; message }`.'
+  - 'Given a session uid AND a request body that attempts to spoof a different `userId` (e.g., a hidden form field), when the route processes it, then ONLY the session uid is used (request-body uid is ignored). c4 storage rules + Firestore rules would deny the spoof anyway, but the route belt-and-suspenders rejects it.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Next.js 15 App Router multipart/form-data parsing — does
+      `Request.formData()` work in route handlers, and does it stream or
+      buffer the body? Buffering large requests in memory is fine at
+      10 MB cap; streaming is overkill for v1 but worth knowing the
+      limit.
+      (2) HEIC content type — is it `image/heic`, `image/heif`, or both?
+      Phone uploads from iOS land as one of these; both should be accepted
+      and normalized. c5 storage helper already maps `image/heic → heic`
+      extension; confirm the alignment.
+      (3) Authenticated session retrieval in a route handler — Epic A
+      shipped `lib/firebase/session.ts`. Confirm the API for reading the
+      session uid from a Next.js route handler request (likely
+      `getSession()` or `getSessionFromCookies()`); read the existing
+      `app/api/auth/session/route.ts` to see the canonical pattern.
+
+      Also read `app/(auth)/login/actions.ts` for the discriminated
+      envelope return-shape convention to mirror.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Two layers: ingestUpload
+      function tests (mocked) + route handler integration tests.
+
+      - tests/unit/references/ingest-upload-happy-path.test.ts —
+        (1) Mock c5 helper to return `{ ok: true; storagePath }`
+        (2) Mock Firestore Admin doc set to succeed
+        (3) Call `ingestUpload({ userId: "alice", bytes:
+            new Uint8Array([0xFF, 0xD8, 0xFF]),
+            contentType: "image/jpeg",
+            originalFilename: "nail.jpg" })`
+        (4) Assert returned `reference.source === "upload"`,
+            `pinterestPinId === null`, `userId === "alice"`,
+            `storagePath` matches `users/alice/references/<refId>.jpg`,
+            `sourceUrl === null` (uploads have no external URL)
+
+      - tests/unit/references/ingest-upload-error-paths.test.ts —
+        (1) c5 helper returns `storage_failure` → propagates,
+            no Firestore call
+        (2) Firestore mock throws after Storage success → logs
+            `[ingest] firestore write failed after storage write succeeded`,
+            returns `firestore_failure`
+
+      - tests/integration/references/ingest-upload-real-emulator.test.ts —
+        (Storage + Firestore emulators wrapped) (lane same as c5):
+        (1) Real `ingestUpload` end-to-end: assert document at
+            `references/{refId}` + bytes readable at the storagePath.
+        (2) Concurrent calls with two different userIds → produce two
+            distinct refs, no cross-user contamination.
+
+      - tests/integration/api/references-upload-route.test.ts —
+        Route handler tests (use Next.js test idiom for route handlers,
+        OR direct invocation of the exported `POST` function with a mocked
+        `Request`):
+        (1) Mock authenticated session for "alice-uid"; build a
+            multipart Request with a JPEG file under 10 MB; assert 200 +
+            `{ ok: true; reference }` body shape
+        (2) No session → 401 + `unauthorized`
+        (3) `Content-Type: application/json` → 415 + `unsupported_content_type`
+        (4) multipart but no `file` field → 400 + `missing_file`
+        (5) multipart with `file` of `application/pdf` → 415 +
+            `unsupported_file_type`
+        (6) multipart with `file` of 11 MB → 413 + `file_too_large`
+        (7) Empty file (0 bytes) → 400 + `empty_file`
+        (8) HEIC file → accepted, returns 200 with reference where
+            `storagePath` ends in `.heic`
+        (9) Form data has a `userId` field that disagrees with session uid
+            → handler IGNORES form userId, uses session uid
+
+      Use vitest's `it.concurrent` for the concurrent-userId test.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Two file deltas: extend
+      `lib/references/ingest.ts` with `ingestUpload`, and create the
+      route handler.
+
+      1. Extend `lib/references/ingest.ts`:
+         ```ts
+         type IngestUploadResult =
+           | { ok: true; reference: Reference }
+           | { ok: false;
+               reason: 'storage_failure' | 'firestore_failure' | 'unknown';
+               message: string };
+
+         export async function ingestUpload(input: {
+           userId: string;
+           bytes: Buffer | Uint8Array;
+           contentType: string;
+           originalFilename: string;
+         }): Promise<IngestUploadResult> {
+           const refId = crypto.randomUUID();
+
+           const upload = await uploadReferenceBytes({
+             uid: input.userId,
+             refId,
+             bytes: input.bytes,
+             contentType: input.contentType,
+           });
+           if (!upload.ok) return upload; // propagates `storage_failure`
+
+           const reference: Reference = {
+             id: refId,
+             userId: input.userId,
+             source: 'upload',
+             sourceUrl: null,
+             storagePath: upload.storagePath,
+             pinterestPinId: null,
+             createdAt: new Date().toISOString(),
+           };
+
+           try {
+             const db = getFirestore(createServerFirebaseAdmin());
+             await db.collection('references').doc(refId)
+               .withConverter(referenceConverter).set(reference);
+             return { ok: true, reference };
+           } catch (err) {
+             const code = (err as { code?: string }).code ?? 'unknown';
+             const message = (err as Error).message ?? String(err);
+             console.error(
+               '[ingest] firestore write failed after storage write succeeded',
+               { uid: input.userId, refId,
+                 storagePath: upload.storagePath, code, message });
+             return { ok: false, reason: 'firestore_failure', message };
+           }
+         }
+         ```
+
+      2. Create `app/api/references/upload/route.ts`:
+         ```ts
+         import { NextRequest, NextResponse } from 'next/server';
+         import { getSession } from '@/lib/firebase/session'; // confirm name
+         import { ingestUpload } from '@/lib/references/ingest';
+
+         export const runtime = 'nodejs';
+         export const dynamic = 'force-dynamic';
+
+         const MAX_BYTES = 10 * 1024 * 1024; // 10 MB locked per Open Q5
+         const ACCEPTED_CONTENT_TYPES = new Set([
+           'image/jpeg', 'image/png', 'image/heic', 'image/heif',
+         ]);
+
+         export async function POST(req: NextRequest) {
+           const session = await getSession();
+           if (!session?.uid) {
+             return NextResponse.json(
+               { ok: false, reason: 'unauthorized',
+                 message: 'sign in required' },
+               { status: 401 });
+           }
+
+           const contentTypeHeader = req.headers.get('content-type') ?? '';
+           if (!contentTypeHeader.startsWith('multipart/form-data')) {
+             return NextResponse.json(
+               { ok: false, reason: 'unsupported_content_type',
+                 message: 'multipart/form-data required' },
+               { status: 415 });
+           }
+
+           let formData: FormData;
+           try {
+             formData = await req.formData();
+           } catch (err) {
+             const message = (err as Error).message ?? String(err);
+             return NextResponse.json(
+               { ok: false, reason: 'malformed_multipart', message },
+               { status: 400 });
+           }
+
+           const file = formData.get('file');
+           if (!file || !(file instanceof File)) {
+             return NextResponse.json(
+               { ok: false, reason: 'missing_file',
+                 message: 'field "file" required' },
+               { status: 400 });
+           }
+
+           if (file.size === 0) {
+             return NextResponse.json(
+               { ok: false, reason: 'empty_file', message: 'file is empty' },
+               { status: 400 });
+           }
+           if (file.size > MAX_BYTES) {
+             return NextResponse.json(
+               { ok: false, reason: 'file_too_large', message: 'max 10 MB' },
+               { status: 413 });
+           }
+           if (!ACCEPTED_CONTENT_TYPES.has(file.type)) {
+             return NextResponse.json(
+               { ok: false, reason: 'unsupported_file_type',
+                 message: 'only image/jpeg, image/png, image/heic accepted' },
+               { status: 415 });
+           }
+
+           const bytes = Buffer.from(await file.arrayBuffer());
+           // Normalize HEIF → HEIC content type for c5 helper alignment
+           const contentType = file.type === 'image/heif' ? 'image/heic' : file.type;
+
+           const result = await ingestUpload({
+             userId: session.uid,
+             bytes,
+             contentType,
+             originalFilename: file.name,
+           });
+
+           if (!result.ok) {
+             return NextResponse.json(result, { status: 500 });
+           }
+           return NextResponse.json(result, { status: 200 });
+         }
+         ```
+
+      DO NOT: add a server action wrapper (UI posts directly to this route
+      via fetch with FormData). DO NOT: add download/signed-URL endpoints.
+      DO NOT: add upload progress / resumable uploads (out of v1 scope).
+      DO NOT: catch and silently swallow — all error paths log code+message.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify route + ingest function are symmetric with c6 + tight on
+      validation.
+
+      - `ingestUpload` reuses the SAME Firestore-write block as c6
+        (same orphan log line, same converter, same collection name).
+      - Route reads ONLY session uid for `userId` — request body cannot
+        spoof. Test (9) asserts.
+      - Route returns appropriate HTTP status codes (401, 413, 415, 400, 500).
+        NextResponse.json sets the status correctly.
+      - 10 MB cap is the literal `10 * 1024 * 1024` constant. Any drift
+        from the locked Open Q5 value requires a separate decision.
+      - Accepted content types: `image/jpeg`, `image/png`, `image/heic`,
+        `image/heif` (HEIF normalized to HEIC for c5 alignment).
+      - `runtime = 'nodejs'` and `dynamic = 'force-dynamic'` set on the
+        route — multipart streaming requires Node runtime, not Edge.
+      - Reference shape matches c3 lock; `source === 'upload'`,
+        `pinterestPinId === null`, `sourceUrl === null` invariants hold.
+      - All vitest unit + integration + route-handler tests pass.
+      - Reviewer manual grep: confirm no `app/api/references/pinterest/select/route.ts`
+        was accidentally created (that flow is c9 server action, not a route).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c7-upload-ingest-route`.
+      Commit: `feat(c7): multipart upload ingest route + ingestUpload function`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 route handler (POST /api/references/upload, runtime: nodejs)'
+    runtime: 'Node 20+; multipart/form-data via Request.formData(); firebase-admin'
+    testing: 'Vitest unit (mocked Firestore + c5); vitest+emulator integration; route-handler test'
+  key_files:
+    - path: lib/references/ingest.ts
+      purpose: 'EXTENDED (c6 created); ingestUpload added next to ingestPinterestPin'
+    - path: app/api/references/upload/route.ts
+      purpose: 'CREATE; multipart route handler'
+    - path: app/api/auth/session/route.ts
+      purpose: 'Existing — pattern reference for route handler shape + session usage'
+    - path: lib/firebase/session.ts
+      purpose: 'Consumed — getSession() reads session uid from cookies'
+    - path: lib/firebase/storage.ts
+      purpose: 'Consumed (c5) — uploadReferenceBytes'
+    - path: lib/firestore/converters/index.ts
+      purpose: 'Consumed (c3) — referenceConverter'
+    - path: app/(auth)/login/actions.ts
+      purpose: 'Pattern reference — discriminated envelope return shape'
+
+files_to_modify:
+  - file: lib/references/ingest.ts
+    change: 'EXTEND (c6 created the file) with ingestUpload function'
+  - file: app/api/references/upload/route.ts
+    change: 'CREATE; POST handler with multipart parse + validation + ingestUpload call'
+  - file: tests/unit/references/ingest-upload-happy-path.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/references/ingest-upload-error-paths.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/references/ingest-upload-real-emulator.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/api/references-upload-route.test.ts
+    change: 'CREATE in test-spec — route handler tests with mocked session + multipart Request fixtures'
+
+design_decisions:
+  - decision: 'Route handler (NOT server action) for the upload endpoint — explicit exception to api:surface-boundary lock'
+    rationale: 'Next.js server actions accept FormData but multipart streaming through them is brittle (encoding edge cases on heic/heif, large-buffer handling). Route handler with `Request.formData()` is the canonical Next.js multipart pattern. This is the ONLY exception in Epic C — all other mutations (selectPinterestPin, createDesign, generateDesign) stay as server actions per the lock.'
+  - decision: 'Server-proxied uploads (NOT direct browser-to-Storage with signed URLs)'
+    rationale: 'design-discussion §My Proposed Approach + research-brief Open Q5. Server-proxied means bytes flow Vercel → Cloud Storage; client never gets a signed URL. Bandwidth cost is acceptable for v1 single-user volume. Avoids CORS config + signed-URL minting infrastructure. Future epic can swap to direct-browser if user growth demands it.'
+  - decision: '10 MB max file size, locked per design-discussion §Open Q5'
+    rationale: 'Phone JPEGs are 3-8 MB typical; HEIC is 1-4 MB; PNG is variable. 10 MB covers 99th percentile. Vercel function body limit is 4.5 MB on Hobby (more on Pro); if Hobby plan, this cap may need to drop to 4 MB OR move to direct-browser uploads. Confirm during integrate against actual Vercel plan.'
+  - decision: 'Accepted MIME types: jpeg, png, heic, heif (heif normalized to heic)'
+    rationale: 'Phone uploads use jpeg, heic, heif depending on iOS version; PNG covers screenshots. HEIF is functionally identical to HEIC for storage; normalize to one extension. Generation provider may not accept HEIC — c13 buildGeminiRequest handles re-encoding if needed (defer to that story).'
+  - decision: '`userId` derived from session ONLY — request body cannot spoof'
+    rationale: 'Defense in depth: c4 storage rules + Firestore rules would deny a UID mismatch anyway, but the route should reject the spoof at the API boundary instead of relying on the rules layer to bounce it. Test (9) explicit.'
+  - decision: '`runtime = "nodejs"` not Edge'
+    rationale: 'Multipart parsing requires Node Buffer + arrayBuffer streaming. Edge runtime has limitations on body size + Buffer access. firebase-admin SDK also requires Node runtime. Node is the only option.'
+  - decision: 'No upload progress / resumable upload'
+    rationale: 'YAGNI for v1 single-user; UI shows pending state in c11. If real users complain, swap to tus-js / signed URLs in a future epic. Server action / route handler distinction is independent of resumable UX.'
+  - decision: 'No virus scanning'
+    rationale: "Single trusted user (Don's wife) only ingests her own phone photos. Adding virus scanning would require Cloud Functions or a third-party scanner — out of v1 scope. Future epics that add multi-user / public uploads must add scanning."
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'Route enforces session uid; c4 storage.rules enforce path-derived owner; c4 firestore.rules enforce `userId == request.auth.uid`. Three layers of defense.'
+  - concern: 'error-handling'
+    notes: 'Discriminated envelope same shape as c6, c8, c9. Every catch logs code+message. Reason taxonomy is route-aware (`unauthorized`, `unsupported_content_type`, `file_too_large`, etc.) for HTTP semantics, but propagated `ingestUpload` reasons (`storage_failure`, `firestore_failure`) match c6 verbatim.'
+  - concern: 'data-model'
+    notes: 'Reference contract from c3 returned verbatim. `source: "upload"`, `pinterestPinId: null`, `sourceUrl: null` invariants enforced by the function shape.'
+
+risks:
+  - severity: high
+    description: 'Vercel function body size limit (4.5 MB on Hobby plan) silently truncates 10 MB uploads → request never hits route handler'
+    mitigation: 'Researcher confirms Vercel plan tier during integrate. If Hobby, cap drops to 4 MB OR Don upgrades to Pro. Not blocking for c7 scaffold but blocks production deploy.'
+  - severity: high
+    description: 'Multipart parser fails on legitimate iPhone HEIC uploads due to non-standard MIME headers'
+    mitigation: 'Test with real iPhone fixture during integrate. If fails, accept both `image/heic` and `image/heif` (already in code) AND fall through to extension-based inference if `file.type` is empty.'
+  - severity: medium
+    description: 'Empty `file.type` from some browsers (older Chrome) → rejected as `unsupported_file_type`'
+    mitigation: 'Fallback: if `file.type` is empty, infer from `file.name` extension. Implementation can include this if test (5) variants demand it.'
+  - severity: medium
+    description: 'Concurrent uploads from same user race on Firestore doc creation'
+    mitigation: 'refId = crypto.randomUUID() per upload; collisions are negligible. Test (concurrent userId test) covers cross-user; same-user concurrency is implicitly safe due to UUID generation.'
+  - severity: low
+    description: "CSRF on the upload route — a malicious site could POST to it with the user's session cookie"
+    mitigation: 'SameSite=Lax cookies on the session (Epic A baseline). Multipart POSTs from cross-origin require explicit content-type setting which browsers block on simple form POSTs. Acceptable residual for v1; add Origin header check in a future hardening epic.'
+  - severity: low
+    description: 'Route handler tests are flaky due to multipart Request fixture construction'
+    mitigation: 'Use `new FormData()` + `new Request(url, { method: "POST", body: formData })` pattern; multiple Next.js community examples confirm this works in vitest jsdom. If flaky, fall back to undici Request from `node:undici`.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #9 (line 238): app/api/references/upload/route.ts —
+      accept multipart uploads for new photo references.
+      Slice 3 Changes #4 (line 233): components/UploadZone.tsx — support
+      drag/drop or picker-based photo upload. (Source: prompt-required
+      manifest example; horizontal-plan Feature UI)
+  - path: .pHive/planning/horizontal-plan.md
+    relevant_excerpt: |
+      Layer: API / Server Actions — Routes for non-action mutations
+      include the multipart upload endpoint. Server actions for all other
+      mutation flows.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      Open Question §5: File-type and max-size constraints for
+      uploadReference — JPEG/PNG/HEIC? 10 MB? 25 MB? My opinion: JPEG +
+      PNG + HEIC, 10 MB cap, validated server-side. Override if there's a
+      product reason to widen.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: Both Pinterest pins and uploads land as the
+      same Reference shape. The upload path goes straight to the same
+      bucket. By the time buildGeminiRequest runs, both paths look
+      identical. This is FR-C-1.
+      §Open Q5 (locked): JPEG + PNG + HEIC, 10 MB cap, validated
+      server-side.
+  - path: app/api/auth/session/route.ts
+    relevant_excerpt: |
+      Existing route handler — pattern for runtime + dynamic exports +
+      session reading. This story mirrors the import + return-shape style.
+
+ui_indicators: 'NO new UI surface in this story — c11 builds the UploadZone client component that POSTs to this route'

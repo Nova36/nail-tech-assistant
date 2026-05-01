@@ -1,0 +1,421 @@
+id: c10-create-design-action
+epic: epic-c-reference-and-generation
+title: 'createDesign server action + lib/designs/lifecycle.ts (draft create only; latestGenerationId: null at create time)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [c8-reference-set-builder, c4-firestore-storage-rules]
+
+escalations_addressed:
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Action persists durable Design draft using the c3-locked Design
+      shape verbatim. `secondaryReferenceIds: string[]` ordered array
+      enforced. `latestGenerationId: null` at create (set transactionally
+      on terminal generation success per c15). `name: null` at create
+      (UX in c11/c17 may rename later). `nailShape` validated via c8
+      builder against NailShape union.
+  - trigger: api:surface-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      LOCKED as server action (NOT route handler). Same envelope shape
+      as c9. Lives in same file (`app/(authenticated)/design/actions.ts`).
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Single Firestore write of the Design doc. No Storage involvement
+      (Design records are pure metadata; Storage is reference + generation
+      blob territory). c4 firestore.rules deny on UID mismatch — defense
+      in depth.
+
+description: |
+  Persists the durable Design draft. Combines c8's pure
+  `buildReferenceSet` validator with the c3 Design shape and writes a
+  Firestore doc using c3's `designConverter`. Returns
+  `{ ok: true; designId; status: 'draft_created' }` on success.
+
+  Two-file delivery:
+
+  1. `lib/designs/lifecycle.ts` — server-only module with
+     `createDesignDraft({ userId, primaryReferenceId, secondaryReferenceIds,
+     promptText, nailShape }): Promise<CreateDesignDraftResult>`. Calls
+     c8's `buildReferenceSet` for validation, generates a `designId`
+     (`crypto.randomUUID()`), constructs the c3-shaped Design record with
+     `name: null`, `latestGenerationId: null`, `createdAt: now`,
+     `updatedAt: now`, writes through `designConverter`.
+
+  2. `app/(authenticated)/design/actions.ts` — `createDesign` server
+     action lives here next to c9's `selectPinterestPin`. Reads session
+     uid, calls `createDesignDraft({ userId: session.uid, ...input })`,
+     returns the result.
+
+  No Storage. No Generation. No image fetch. This is pure metadata write
+  + validation gate. `latestGenerationId: null` is the explicit "no
+  generation has succeeded yet" sentinel; c15 transactionally sets it on
+  terminal success.
+
+  Out of scope: design update (rename — future epic), design delete
+  (future), design read for library (Epic D), generation triggering
+  (c14/c16). c10 is the FIRST and ONLY write to the `designs` collection
+  in this epic; subsequent updates to set `latestGenerationId` happen in
+  c15 lifecycle.
+
+acceptance_criteria:
+  - 'Given an authenticated session for `alice` and valid input `{ primaryReferenceId: "r1", secondaryReferenceIds: ["r2"], promptText: "matte rose gold", nailShape: "almond" }`, when `createDesign(input)` is called, then it returns `{ ok: true; designId: <uuid>; status: "draft_created" }`.'
+  - 'Given the call succeeds, when Firestore is queried at `designs/{designId}`, then the document exists with `userId: "alice-uid"`, `primaryReferenceId: "r1"`, `secondaryReferenceIds: ["r2"]`, `promptText: "matte rose gold"`, `nailShape: "almond"`, `name: null`, `latestGenerationId: null`, `createdAt: <ISO>`, `updatedAt: <ISO>`.'
+  - 'Given no authenticated session, when `createDesign(input)` is called, then it returns `{ ok: false; reason: "unauthorized"; message }` and Firestore is NOT touched.'
+  - 'Given input with `primaryReferenceId: ""`, when c8 builder rejects, then the action returns `{ ok: false; reason: "primary_required"; message }` and Firestore is NOT touched.'
+  - 'Given input that fails any c8 invariant (`duplicate_reference_id`, `primary_in_secondary`, `prompt_too_long`, `invalid_nail_shape`, `invalid_reference_id`), when the action runs, then the c8 reason propagates verbatim and Firestore is NOT touched.'
+  - 'Given input where `request.resource.data.userId !== request.auth.uid` (which the action prevents but rules enforce), when the rules layer rejects the write, then the action catches and returns `{ ok: false; reason: "rules_denied"; message }` with `console.error("[createDesign] firestore rules denied", { uid, designId, code, message })`.'
+  - 'Given the Firestore write fails for a reason other than rules (network, quota, etc.), when the action catches, then it returns `{ ok: false; reason: "firestore_failure"; message }` with the standard error log.'
+  - 'Given the action returns `{ ok: true; designId }`, when c11 UI receives the response, then it can route to `/design/{designId}` (or wherever c11/c17 chooses to send the user — c11 decides, action just provides the ID).'
+  - 'Given concurrent `createDesign` calls from the same user with the same input, when both run, then both succeed (different `designId` UUIDs) — no idempotency / dedup at this layer.'
+  - 'Given the action file is grepped, when inspected, then it imports `lib/designs/lifecycle` and `lib/firebase/session` only — no direct firebase-admin imports.'
+
+steps:
+  - id: research
+    description: |
+      Max 2 focused questions:
+      (1) Firestore Admin SDK timestamp handling — should `createdAt`/
+      `updatedAt` be ISO strings (`new Date().toISOString()`) or Firestore
+      `Timestamp` objects (`FieldValue.serverTimestamp()`)? c3 typed both
+      as `string` (ISO 8601). Confirm the converter handles either; the
+      simplest approach is client-side ISO. ServerTimestamp is more
+      accurate for ordering but requires `FieldValue` imports through
+      the converter — c3 chose strings; honor that.
+      (2) Confirm c4 firestore.rules `designs` collection rules accept
+      writes where `request.resource.data.userId == request.auth.uid` AND
+      reject UID mismatch. Re-read tests/rules/designs.rules.test.ts (c4)
+      for the rule shape.
+
+      Read .pHive/planning/structured-outline.md:240-260 (Slice 3 Interfaces
+      including `createDesign`).
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Two test files: lifecycle
+      module unit tests + action unit tests + integration tests against
+      emulator.
+
+      - tests/unit/designs/lifecycle-create-draft.test.ts —
+        (1) Mock c8 `buildReferenceSet` to return `{ ok: true; set }`
+        (2) Mock Firestore Admin doc set to succeed
+        (3) Call `createDesignDraft({ userId: "alice-uid", primaryReferenceId:
+            "r1", secondaryReferenceIds: ["r2"], promptText: "matte",
+            nailShape: "almond" })`
+        (4) Assert returned `{ ok: true; designId: <string>;
+            status: "draft_created" }`
+        (5) Assert Firestore mock was called with `withConverter(designConverter)`
+        (6) Assert the document data passed to `set()` matches the c3
+            Design shape with `name: null`, `latestGenerationId: null`,
+            `createdAt`+`updatedAt` ISO strings, all input fields preserved
+
+      - tests/unit/designs/lifecycle-validation.test.ts —
+        Each c8 invariant failure propagates:
+        (7) Empty primaryReferenceId → `primary_required`, Firestore NOT called
+        (8) Duplicate secondaryReferenceIds → `duplicate_reference_id`
+        (9) Primary in secondary → `primary_in_secondary`
+        (10) Prompt too long → `prompt_too_long`
+        (11) Invalid nail shape → `invalid_nail_shape`
+
+      - tests/unit/designs/lifecycle-error-paths.test.ts —
+        (12) Firestore mock throws with `code: "permission-denied"` →
+             returns `{ ok: false; reason: "rules_denied"; message }`,
+             logs `[createDesign] firestore rules denied`
+        (13) Firestore mock throws with other code (e.g., `unavailable`) →
+             returns `{ ok: false; reason: "firestore_failure"; message }`,
+             logs `[createDesign] firestore write failed`
+
+      - tests/unit/actions/create-design.test.ts —
+        (14) Mock `getSession()` to return `{ uid: "alice-uid" }`
+        (15) Mock `createDesignDraft` to return `{ ok: true; designId:
+             "d1"; status: "draft_created" }`
+        (16) Call `createDesign({ primaryReferenceId: "r1", ... })`
+        (17) Assert `createDesignDraft` was called with `userId:
+             "alice-uid"` (from session, NOT from input)
+        (18) Assert returned envelope is verbatim
+        (19) No session → `unauthorized`, `createDesignDraft` NOT called
+
+      - tests/integration/designs/create-design-real-emulator.test.ts —
+        (Firestore emulator wrapped lane):
+        (20) Real `createDesignDraft` call against emulator with valid
+             input + auth context for "alice-uid" → assert document at
+             `designs/{designId}` matches the input
+        (21) Same call but with `userId` mismatching the auth context →
+             assert rules reject (returns `rules_denied`)
+        (22) Concurrent creates with same input from same user → two
+             distinct designIds, no collision
+
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Two files.
+
+      1. Create `lib/designs/lifecycle.ts`:
+         ```ts
+         import 'server-only';
+         import crypto from 'node:crypto';
+         import { getFirestore } from 'firebase-admin/firestore';
+         import { createServerFirebaseAdmin } from '@/lib/firebase/server';
+         import { designConverter } from '@/lib/firestore/converters';
+         import { buildReferenceSet } from '@/lib/references/reference-set';
+         import type { Design, NailShape } from '@/lib/types';
+
+         export type CreateDesignDraftResult =
+           | { ok: true; designId: string; status: 'draft_created' }
+           | { ok: false;
+               reason:
+                 | 'primary_required'
+                 | 'invalid_reference_id'
+                 | 'duplicate_reference_id'
+                 | 'primary_in_secondary'
+                 | 'prompt_too_long'
+                 | 'invalid_nail_shape'
+                 | 'rules_denied'
+                 | 'firestore_failure'
+                 | 'unknown';
+               message: string };
+
+         export async function createDesignDraft(input: {
+           userId: string;
+           primaryReferenceId: string;
+           secondaryReferenceIds: string[];
+           promptText?: string | null;
+           nailShape: string;
+         }): Promise<CreateDesignDraftResult> {
+           const built = buildReferenceSet({
+             primaryReferenceId: input.primaryReferenceId,
+             secondaryReferenceIds: input.secondaryReferenceIds,
+             promptText: input.promptText ?? null,
+             nailShape: input.nailShape,
+           });
+           if (!built.ok) {
+             // c8 reasons are a subset of CreateDesignDraftResult reasons
+             return built;
+           }
+
+           const designId = crypto.randomUUID();
+           const now = new Date().toISOString();
+           const design: Design = {
+             id: designId,
+             userId: input.userId,
+             name: null,
+             primaryReferenceId: built.set.primaryReferenceId,
+             secondaryReferenceIds: built.set.secondaryReferenceIds,
+             promptText: built.set.promptText,
+             nailShape: built.set.nailShape as NailShape,
+             latestGenerationId: null,
+             createdAt: now,
+             updatedAt: now,
+           };
+
+           try {
+             const db = getFirestore(createServerFirebaseAdmin());
+             await db.collection('designs').doc(designId)
+               .withConverter(designConverter).set(design);
+             return { ok: true, designId, status: 'draft_created' };
+           } catch (err) {
+             const code = (err as { code?: string }).code ?? 'unknown';
+             const message = (err as Error).message ?? String(err);
+             if (code === 'permission-denied') {
+               console.error('[createDesign] firestore rules denied',
+                 { uid: input.userId, designId, code, message });
+               return { ok: false, reason: 'rules_denied', message };
+             }
+             console.error('[createDesign] firestore write failed',
+               { uid: input.userId, designId, code, message });
+             return { ok: false, reason: 'firestore_failure', message };
+           }
+         }
+         ```
+
+      2. Extend `app/(authenticated)/design/actions.ts` (file from c9):
+         ```ts
+         import {
+           createDesignDraft,
+           type CreateDesignDraftResult,
+         } from '@/lib/designs/lifecycle';
+
+         export type CreateDesignResult =
+           | CreateDesignDraftResult
+           | { ok: false; reason: 'unauthorized'; message: string };
+
+         export async function createDesign(input: {
+           primaryReferenceId: string;
+           secondaryReferenceIds: string[];
+           promptText?: string | null;
+           nailShape: string;
+         }): Promise<CreateDesignResult> {
+           const session = await getSession();
+           if (!session?.uid) {
+             return { ok: false, reason: 'unauthorized',
+                      message: 'sign in required' };
+           }
+           return createDesignDraft({
+             userId: session.uid,
+             ...input,
+           });
+         }
+         ```
+
+      DO NOT: trigger generation here (c16). DO NOT: write any
+      `references` docs (c6/c7 already did). DO NOT: write any Storage
+      bytes. DO NOT: send notifications.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the lifecycle module + action are tight on the contract.
+
+      - `lib/designs/lifecycle.ts` imports `'server-only'` first.
+      - c8 `buildReferenceSet` reasons propagate verbatim through
+        `createDesignDraft` — reviewer manual check on the union.
+      - `Design.name === null` and `latestGenerationId === null` at
+        create time. Test (6) asserts.
+      - `createdAt === updatedAt` at create time (both ISO strings).
+      - `permission-denied` Firestore error → `rules_denied` reason
+        with the specific log line; other errors → `firestore_failure`.
+      - Action lives in `app/(authenticated)/design/actions.ts`
+        co-located with c9's `selectPinterestPin`.
+      - Action reads uid from session ONLY.
+      - All vitest unit + integration tests pass.
+      - Reviewer grep: no firebase-admin imports in the action file
+        (only the lifecycle module touches firebase-admin).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c10-create-design-action`.
+      Commit: `feat(c10): createDesign server action + designs lifecycle (draft create)`.
+      Pre-commit: `pnpm test`, `pnpm test:rules` must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 server action + server-only lifecycle module'
+    runtime: 'Node 20+; firebase-admin v13.8.0'
+    testing: 'Vitest unit (mocked Firestore + c8); vitest+emulator integration'
+  key_files:
+    - path: lib/designs/lifecycle.ts
+      purpose: 'CREATE; createDesignDraft; c15 will EXTEND with persistGenerationStart + persistGenerationResult'
+    - path: app/(authenticated)/design/actions.ts
+      purpose: 'EXTEND (c9 created); createDesign server action added'
+    - path: lib/references/reference-set.ts
+      purpose: 'Consumed (c8) — buildReferenceSet'
+    - path: lib/firestore/converters/index.ts
+      purpose: 'Consumed (c3) — designConverter'
+    - path: lib/firebase/server.ts
+      purpose: 'Consumed — createServerFirebaseAdmin'
+    - path: lib/firebase/session.ts
+      purpose: 'Consumed — getSession'
+    - path: firestore.rules
+      purpose: 'Consumed (c4) — designs collection rules deny UID mismatch'
+    - path: tests/rules/designs.rules.test.ts
+      purpose: 'Consumed (c4) — proves rules enforce userId immutability + owner-only writes'
+
+files_to_modify:
+  - file: lib/designs/lifecycle.ts
+    change: 'CREATE; createDesignDraft + CreateDesignDraftResult union'
+  - file: app/(authenticated)/design/actions.ts
+    change: 'EXTEND with createDesign action'
+  - file: tests/unit/designs/lifecycle-create-draft.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/designs/lifecycle-validation.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/designs/lifecycle-error-paths.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/actions/create-design.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/designs/create-design-real-emulator.test.ts
+    change: 'CREATE in test-spec'
+
+design_decisions:
+  - decision: 'Design draft persists BEFORE generation (FR-C-4)'
+    rationale: 'Outline + design-discussion lock this. Durable design state means c15 generation lifecycle can reference an already-existing designId; user can navigate away mid-flow without losing the assembled inputs. Also enables future "save without generating" UX.'
+  - decision: '`latestGenerationId: null` at create — set transactionally on terminal success in c15'
+    rationale: "data-model:contract-stability + persistence:consistency. Null at create means readers can't accidentally treat a never-generated design as having a generation. c15 owns the transactional set; c10 cannot pre-set it."
+  - decision: '`name: null` at create — UI defers naming to a future surface (likely Library / Epic D)'
+    rationale: 'Naming is not on the v1 critical path. Auto-naming based on prompt is brittle. Leaving null means the UI can show "Untitled Design" / `<creation date>` as a fallback. c11 / c17 may add an inline rename if Don wants it.'
+  - decision: '`createdAt` and `updatedAt` are client-generated ISO strings, NOT FieldValue.serverTimestamp()'
+    rationale: 'c3 typed both as `string`. ServerTimestamp objects break round-trip simplicity in tests + converters. Drift from server clock on a single-user app is negligible. Future epic can swap to serverTimestamp if multi-user ordering accuracy matters.'
+  - decision: 'Single Firestore write — no transaction'
+    rationale: 'Design create touches only the `designs/{designId}` doc. No cross-collection consistency needed at this stage. c15 will use a transaction for `generations/{genId}` write + `designs/{designId}.latestGenerationId` update.'
+  - decision: 'Concurrent identical createDesign calls produce distinct designIds — no idempotency token'
+    rationale: 'crypto.randomUUID() is per-call. UI in c11 prevents double-click via disabled-state (button disabled while pending). Idempotency tokens add complexity for a non-problem in v1.'
+  - decision: '`permission-denied` Firestore error caught as a SEPARATE reason from generic firestore_failure'
+    rationale: 'rules_denied is actionable for the user (re-auth, contact support); firestore_failure is transient. UI in c11 may render different copy. Distinguishing the two requires error-code inspection in the catch — done.'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'Action reads uid from session; lifecycle writes with that uid in `userId`. c4 firestore.rules deny UID mismatch — third defense layer. Test (21) explicit.'
+  - concern: 'error-handling'
+    notes: 'Discriminated envelope. c8 reasons + Firestore reasons + auth reason. UI in c11 exhaustively maps reasons to copy.'
+  - concern: 'data-model'
+    notes: 'c3 Design shape used verbatim via designConverter. Adding fields requires updating c3 type + converter + this lifecycle in lockstep.'
+
+risks:
+  - severity: medium
+    description: '`permission-denied` Firestore error string differs across firebase-admin versions; catch block matches wrong code'
+    mitigation: 'Test (12) uses literal `code: "permission-denied"` — fixed by the test if the actual code is different. firebase-admin v13.8.0 documentation confirms this code; researcher verifies via context7.'
+  - severity: medium
+    description: "createDesign called with secondaryReferenceIds containing IDs the user does not actually own; Firestore rules allow because rules don't cross-validate"
+    mitigation: 'c4 firestore.rules accept; c11 UI restricts the picker to alice-owned references; c13 buildGeminiRequest in a future story would fail to fetch the bytes if a non-owned reference made it through. Acceptable trade-off — cross-doc validation in rules is expensive.'
+  - severity: low
+    description: '`updatedAt === createdAt` at create looks weird in admin tools / queries that filter by recently-updated'
+    mitigation: 'Standard pattern for create-then-update workflows. No admin UI in v1; future epic may treat them as separate fields.'
+  - severity: low
+    description: 'A future story (c11) calls createDesign with FormData encoding; server action FormData unwrapping might mismatch the `input` shape'
+    mitigation: 'c11 wraps the action in `useActionState` or calls with a typed object directly via `startTransition` — typed object is the simpler path.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #11 (line 240): app/api/designs/create/route.ts —
+      create a draft design record that captures references, prompt, and
+      current nail shape even before generation.
+      [Note: locked as server action per epic.yaml api:surface-boundary.]
+      Slice 3 Interfaces (line 251): createDesign(input: { userId,
+        primaryReferenceId, secondaryReferenceIds: string[], promptText?,
+        nailShape: 'almond' | 'coffin' | 'square' | 'stiletto' }):
+        Promise<{ designId: string }>
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      US-C-3: Persist a durable draft design.
+      Acceptance: Given I have assembled a valid reference set and selected
+      a shape, when the app creates the design, then it stores a durable
+      design record with primary reference, ordered secondary references,
+      prompt, and shape.
+      Acceptance: Given the design create request fails under Security
+      Rules or persistence issues, when I attempt to continue to generation,
+      then the app blocks the transition and reports the save failure
+      instead of leaving a ghost design state.
+      Acceptance: Given an unauthorized or mismatched user context, when
+      a design create mutation executes, then the write is denied by
+      user-scoped rules rather than creating a cross-user record.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > Server Actions: createDesign(input) is the
+      durable-draft creation surface for one primary reference, ordered
+      secondary references, optional prompt, and nail shape.
+      §Contract Anchors: Design { id; userId; name; primaryReferenceId;
+      secondaryReferenceIds: string[]; promptText; nailShape;
+      latestGenerationId; createdAt; updatedAt }
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: Persist the generation lifecycle in two
+      writes, never one... persistGenerationStart writes the `pending`
+      row before the provider call. persistGenerationResult transitions
+      to `success` or `failure`...
+      [c10 only writes the design doc; lifecycle continuation is c15.]
+
+ui_indicators: 'NO new UI surface — server action + lifecycle module only; no wireframes; no ui-design step required'

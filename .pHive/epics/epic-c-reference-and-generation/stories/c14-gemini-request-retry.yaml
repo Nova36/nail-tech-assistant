@@ -1,0 +1,469 @@
+id: c14-gemini-request-retry
+epic: epic-c-reference-and-generation
+title: 'lib/ai/generate.ts — buildGeminiRequest + one-silent-retry policy (transient errors only; refusal + low_quality NOT retried)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [c13-ai-env-provider-boundary, c8-reference-set-builder]
+
+escalations_addressed:
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Retry budget = exactly ONE silent retry. Locked here so c15
+      lifecycle does not double-retry, and c17 UI does not see ambiguous
+      "retrying..." states. Transient errors (`network`, `rate_limit`)
+      retry once; refusal + low_quality + unknown DO NOT retry. After
+      retry exhausts, terminal failure surfaces to c15 / c16 / c17.
+  - trigger: provider-boundary
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      `lib/ai/generate.ts` wraps c13's `lib/ai/provider.ts` only —
+      knows the SDK ONLY through ProviderRequest / ProviderResult
+      contracts. Provider swap (FLUX, gpt-image-1) requires changing
+      c13 implementation; this file's request builder + retry policy
+      stays as-is.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      `buildGeminiRequest` consumes the c3-locked Reference shape and
+      c8 ReferenceSet output verbatim. Returns a ProviderRequest (c13
+      contract). No new types invented. Reference bytes are read from
+      c5 storage helper inside this story.
+
+description: |
+  Slice 4 application layer. `lib/ai/generate.ts` lives between c13
+  (provider boundary) and c15 (lifecycle persistence). It owns:
+
+  1. **`buildGeminiRequest`** — pure-ish function that takes a
+     ReferenceSet (c8 output) plus the resolved Reference docs +
+     fetched bytes, and produces a `ProviderRequest` (c13 contract).
+     "Pure-ish" because it reads bytes via c5's storage helper inside
+     the function (signed-URL or admin download). Builds the
+     primary-first, secondaries-in-order images array; threads
+     promptText + nailShape through.
+
+  2. **`generateWithRetry`** — wraps `provider.generateImage(req)` with
+     ONE silent retry budget on transient errors. Retry triggers:
+     `network`, `rate_limit`. NO retry on: `refusal`, `low_quality`,
+     `unknown`. After retry: returns the last result verbatim (whether
+     success or terminal failure). Records retry attempts in metadata
+     for c15 to persist on the generation row.
+
+  3. **`generate`** — public entrypoint. Composes
+     `buildGeminiRequest` + `generateWithRetry`. Returns a normalized
+     `GenerateResult`:
+     ```
+     | { ok: true; imageBytes; mimeType; metadata: { retryCount; durationMs } }
+     | { ok: false; reason: 'refusal' | 'rate_limit' | 'network' | 'low_quality' | 'unknown'; message; metadata: { retryCount; durationMs } }
+     ```
+
+  This story extends `lib/ai/generate.ts` only (the story scaffolds a
+  new file because c13 chose not to put `generateImage` here — c13 owns
+  `lib/ai/provider.ts`). c14 is the wrapper layer that downstream code
+  (c15 lifecycle, c16 action) consumes.
+
+  Out of scope: Firestore writes (c15 owns `persistGenerationStart` /
+  `persistGenerationResult`). Storage write of output bytes (c15 owns).
+  HTTP / action surface (c16). UI (c17).
+
+acceptance_criteria:
+  # US-C-4 (generate a nail-design image) — c14 owns request assembly + retry policy upstream of c15/c16
+  - 'Given a valid ReferenceSet `{ primaryReferenceId, secondaryReferenceIds, promptText, nailShape }` and the corresponding Reference docs (with valid Storage paths), when `buildGeminiRequest` runs, then it returns a `ProviderRequest` with `images: [primaryImg, ...secondaryImgsInOrder]` (primary first, secondaries in input order), `promptText`, and `nailShape` threaded through.'
+  - 'Given a Reference whose Storage object cannot be read (404 or rules-denied), when `buildGeminiRequest` runs, then it returns `{ ok: false; reason: "missing_reference_bytes"; message }` and does NOT call the provider.'
+  - 'Given the provider returns `{ ok: true; imageBytes; mimeType }` on first attempt, when `generateWithRetry` runs, then it returns the success verbatim with `metadata.retryCount === 0`.'
+  - 'Given the provider returns `{ ok: false; reason: "network" }` on first attempt and `{ ok: true; imageBytes }` on second attempt, when `generateWithRetry` runs, then it returns the success with `metadata.retryCount === 1`.'
+  - 'Given the provider returns `{ ok: false; reason: "rate_limit" }` on first attempt and `{ ok: false; reason: "network" }` on second attempt, when `generateWithRetry` runs, then it returns the second failure with `metadata.retryCount === 1` (no third attempt).'
+  - 'Given the provider returns `{ ok: false; reason: "refusal" }` on first attempt, when `generateWithRetry` runs, then it returns the failure verbatim with `metadata.retryCount === 0` (NO retry on refusal).'
+  - 'Given the provider returns `{ ok: false; reason: "unknown" }` on first attempt, when `generateWithRetry` runs, then it returns the failure verbatim with `metadata.retryCount === 0` (NO retry on unknown).'
+  - 'Given the provider returns `{ ok: true; imageBytes }` but the bytes appear corrupt or near-uniform (low_quality heuristic), when downstream classification runs (deferred to c17 if needed), then `generate` does NOT add `low_quality` to the metadata at this layer — provider success is success at the c14 layer.'
+  - 'Given `generateWithRetry` records timing, when it returns, then `metadata.durationMs` reflects total elapsed time (including retry sleep if any).'
+  - 'Given retry between attempts, when network error triggers retry, then a brief backoff sleep occurs (e.g., 500ms — value locked here as a constant) before the second attempt.'
+  - "Given grep across `lib/ai/generate.ts`, when searching for forbidden imports, then NO matches for `firebase-admin/firestore`, `getFirestore` — Firestore is c15's territory. Storage reads (via c5 helper) ARE allowed because c14 needs reference bytes."
+
+steps:
+  - id: research
+    description: |
+      Max 2 focused questions:
+      (1) c5 storage helper — is there a `downloadReferenceBytes(uid,
+      refId, ext)` or `downloadBytes(storagePath)` function? If c5 only
+      shipped upload helpers, c14 EXTENDS c5 with a download function
+      OR uses the admin SDK directly (e.g., `bucket.file(path).download()`)
+      with a comment citing the gap. Recommendation: extend c5 with a
+      thin `readReferenceBytes(storagePath): Promise<Buffer>` if missing.
+      (2) Backoff strategy — fixed 500ms vs exponential? For a single
+      retry, fixed is sufficient and simpler. Lock to 500ms unless
+      research finds a real reason otherwise. (Exponential backoff
+      matters at 3+ attempts; we have 2.)
+
+      Read .pHive/planning/structured-outline.md:282-309 (Slice 4
+      interfaces). Read kickoff-decisions #8 (one silent retry).
+      Read c13's lib/ai/provider.ts contract verbatim.
+      Read c8 lib/references/reference-set.ts ReferenceSet shape.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Heavy mocking of c13
+      provider + c5 storage.
+
+      - tests/unit/ai/build-gemini-request-happy-path.test.ts —
+        (1) Mock c5 storage to return Buffer bytes for each reference's
+            storagePath
+        (2) Call `buildGeminiRequest({ referenceSet, primaryRef,
+            secondaryRefs })` (or whatever the locked signature is)
+        (3) Assert `request.images[0].role === "primary"`
+        (4) Assert `request.images[1..N].role === "secondary"` and order
+            matches input `secondaryReferenceIds` order
+        (5) Assert `request.promptText` and `request.nailShape` match
+            input
+        (6) Assert each image has `bytes: Buffer`, `mimeType: "image/jpeg"
+            | "image/png" | "image/heic"`
+
+      - tests/unit/ai/build-gemini-request-error-paths.test.ts —
+        (7) Mock c5 storage to throw NotFound for primary's storagePath
+            → returns `{ ok: false; reason: "missing_reference_bytes" }`
+        (8) Mock c5 storage to throw NotFound for one secondary →
+            returns `missing_reference_bytes` (don't proceed with partial
+            secondaries — strict)
+        (9) Reference array empty (no primary somehow — defensive) →
+            should not happen if c8 validated, but `buildGeminiRequest`
+            asserts and returns `{ ok: false; reason: "primary_required" }`
+
+      - tests/unit/ai/retry-transient.test.ts —
+        (10) Provider mock: first call → `network`, second call → success
+             ⇒ `generate` returns success with `retryCount: 1`
+        (11) Provider mock: first call → `rate_limit`, second call →
+             success ⇒ success with retryCount: 1
+        (12) Provider mock: first call → `network`, second call →
+             `rate_limit` ⇒ failure with reason: "rate_limit", retryCount: 1
+        (13) Provider mock: first call → success ⇒ success with retryCount: 0
+             (no second call attempted; assert provider mock called once)
+
+      - tests/unit/ai/retry-no-retry-on-refusal.test.ts —
+        (14) Provider mock: first call → `refusal` ⇒ failure with
+             retryCount: 0 (no second call; assert provider mock called once)
+        (15) First call → `unknown` ⇒ retryCount: 0
+        (16) First call → `low_quality` (if c13 ever emits it; currently
+             provider does not) ⇒ retryCount: 0
+
+      - tests/unit/ai/retry-timing.test.ts —
+        (17) `vi.useFakeTimers()` — advance 500ms between retry attempts;
+             assert backoff occurred (provider second call did NOT happen
+             before timer advanced)
+        (18) `metadata.durationMs >= 500` when retry occurs
+
+      - tests/integration/ai/generate-end-to-end.test.ts —
+        Real c5 + emulator + mocked provider:
+        (19) Upload a real JPEG via c5; create a Reference doc; call
+             `generate(referenceSet)` with c13 provider mocked to return
+             a known image bytes blob; assert c14 returns success with
+             those bytes and metadata.retryCount === 0
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Single new file + optional c5 extension.
+
+      1. If c5 storage helper lacks a `readReferenceBytes` function,
+         EXTEND `lib/firebase/storage.ts`:
+         ```ts
+         export async function readReferenceBytes(
+           storagePath: string,
+         ): Promise<{ ok: true; bytes: Buffer; contentType: string }
+                   | { ok: false; reason: 'not_found' | 'storage_failure'; message: string }> {
+           try {
+             const bucket = getServerFirebaseStorage();
+             const [bytes] = await bucket.file(storagePath).download();
+             const [metadata] = await bucket.file(storagePath).getMetadata();
+             return { ok: true, bytes, contentType: metadata.contentType ?? 'application/octet-stream' };
+           } catch (err) {
+             const code = (err as { code?: string }).code ?? 'unknown';
+             const message = (err as Error).message ?? String(err);
+             console.error('[storage] readReferenceBytes failed',
+               { storagePath, code, message });
+             const reason = code === 'storage/object-not-found' || code === '404'
+               ? 'not_found' : 'storage_failure';
+             return { ok: false, reason, message };
+           }
+         }
+         ```
+
+      2. Create `lib/ai/generate.ts`:
+         ```ts
+         import 'server-only';
+         import { generateImage,
+           type ProviderRequest, type ProviderResult,
+         } from '@/lib/ai/provider';
+         import { readReferenceBytes } from '@/lib/firebase/storage';
+         import type { Reference, NailShape } from '@/lib/types';
+
+         const RETRY_BACKOFF_MS = 500; // single fixed-backoff retry
+         const TRANSIENT_REASONS: ReadonlySet<string> =
+           new Set(['network', 'rate_limit']);
+
+         export interface GenerateInput {
+           primaryReference: Reference;
+           secondaryReferences: Reference[]; // ordered
+           promptText: string | null;
+           nailShape: NailShape;
+         }
+
+         export type GenerateResult =
+           | { ok: true; imageBytes: Buffer; mimeType: 'image/png' | 'image/jpeg';
+               metadata: { retryCount: number; durationMs: number } }
+           | { ok: false;
+               reason: 'missing_reference_bytes' | 'primary_required'
+                 | 'refusal' | 'rate_limit' | 'network' | 'low_quality' | 'unknown';
+               message: string;
+               metadata: { retryCount: number; durationMs: number } };
+
+         export async function buildGeminiRequest(input: GenerateInput): Promise<
+           | { ok: true; request: ProviderRequest }
+           | { ok: false; reason: 'missing_reference_bytes' | 'primary_required'; message: string }
+         > {
+           if (!input.primaryReference) {
+             return { ok: false, reason: 'primary_required',
+                      message: 'primary reference is required' };
+           }
+
+           const primaryBytes = await readReferenceBytes(input.primaryReference.storagePath);
+           if (!primaryBytes.ok) {
+             return { ok: false, reason: 'missing_reference_bytes',
+                      message: `primary ${input.primaryReference.id}: ${primaryBytes.message}` };
+           }
+
+           const secondaryImages: ProviderRequest['images'] = [];
+           for (const ref of input.secondaryReferences) {
+             const bytesResult = await readReferenceBytes(ref.storagePath);
+             if (!bytesResult.ok) {
+               return { ok: false, reason: 'missing_reference_bytes',
+                        message: `secondary ${ref.id}: ${bytesResult.message}` };
+             }
+             secondaryImages.push({
+               bytes: bytesResult.bytes,
+               mimeType: bytesResult.contentType as ProviderRequest['images'][number]['mimeType'],
+               role: 'secondary',
+             });
+           }
+
+           const request: ProviderRequest = {
+             images: [
+               { bytes: primaryBytes.bytes,
+                 mimeType: primaryBytes.contentType as ProviderRequest['images'][number]['mimeType'],
+                 role: 'primary' },
+               ...secondaryImages,
+             ],
+             promptText: input.promptText,
+             nailShape: input.nailShape,
+           };
+           return { ok: true, request };
+         }
+
+         async function sleep(ms: number): Promise<void> {
+           return new Promise((res) => setTimeout(res, ms));
+         }
+
+         async function generateWithRetry(
+           request: ProviderRequest,
+         ): Promise<{ result: ProviderResult; retryCount: number }> {
+           let result = await generateImage(request);
+           if (result.ok) return { result, retryCount: 0 };
+           if (!TRANSIENT_REASONS.has(result.reason)) {
+             return { result, retryCount: 0 };
+           }
+           await sleep(RETRY_BACKOFF_MS);
+           result = await generateImage(request);
+           return { result, retryCount: 1 };
+         }
+
+         export async function generate(input: GenerateInput): Promise<GenerateResult> {
+           const startedAt = Date.now();
+           const built = await buildGeminiRequest(input);
+           if (!built.ok) {
+             return { ok: false, reason: built.reason, message: built.message,
+                      metadata: { retryCount: 0, durationMs: Date.now() - startedAt } };
+           }
+
+           const { result, retryCount } = await generateWithRetry(built.request);
+           const durationMs = Date.now() - startedAt;
+           if (result.ok) {
+             return { ok: true, imageBytes: result.imageBytes,
+                      mimeType: result.mimeType,
+                      metadata: { retryCount, durationMs } };
+           }
+           return { ok: false, reason: result.reason, message: result.message,
+                    metadata: { retryCount, durationMs } };
+         }
+         ```
+
+      DO NOT: write Firestore docs (c15 owns generation row writes).
+      DO NOT: write Storage output bytes (c15 owns). DO NOT: implement
+      a second retry. DO NOT: classify low_quality at this layer.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify retry policy is exactly one silent retry on transient only.
+
+      - `RETRY_BACKOFF_MS = 500` is a named constant.
+      - `TRANSIENT_REASONS` set contains exactly `network`, `rate_limit`.
+        Reviewer manual diff: `refusal`, `low_quality`, `unknown`,
+        `missing_reference_bytes` are NOT in the set.
+      - `generateWithRetry` calls `generateImage` AT MOST twice. Test
+        (13) (success-on-first-call ⇒ provider called once) and test
+        (14)/(15) (refusal/unknown ⇒ provider called once) both assert
+        the call count.
+      - `metadata.retryCount` accurately reflects 0 or 1 — never 2 or
+        higher.
+      - `metadata.durationMs` includes backoff if retry occurred.
+      - `buildGeminiRequest` strictly fails on any missing reference
+        byte (no partial-secondaries proceed).
+      - Image order: primary at index 0; secondaries in input order from
+        index 1 onward.
+      - Reviewer grep: NO `firebase-admin/firestore`, NO `getFirestore`
+        in `lib/ai/generate.ts`. Storage reads (via c5 helper) ARE
+        allowed because reference bytes are needed.
+      - All vitest unit + integration tests pass.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c14-gemini-request-retry`.
+      Commit: `feat(c14): buildGeminiRequest + one-silent-retry policy`.
+      Pre-commit: `pnpm test`, `pnpm test:rules` (or :storage) must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 server-only module'
+    runtime: 'Node 20+; firebase-admin v13.8.0 via c5; provider SDK via c13'
+    testing: 'Vitest unit (mocked c13 + c5); vitest+emulator integration'
+  key_files:
+    - path: lib/ai/provider.ts
+      purpose: 'Consumed (c13) — generateImage, ProviderRequest, ProviderResult'
+    - path: lib/firebase/storage.ts
+      purpose: 'Consumed (c5) — readReferenceBytes (extended in this story if missing)'
+    - path: lib/references/reference-set.ts
+      purpose: 'Consumed (c8) — ReferenceSet shape; c14 takes built set + resolved Reference docs'
+    - path: lib/types.ts
+      purpose: 'Consumed (c3) — Reference, NailShape'
+    - path: lib/ai/generate.ts
+      purpose: 'CREATE; buildGeminiRequest + generateWithRetry + generate'
+  external_apis:
+    - 'Provider SDK via c13 (firebase-admin Storage download via c5)'
+
+files_to_modify:
+  - file: lib/firebase/storage.ts
+    change: 'EXTEND with readReferenceBytes(storagePath) IF c5 lacks it (research confirms)'
+  - file: lib/ai/generate.ts
+    change: 'CREATE; buildGeminiRequest + generateWithRetry + generate'
+  - file: tests/unit/ai/build-gemini-request-happy-path.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/build-gemini-request-error-paths.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/retry-transient.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/retry-no-retry-on-refusal.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/ai/retry-timing.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/ai/generate-end-to-end.test.ts
+    change: 'CREATE in test-spec — emulator-backed integration'
+
+design_decisions:
+  - decision: 'Retry budget = ONE silent retry (kickoff #8 + FR-C-7)'
+    rationale: 'Locked. Adding more retries hides rate-limit signals and prolongs user wait beyond the polished pending state c17 ships. Single retry on transient errors gives one chance to recover from a flaky network without adding ambiguous "trying again..." UX.'
+  - decision: 'Transient reasons = `network` + `rate_limit` ONLY'
+    rationale: 'Refusal is a deterministic provider judgment (safety / recitation block); retrying with the same input changes nothing. Low_quality is a downstream classification that retry would not improve. Unknown means the error is unclassified — retrying without diagnosis is a coin flip; better to surface immediately.'
+  - decision: 'Fixed 500ms backoff between retry attempts'
+    rationale: 'Single retry; exponential backoff is for 3+ attempt scenarios. 500ms is enough to let a transient blip resolve without making the user wait noticeably longer (c17 pending state is already 10-15s territory).'
+  - decision: '`buildGeminiRequest` fails strictly on any missing reference byte (no partial-secondaries)'
+    rationale: 'If a secondary reference cannot be read, the assembled request is materially different from what the user composed. Better to surface the failure than silently send a smaller reference set. User can remove the broken reference in c11 UI and retry.'
+  - decision: 'Image order in ProviderRequest: primary at index 0, secondaries in input order'
+    rationale: "Order matters to the model. c8 ReferenceSet preserves user-input order; c14 propagates that order to the provider. If c1 spike found that order doesn't affect quality, this is still cheap to maintain."
+  - decision: 'Provider success returns success at c14 — `low_quality` classification deferred to c17 if needed'
+    rationale: "c1 spike output didn't identify a robust low_quality signal at the bytes level. UI in c17 reserves a low_quality branch for future use (e.g., if blank-output detection is added). Not classifying at c14 keeps this layer pure."
+  - decision: '`metadata.retryCount` and `metadata.durationMs` propagated to caller for c15 to persist'
+    rationale: 'c15 generations row stores `providerResponseMetadata: unknown` (c3). Storing retryCount + durationMs lets future telemetry queries answer "what % of generations needed retry?" and "what''s P95 generation latency?". Cheap to record.'
+  - decision: 'No request memoization or deduplication'
+    rationale: 'Each generate call is unique (new generation row). User clicking generate twice should produce two attempts. Idempotency would require a request hash + cache; not worth v1 complexity.'
+
+cross_cutting:
+  - concern: 'error-handling'
+    notes: 'Discriminated envelope. Reasons (`missing_reference_bytes`, `primary_required`, `refusal`, `rate_limit`, `network`, `low_quality`, `unknown`) align with c13 + c17 UI mapping. metadata.retryCount + durationMs persisted by c15.'
+  - concern: 'provider-boundary'
+    notes: "c14 wraps c13 with retry; c14 itself does NOT touch the SDK. Provider swap is c13's file only."
+  - concern: 'data-model'
+    notes: 'Reference + NailShape consumed verbatim from c3. ProviderRequest + ProviderResult consumed verbatim from c13. No new types invented at c14 layer (only the GenerateResult composite envelope).'
+
+risks:
+  - severity: high
+    description: 'Single 500ms backoff insufficient for some rate_limit windows (e.g., per-minute quota), retry hits the same wall'
+    mitigation: 'Expected behavior — second failure surfaces to user. UI in c17 includes "rate_limit-after-retry" branch with copy guiding the user to wait. Future hardening could implement Retry-After header parsing if provider supports it.'
+  - severity: high
+    description: 'c5 readReferenceBytes is missing and c14 introduces it as a side effect; reviewer overlooks the storage helper change'
+    mitigation: 'Researcher question (1) confirms c5 surface; reviewer step explicitly checks for new exports in lib/firebase/storage.ts. If extension was needed, files_to_modify lists it.'
+  - severity: medium
+    description: 'Reference Storage object MIME type is `application/octet-stream` (default) instead of image/jpeg → ProviderRequest mimeType invalid'
+    mitigation: 'c6/c7 ingest paths set Content-Type metadata explicitly when uploading. readReferenceBytes returns the actual stored content-type. If drift, integration test (19) catches it.'
+  - severity: medium
+    description: 'Provider SDK version drift after c13 ships changes the success / error response shape; c14 retry classification breaks'
+    mitigation: 'Pinned SDK version in package.json (^x.y.z) limits drift. Integration test catches breakage on next CI run.'
+  - severity: low
+    description: 'metadata.durationMs measures wall-clock; if the test process is slow, durationMs > 500ms even without retry, masking timing assertions'
+    mitigation: 'Test (18) uses `>= 500` not `=== 500`. Fake timers in test (17) make timing deterministic. Acceptable.'
+  - severity: low
+    description: 'Buffer.toString("base64") for large images is memory-intensive (~10 MB image → ~13 MB base64 string)'
+    mitigation: 'c7 caps uploads at 10 MB; Pinterest variants are smaller. Memory pressure acceptable for v1 single-user. Future optimization if user growth demands.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 4 Changes #2 (line 282): lib/ai/generate.ts — build the
+      production multimodal request layer, transient retry logic, error
+      classification, and provider-boundary abstraction on top of
+      Firebase AI Logic.
+      Slice 4 Interfaces (line 297): buildGeminiRequest(input: {
+        primaryReference: ReferenceRecord; secondaryReferences:
+        ReferenceRecord[]; promptText?; nailShape: NailShape }):
+        GeminiRequestPayload
+      Slice 4 Validation: Verify a transient provider error retries
+      once automatically and then succeeds or fails deterministically.
+      Verify a hard refusal surfaces the adjust-inputs guidance instead
+      of an opaque generic error.
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      FR-C-7: Generation failures must use one silent auto-retry and
+      then present an adjust-inputs recovery state. Reference build
+      detail: structured-outline.md Part 2 Slice 4, Part 3b Error
+      Handling Strategy, and kickoff-decisions.md #8.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      Open Question §6: How should buildGeminiRequest(...) materialize
+      image inputs at runtime: inline base64 assembled from Firebase
+      Cloud Storage fetches, or another provider-approved transfer
+      shape? My opinion: inline base64 for v1 (simpler, single
+      round-trip). [Locked: c14 reads bytes via c5 readReferenceBytes,
+      passes Buffers to c13 which serializes to base64.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: One retry, only on transient codes
+      (`network`, `rate_limit` when retry-after permits). Refusal and
+      unknown failures do *not* retry — they go straight to the
+      adjust-inputs UI. The retry happens inside lib/ai/generate.ts,
+      not in the route layer or the UI.
+  - path: .pHive/planning/sign-off.md
+    relevant_excerpt: |
+      kickoff-decisions #8: one silent auto-retry on transient failures.
+      [Honored as RETRY_BACKOFF_MS = 500, transient reasons =
+      network + rate_limit only.]
+
+ui_indicators: 'NO new UI surface — server module only; no wireframes; no ui-design step required'

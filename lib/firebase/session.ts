@@ -1,4 +1,5 @@
 import { getAuth } from 'firebase-admin/auth';
+import { cookies } from 'next/headers';
 
 import { createServerFirebaseAdmin } from './server';
 
@@ -62,4 +63,8 @@ export async function getSessionFromCookieString(
 
 export async function getSession(req: NextRequest): Promise<Session | null> {
   return getSessionFromCookieString(req.cookies.get('session')?.value);
+}
+
+export async function getSessionForServerAction(): Promise<Session | null> {
+  return getSessionFromCookieString((await cookies()).get('session')?.value);
 }

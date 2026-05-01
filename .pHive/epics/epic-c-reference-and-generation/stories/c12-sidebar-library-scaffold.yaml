@@ -1,0 +1,409 @@
+id: c12-sidebar-library-scaffold
+epic: epic-c-reference-and-generation
+title: 'Studio sidebar nav: New Design + Library scaffold (option B locked: NO Pinterest top-level entry; /library empty-state placeholder only — full Library = Epic D)'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: [c11-design-new-workspace-ui]
+renditions: 3
+
+wireframes:
+  touchpoint_1_status: APPROVED
+  approved_at: '2026-04-29'
+  approved_by: don
+  approved_rendition: .pHive/wireframes/epic-c-reference-and-generation/c12-sidebar-library-scaffold/wireframe.html
+  rationale: |
+    Single approved wireframe shows the three sidebar nav entries
+    (Dashboard, New Design, Library) + /library empty-state placeholder
+    + mobile reflow. NO Pinterest entry per option B lock. Brand tokens
+    match Epic A/B.
+  references:
+    - .pHive/wireframes/epic-b-pinterest-integration/_base-template.md
+    - .pHive/wireframes/epic-b-pinterest-integration/_a11y-spec.md
+  implementation_notes: |
+    - 3 nav entries: Dashboard (existing) · New Design · Library. Order
+      per wireframe Frame 01.
+    - Pinterest stays unsurfaced from sidebar — only reachable by URL or
+      via the embedded picker inside the New Design workspace (c11).
+    - /library empty state: heading + description + primary CTA "New
+      Design" linking to /design/new. NO populated library list (Epic D).
+    - Mobile reflow per Frame 03 — sidebar collapses; library content
+      stacks single-column.
+
+wireframe_approval:
+  touchpoint_1:
+    status: approved
+    approved_by: don
+    approved_at: '2026-04-29'
+    canonical_artifact: .pHive/wireframes/epic-c-reference-and-generation/c12-sidebar-library-scaffold/wireframe.html
+
+escalations_addressed:
+  - trigger: ui:scope-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      LOCKED user decision (option B): sidebar gets EXACTLY 2 new entries
+      — "New Design" (/design/new) and "Library" (/library). NO Pinterest
+      top-level entry. /pinterest/* routes stay reachable by direct URL
+      but are unsurfaced from sidebar. /library renders empty-state
+      placeholder ONLY — full Library is Epic D scope. Dashboard (/)
+      untouched. Acceptance criteria explicitly forbid: full library
+      grid, design detail page, regenerate, save-to-library button.
+  - trigger: ui:major
+    severity: major
+    placement: pre-exec
+    raised_by: ui-designer
+    addressed_by: |
+      ui-design step inserted between research and test-spec; renditions: 3
+      at .pHive/wireframes/epic-c-reference-and-generation/c12-sidebar-library-scaffold/
+      v{1,2,3}.html; blocking on Don approval before execute. Smaller UI
+      delta than c11 — touches existing sidebar layout from Epic A.
+
+description: |
+  Sidebar navigation scaffold + `/library` empty-state placeholder. The
+  smallest UI story in batch 2. Two-part delivery:
+
+  1. **Sidebar nav** — Add 2 entries to the existing authenticated
+     sidebar (`app/(authenticated)/layout.tsx` or wherever the sidebar
+     lives per Epic A): "New Design" (linking to `/design/new`) and
+     "Library" (linking to `/library`). Dashboard entry (`/`) stays
+     untouched. NO Pinterest entry — option B locked.
+
+  2. **`/library` empty-state placeholder** — `app/(authenticated)/library/
+     page.tsx` renders a placeholder with copy like "Your saved designs
+     will appear here. Start a new design to begin." with a CTA button
+     linking to `/design/new`. This is NOT the real Library; full Library
+     (grid of saved designs, search, rename, regenerate) is Epic D scope.
+
+  The placeholder route exists in c12 because:
+
+  - Sidebar entry "Library" needs a destination (404 is bad UX even if
+    Library is empty).
+  - Establishing the route now means Epic D doesn't need to negotiate the
+    URL or sidebar surface — those are settled.
+  - The empty-state copy + CTA reinforces the v1 single-flow narrative:
+    user creates a design, eventually views it in Library.
+
+  The "Pinterest unsurfaced from sidebar" decision is locked in
+  design_decisions so future Library/Studio iterations don't accidentally
+  re-add it. `/pinterest` and `/pinterest/[boardId]` continue to work by
+  direct URL; they're useful as developer/admin reachability paths but
+  not surfaced as user destinations.
+
+  Out of scope: full Library grid (Epic D), design detail page (Epic D),
+  inline rename (Epic D), search/filter (Epic D), saved-design viewer
+  (Epic D + Slice 5/6 visualizer).
+
+acceptance_criteria:
+  - 'Given an authenticated user is in the app shell, when the sidebar renders, then it shows exactly 2 NEW entries (in addition to whatever existed pre-Epic-C): "New Design" → `/design/new`, "Library" → `/library`.'
+  - 'Given the sidebar renders, when inspected, then NO "Pinterest" top-level entry is present (option B locked). Reviewer manually verifies.'
+  - 'Given the user is on `/design/new`, when the sidebar renders, then "New Design" entry shows the active state class (matches Epic A pattern).'
+  - 'Given the user is on `/library`, when the sidebar renders, then "Library" entry shows the active state class.'
+  - 'Given the user navigates directly to `/pinterest`, when the page loads, then it still works (reachable by URL) — c12 does NOT remove the route; only un-surfaces it from sidebar.'
+  - 'Given the user navigates to `/library`, when the page renders, then it shows a placeholder: heading "Your library is empty" (or wireframe-locked copy), description "Saved designs will appear here. Start a new design to begin.", and a CTA button "New Design" linking to `/design/new`.'
+  - 'Given the placeholder renders, when inspected, then it does NOT fetch any Firestore data — no `designs` query runs, no Storage reads. It is a static empty-state.'
+  - 'Given screen-reader use, when navigating the sidebar, then both new entries are reachable by keyboard with appropriate `aria-current="page"` on the active route.'
+  - 'Given the page is loaded on a tablet-landscape viewport, when sidebar renders, then it adapts per existing Epic A layout convention (no new responsive breakpoints introduced by c12).'
+  - 'Given the placeholder renders, when inspected, then it includes a brand-tokens-locked illustration or icon (per wireframe brief decision) — NOT a generic "404"-style empty page.'
+  - 'Given grep across `app/**` and `components/**`, when searching for Pinterest sidebar entries, then no occurrence found (e.g., no `<SidebarLink href="/pinterest">`). Reviewer manual.'
+
+steps:
+  - id: research
+    description: |
+      Max 2 focused questions:
+      (1) Sidebar location — read the existing
+      `app/(authenticated)/layout.tsx` and any sidebar component to
+      confirm the layout file. Epic A established this; c12 modifies it.
+      Identify the exact sidebar component (`components/AppShell.tsx` or
+      similar) and its existing entries.
+      (2) Active-state pattern — how does the existing sidebar mark the
+      active route? `usePathname()` from `next/navigation` is canonical.
+      Read existing implementation to mirror.
+
+      Read .pHive/planning/horizontal-plan.md Feature UI section for
+      the sidebar nav references.
+
+      Memory anchor: `reference_app_infra_gotchas` notes "app shell
+      needs h-screen + overflow-y-auto for sidebar pinning" — already
+      in place from Epic A; c12 inherits. Do not modify shell layout.
+    agent: researcher
+  - id: ui-design
+    description: |
+      COMPLETE — Touchpoint 1 APPROVED 2026-04-29 by Don.
+
+      Canonical artifact: `.pHive/wireframes/epic-c-reference-and-generation/c12-sidebar-library-scaffold/wireframe.html` (663 lines).
+
+      The implement step takes wireframe.html as the AUTHORITATIVE visual +
+      interaction source — including:
+      - Sidebar three-entry order: Dashboard · New Design · Library.
+        Iconography per Frame 01 (small SVG glyphs matching Epic A vocabulary).
+      - Active state pattern (`aria-current="page"` + brand-locked accent).
+      - /library empty-state per Frame 02 — heading + description + primary
+        CTA "New Design" → /design/new. No populated list.
+      - Mobile reflow per Frame 03.
+      - Brand tokens (`--primary: #6b3f5e`, etc.) per wireframe `<style>` block.
+
+      No deviation from the approved wireframe without TPM + Don sign-off.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Small UI surface = small
+      test surface.
+
+      AUTHORITATIVE VISUAL SOURCE:
+      - .pHive/design/briefs/sidebar-library-scaffold.md (+ approved HTML)
+
+      - tests/unit/layout/Sidebar.test.tsx —
+        (1) Sidebar renders pre-existing Epic A entries (e.g., Dashboard)
+            UNCHANGED — assert by their text content
+        (2) Sidebar renders NEW "New Design" entry with href="/design/new"
+        (3) Sidebar renders NEW "Library" entry with href="/library"
+        (4) Sidebar does NOT render any "Pinterest" entry — assert by
+            queryByText (must return null)
+        (5) Mock pathname `/design/new` → "New Design" entry has
+            `aria-current="page"` AND active-state class
+        (6) Mock pathname `/library` → "Library" entry has aria-current
+        (7) Mock pathname `/pinterest` → neither new entry is active
+            (the existing Epic A logic handles `/` Dashboard active state;
+            c12 doesn''t change that)
+
+      - tests/unit/library/page.test.tsx —
+        (8) `/library` page renders heading, description, CTA button
+        (9) CTA button links to `/design/new`
+        (10) Page does NOT call any data-fetching function — assert by
+             checking for `designs` collection or fetch import absence
+             (best-effort grep)
+
+      - tests/integration/library/page-direct-load.test.tsx —
+        (11) Authenticated user navigates to `/library` → renders
+             placeholder
+        (12) Unauthenticated user navigates to `/library` → middleware
+             redirects to login (Epic A baseline; c12 inherits)
+
+      DO NOT write tests for sidebar collapse/expand behavior (Epic A
+      baseline). DO NOT write tests for Library data fetching (Epic D).
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Make failing tests pass. Two file deltas: extend sidebar, create
+      library placeholder.
+
+      1. Identify the sidebar component file via research step. Likely
+         `app/(authenticated)/layout.tsx` or `components/AppShell.tsx`
+         or `components/Sidebar.tsx`. EXTEND it additively:
+         - Add NEW entries: "New Design" and "Library"
+         - Use the existing entry pattern (probably a
+           `<SidebarLink href={...}>` or similar abstraction)
+         - Use `usePathname()` for active-state per the existing pattern
+         - Iconography per wireframe brief (likely a small SVG or
+           lucide-react if Epic A added that; otherwise inline SVG)
+         - DO NOT add a Pinterest entry. DO NOT modify Dashboard entry.
+
+         If the sidebar is currently a server component reading the
+         session, the active-state lookup might happen via a small
+         client wrapper. Mirror Epic A pattern.
+
+      2. Create `app/(authenticated)/library/page.tsx`:
+         ```tsx
+         export const runtime = 'nodejs';
+         export const dynamic = 'force-static'; // pure static placeholder
+
+         export default function LibraryPlaceholderPage() {
+           return (
+             <main className="...brand-tokens-locked-classes...">
+               <div className="...">
+                 {/* Optional brand glyph / illustration per wireframe */}
+                 <h1 className="...">Your library is empty</h1>
+                 <p className="...">
+                   Saved designs will appear here. Start a new design to
+                   begin.
+                 </p>
+                 <Link href="/design/new" className="...primary-cta...">
+                   New Design
+                 </Link>
+               </div>
+             </main>
+           );
+         }
+         ```
+
+      3. NO `loading.tsx`, NO `error.tsx` for `/library` — placeholder is
+         static, no async work to fail.
+
+      4. NO Firestore queries, NO Admin SDK imports. Pure presentational.
+
+      DO NOT: modify `app/(authenticated)/pinterest/*` (those routes
+      stay; they are just unsurfaced from sidebar).
+      DO NOT: build Library data fetching (Epic D).
+      DO NOT: build design detail page, regenerate, save-to-library.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the scope-boundary lock holds and the placeholder is truly
+      a placeholder.
+
+      - Sidebar has exactly 2 NEW entries: "New Design" + "Library".
+        Reviewer manual diff against Epic A baseline.
+      - NO Pinterest entry. Reviewer grep for `pinterest` in sidebar
+        component returns 0 hits (case-insensitive).
+      - `usePathname()` drives active state on both new entries.
+      - `/library/page.tsx` is presentational — no firebase-admin
+        imports, no `getFirestore` calls, no fetch calls. Reviewer grep.
+      - CTA button links to `/design/new`.
+      - Existing `/pinterest` and `/pinterest/[boardId]` routes still
+        work — reviewer manually loads them in `pnpm dev`.
+      - Existing Dashboard sidebar entry untouched. Reviewer manual diff.
+      - Brand tokens used (no hardcoded colors).
+      - All vitest tests pass.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c12-sidebar-library-scaffold`.
+      Commit: `feat(c12): sidebar New Design + Library entries + library empty-state placeholder`.
+      Pre-commit: `pnpm test`, `pnpm typecheck`, `pnpm lint` must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router (server components for layout; client wrapper for active-state)'
+    runtime: 'React 19; Tailwind-first; brand tokens'
+    testing: 'Vitest jsdom + RTL for component tests'
+  key_files:
+    - path: app/(authenticated)/layout.tsx
+      purpose: 'Existing — Epic A authenticated shell; c12 EXTENDS sidebar entries (or via the sidebar component the layout renders)'
+    - path: app/(authenticated)/library/page.tsx
+      purpose: 'CREATE; placeholder empty-state'
+    - path: app/(authenticated)/page.tsx
+      purpose: 'Existing — Dashboard; UNTOUCHED by c12'
+    - path: app/(authenticated)/pinterest/page.tsx
+      purpose: 'Existing — UNTOUCHED by c12; reachable by direct URL'
+    - path: app/(authenticated)/design/new/page.tsx
+      purpose: 'Consumed (c11) — sidebar "New Design" links here'
+    - path: .pHive/brand/brand-system.yaml
+      purpose: 'Brand tokens for sidebar styling + placeholder layout'
+    - path: .pHive/design/briefs/sidebar-library-scaffold.md
+      purpose: 'Produced by ui-design step — authoritative wireframe brief'
+
+files_to_modify:
+  - file: app/(authenticated)/layout.tsx
+    change: 'EXTEND sidebar with New Design + Library entries (or via the sidebar component file the layout renders)'
+  - file: app/(authenticated)/library/page.tsx
+    change: 'CREATE; presentational placeholder with CTA to /design/new'
+  - file: components/Sidebar.tsx (or whatever Epic A named it)
+    change: 'CONFIRM via research step; EXTEND additively with the 2 new entries'
+  - file: .pHive/design/briefs/sidebar-library-scaffold.md
+    change: 'Created in ui-design step'
+  - file: tests/unit/layout/Sidebar.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/unit/library/page.test.tsx
+    change: 'CREATE in test-spec'
+  - file: tests/integration/library/page-direct-load.test.tsx
+    change: 'CREATE in test-spec'
+
+design_decisions:
+  - decision: 'Sidebar gets EXACTLY 2 new entries — "New Design" + "Library" — NO Pinterest top-level entry (option B locked by user)'
+    rationale: |
+      User decision: Pinterest is a tactical pin source, not a destination.
+      Surfacing it as a top-level sidebar entry would imply it''s a
+      separate workflow when actually pin selection lives embedded
+      inside Studio (c11 EmbeddedPinterestPanel). Locked here so future
+      Library / Studio iterations don''t accidentally re-add it.
+      `/pinterest/*` routes stay live for direct URL access (developer
+      reachability + future "open in browse" link from a saved design
+      in Epic D).
+  - decision: '/library renders empty-state placeholder ONLY — full Library is Epic D'
+    rationale: |
+      ui:scope-boundary escalation. Library grid (saved designs,
+      thumbnails, rename, regenerate, search, filter) is Slice 6 +
+      Epic D scope. Placeholder ships in c12 to (a) give the sidebar
+      "Library" entry a real destination, (b) reinforce the v1
+      narrative ("you''ll see saved designs here"), (c) settle the URL
+      so Epic D doesn''t need to renegotiate.
+  - decision: 'Placeholder is purely presentational — NO Firestore queries'
+    rationale: |
+      Defense in depth: a placeholder that queries Firestore and gets
+      empty results LOOKS the same as a static placeholder, but
+      consumes quota + introduces latency + adds a failure surface.
+      Static is strictly better for v1. Epic D replaces this page with
+      the real Library when designs exist to show.
+  - decision: 'Wireframe Touchpoint 1 still required even though delta is small'
+    rationale: |
+      ui:major escalation applies. Sidebar additions touch the chrome
+      Don sees on every page; getting the iconography + active state +
+      empty-state copy wrong is visible. Three renditions per protocol;
+      iteration is fast since the surface is small.
+  - decision: 'Existing Dashboard (/) sidebar entry UNCHANGED'
+    rationale: |
+      Epic A locked Dashboard placement + active state. c12 is purely
+      additive. Modifying Dashboard placement would invite drift across
+      epics.
+  - decision: '`/pinterest/*` routes preserved (just unsurfaced)'
+    rationale: |
+      Removing routes would break Epic B test fixtures + remove
+      developer reachability + remove the future "open original pin"
+      link from saved designs in Epic D. Unsurfacing is sufficient — the
+      cost of preservation is zero (routes already work; we''re just not
+      pointing at them from the sidebar).
+  - decision: '`runtime = "nodejs"` + `dynamic = "force-static"` on /library page'
+    rationale: |
+      No dynamic data; static rendering is fine. Force-static avoids
+      accidental opt-in to per-request rendering.
+
+cross_cutting:
+  - concern: 'ui-major'
+    notes: 'Wireframe Touchpoint 1 gates implement.'
+  - concern: 'ui-scope-boundary'
+    notes: 'Acceptance criteria lock the no-Pinterest decision and the placeholder-only Library scope. Reviewer enforces.'
+
+risks:
+  - severity: medium
+    description: 'Sidebar component file location unclear (Epic A may have used `components/AppShell.tsx`, `components/Sidebar.tsx`, or inlined into layout.tsx)'
+    mitigation: 'Researcher question (1) confirms before implementation. Wireframe brief notes the actual file.'
+  - severity: low
+    description: "Future Library iteration (Epic D) reads this story's placeholder and copies the layout, missing the dynamic Firestore query"
+    mitigation: 'Comment in placeholder file: `// Epic C placeholder. Epic D replaces with real designs grid (firestore query + grid render).` Hard-to-miss for the future implementer.'
+  - severity: low
+    description: 'Don sees the empty-state placeholder + sidebar changes and says "actually I want Pinterest in the sidebar"'
+    mitigation: 'Decision was option B locked at user gate. If reversed, separate atomic change to add the entry; not a c12 issue. ui-design Touchpoint 1 surfaces the question one more time.'
+
+references:
+  - path: .pHive/wireframes/epic-c-reference-and-generation/c12-sidebar-library-scaffold/wireframe.html
+    relevant_excerpt: |
+      Sidebar update + /library empty.
+      Sidebar gets two new entries. Library ships empty. Three frames:
+      (1) sidebar idle/active states across all three nav entries ·
+      (2) the /library empty-state page · (3) mobile collapse + library reflow.
+      Pinterest stays unsurfaced from the sidebar — only reachable by URL
+      or via the embedded picker inside the New Design workspace.
+      No Pinterest entry. No populated library list (future epic). No
+      Dashboard or other surface changes.
+  - path: .pHive/planning/horizontal-plan.md
+    relevant_excerpt: |
+      Layer: Feature UI > LOGIN / HOME — Login page. Home/dashboard
+      with primary CTA `New design` and secondary entry to `My designs`.
+      [Note: "My designs" → renamed "Library" per c12 user decision.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > UI Surface: The authenticated shell navigation
+      will need new Studio destinations such as `New Design` and
+      `Library` to make the Epic C workspace reachable from the
+      shipped shell.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §Dependencies and Constraints: Mother''s Day deadline shapes scope
+      discipline. Slice 7 cuttable; Library is Slice 6 + Epic D scope.
+      §Verification Strategy > Not verifying: chat refinement, library
+      browse, regenerate.
+  - path: app/(authenticated)/layout.tsx
+    relevant_excerpt: |
+      Existing Epic A authenticated shell. c12 extends sidebar entries
+      additively without changing layout structure.
+
+ui_indicators: 'NEW UI surface (small) — 2 sidebar entries + 1 placeholder page; ui-design step REQUIRED before test-spec; renditions: 3 per wireframe-protocol Touchpoint 1; reuses Epic A sidebar visual language'

@@ -146,12 +146,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Studio',
     items: [
       { href: '/', label: 'Dashboard', icon: 'home', active: true },
-      { href: '#', label: 'Gallery', icon: 'grid', badge: '124' },
+      { href: '/design/new', label: 'New Design', icon: 'grid', badge: 'New' },
+      { href: '/library', label: 'Library', icon: 'box' },
     ],
-  },
-  {
-    label: 'Inventory',
-    items: [{ href: '#', label: 'Polishes', icon: 'box', badge: '86' }],
   },
 ];
 

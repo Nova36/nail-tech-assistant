@@ -1,0 +1,250 @@
+id: c18-image-host-config
+epic: epic-c-reference-and-generation
+title: 'next.config.ts — add Firebase Storage host to images.remotePatterns (unblocks <GenerationPreview> next/image rendering)'
+status: shipped
+complexity: low
+methodology: tdd
+depends_on: [c17-generation-ui]
+
+escalations_addressed: []
+
+description: |
+  Tiny config story but easy to forget — the kind of thing that ships
+  green tests in CI but breaks at first user click in production. Adds
+  the Firebase Storage host pattern to `next.config.ts`
+  `images.remotePatterns` so `<GenerationPreview>` `<Image
+  src={signedURL} />` renders without 400-from-next/image.
+
+  Bucket host varies by Firebase project. The canonical Firebase
+  Storage host pattern is `*.firebasestorage.app` (newer) or
+  `*.appspot.com` (older / `firebasestorage.googleapis.com` for
+  signed URLs). Story-time decision: research confirms the actual
+  hostname of the bucket per `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+  env value + the URL shape c5 / c16 produces.
+
+  Pin the host in `next.config.ts` (not env) because: (a) bucket
+  host is a deploy-time constant per project; (b) `next.config.ts`
+  is statically analyzed by Next at build time and env-derived
+  remotePatterns work but introduce a build-time env dep that
+  complicates Vercel preview deploys.
+
+  This is the smallest story in the epic. Honors min_viable_ship_cut
+  consideration from epic.yaml: if cut, c17 falls back to
+  `<img unoptimized={true}>` for the preview — functional but loses
+  optimization.
+
+  Out of scope: storage rules (c4 owns), helper functions (c5 owns),
+  signed URL minting (c16 owns), preview component (c17 owns).
+
+acceptance_criteria:
+  - 'Given `next.config.ts` is inspected, when `images.remotePatterns` array is read, then it includes the Firebase Storage host pattern (e.g., `{ protocol: "https"; hostname: "firebasestorage.googleapis.com" }` and/or `{ protocol: "https"; hostname: "*.firebasestorage.app" }` per research lock).'
+  - 'Given the existing `i.pinimg.com` allowance from Epic B, when this story integrates, then that pattern is preserved (additive change).'
+  - 'Given a Playwright e2e test that uses `next/image` with a signed URL from c5 / c16, when the test loads the page, then the image renders without a 400 / "hostname not configured" error.'
+  - 'Given `pnpm build` is run, when the build succeeds, then no warning about unmatched image hosts is emitted (Next.js sometimes warns; treat as failure).'
+  - 'Given a `pnpm dev` smoke check, when c17 GenerationPreview renders with a real signed URL, then the image displays correctly (manual verify by reviewer).'
+  - 'Given the host pattern is added, when grep across the codebase searches for hardcoded image host strings, then `next.config.ts` is the single source of truth — no `<img src="https://*.firebasestorage..." />` patterns elsewhere.'
+
+steps:
+  - id: research
+    description: |
+      Max 2 focused questions:
+      (1) What hostname do Firebase Storage signed URLs use? Common
+      patterns:
+        - `firebasestorage.googleapis.com` (signed URL host;
+          `https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<path>?alt=media&token=...`)
+        - `<bucket>.firebasestorage.app` (newer; primarily for direct
+          public access)
+        - `<bucket>.appspot.com` (legacy)
+      For Admin SDK `getSignedUrl()`, the URL host is typically
+      `storage.googleapis.com` (Google Cloud Storage signed URL host)
+      OR `firebasestorage.googleapis.com` depending on SDK version.
+      Confirm by inspecting c5 helper or c16 implementation OR by
+      running a smoke test in `pnpm dev` and copying the URL.
+
+      (2) `next.config.ts` `remotePatterns` syntax — confirm the
+      current schema (Next 15.1.x):
+      ```ts
+      images: {
+        remotePatterns: [
+          { protocol: 'https', hostname: 'i.pinimg.com' },  // existing
+          { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },  // new
+          // possibly also:
+          { protocol: 'https', hostname: '*.firebasestorage.app' },
+        ],
+      }
+      ```
+
+      Read existing `next.config.ts` to confirm `i.pinimg.com` shape
+      to mirror.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE the config change. Small surface =
+      small test surface.
+
+      - tests/integration/next-config/image-hosts.test.ts —
+        (1) Read `next.config.ts` (parse via dynamic import or read
+            as text + regex). Assert the file contains the Firebase
+            Storage host pattern.
+        (2) Assert `i.pinimg.com` is still present.
+        (3) Assert the patterns are using `protocol: 'https'`.
+
+      - tests/e2e/generation-preview-image-host.spec.ts —
+        (Playwright; can be merged into c17's generation-flow.spec.ts):
+        (4) Mock c16 to return a real Firebase Storage signed URL
+            (test fixture; OR use the live emulator and seed data).
+        (5) Render `<GenerationPreview>` with that URL.
+        (6) Assert `<img>` element renders (no 400 from next/image).
+        (7) Optional: assert image bytes loaded (head request to the
+            URL within the test).
+
+      The c17 tests already include a Playwright e2e that asserts
+      preview rendering — c18's value is unblocking that test.
+      If c17 e2e (`tests/e2e/generation-flow.spec.ts`) ran with a fallback
+      `<img unoptimized />` while waiting for c18, this story replaces
+      that fallback with the real `<Image>` and the test now exercises
+      the optimized path.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. ONE file change.
+
+      Update `next.config.ts`:
+      ```ts
+      import type { NextConfig } from 'next';
+
+      const nextConfig: NextConfig = {
+        // ... existing config ...
+        images: {
+          remotePatterns: [
+            { protocol: 'https', hostname: 'i.pinimg.com' },  // existing (Epic B)
+            // c18 — Firebase Storage signed URL host:
+            { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
+            // c18 — Firebase Storage public/direct access (if used):
+            { protocol: 'https', hostname: '*.firebasestorage.app' },
+          ],
+        },
+      };
+
+      export default nextConfig;
+      ```
+
+      If c5 / c16 use `storage.googleapis.com` for signed URLs (Google
+      Cloud SDK pattern instead of Firebase pattern), add that host
+      too:
+      ```ts
+      { protocol: 'https', hostname: 'storage.googleapis.com' },
+      ```
+      Research step locks the exact host(s).
+
+      If c17 was using `<img unoptimized={true}>` as a fallback, this
+      story REPLACES it with `<Image>` in
+      `components/design-new/GenerationPreview.tsx`.
+
+      DO NOT: change any other next.config.ts field. DO NOT: add
+      env-derived remotePatterns (per design_decisions).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the config is additive and the preview path works.
+
+      - `next.config.ts` `remotePatterns` includes existing `i.pinimg.com`
+        AND the locked Firebase Storage host(s). No other patterns
+        added unintentionally.
+      - `pnpm build` succeeds without image-host warnings.
+      - `pnpm dev` smoke: reviewer manually triggers a generation in
+        c11 + c17 flow, confirms the preview image loads (HTTP 200,
+        next/image proxy works).
+      - If c17 had `<img unoptimized>` fallback, it''s now `<Image>`
+        with optimization.
+      - Reviewer grep across the codebase: no hardcoded image host
+        strings outside `next.config.ts`.
+      - All vitest unit + Playwright tests pass (especially the c17
+        e2e flow that depends on this).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c18-image-host-config`.
+      Commit: `feat(c18): allow Firebase Storage hosts in next/image remotePatterns`.
+      Pre-commit: `pnpm test`, `pnpm test:e2e` (recommended), `pnpm
+      build` must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15.1.11 — next/image config'
+    runtime: 'Build-time config; affects production + dev image optimization'
+    testing: 'Vitest unit (config file inspection); Playwright e2e (real preview render)'
+  key_files:
+    - path: next.config.ts
+      purpose: 'EXTEND — add Firebase Storage host(s) to remotePatterns; preserve existing i.pinimg.com'
+    - path: components/design-new/GenerationPreview.tsx
+      purpose: 'Consumed (c17) — uses next/image with the signed URL; this story unblocks the optimized path'
+    - path: lib/firebase/storage.ts
+      purpose: 'Consumed (c5) — possibly mints signed URLs; research confirms host'
+    - path: app/(authenticated)/design/actions.ts
+      purpose: 'Consumed (c16) — generateDesign returns the imageUrl; research confirms host shape'
+
+files_to_modify:
+  - file: next.config.ts
+    change: 'Add Firebase Storage host(s) to images.remotePatterns; preserve existing entries'
+  - file: components/design-new/GenerationPreview.tsx
+    change: 'IF previously using `<img unoptimized>` fallback, REPLACE with `<Image>` for optimization'
+  - file: tests/integration/next-config/image-hosts.test.ts
+    change: 'CREATE in test-spec — config inspection'
+
+design_decisions:
+  - decision: 'Pin Firebase Storage host in `next.config.ts` literal (NOT derive from env)'
+    rationale: 'Bucket host is a deploy-time constant per project. Env-derived remotePatterns would couple build to env presence, breaking Vercel preview deploys that may not have the env hydrated. Static literal is simpler, more explicit, and visible in code review when it changes.'
+  - decision: 'Allow BOTH `firebasestorage.googleapis.com` AND `*.firebasestorage.app` (research-locked)'
+    rationale: "Signed URLs from Admin SDK use `firebasestorage.googleapis.com`; direct public/download URLs use `*.firebasestorage.app`. Allowing both covers c16's signed-URL strategy + future epic D library if it switches to direct download URLs."
+  - decision: 'No env-derived bucket pattern (e.g., `${env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}.firebasestorage.app`)'
+    rationale: 'Wildcard `*.firebasestorage.app` covers all buckets. Env-derived would be tighter but more fragile.'
+  - decision: 'min_viable_ship_cut consideration: c18 cuttable; c17 falls back to `<img unoptimized={true}>`'
+    rationale: "Per epic.yaml min_viable_ship_cut. Optimization is nice-to-have; functional preview is must-have. If Mother's Day pressure forces a cut, ship c17 with the unoptimized fallback and add c18 post-launch as a perf polish."
+
+cross_cutting:
+  - concern: 'image-rendering'
+    notes: 'Single source of truth for image hosts. Future epic adds a new external image source = one place to update.'
+
+risks:
+  - severity: medium
+    description: 'Wrong host added (e.g., `*.firebasestorage.app` when actual URL is `firebasestorage.googleapis.com`); preview breaks at runtime'
+    mitigation: 'Researcher question (1) confirms by inspecting actual signed URL output OR by smoke test. Reviewer step manually loads preview in `pnpm dev`.'
+  - severity: low
+    description: "Wildcard `*.firebasestorage.app` is too permissive — accepts any bucket's images, not just ours"
+    mitigation: 'Acceptable v1 residual. Tighter pattern (specific bucket name) requires env-derived patterns; trade-off documented above. Future hardening can pin to specific bucket if needed.'
+  - severity: low
+    description: 'Next.js silently ignores invalid `remotePatterns` entries; tests pass but production still 400s'
+    mitigation: 'Test (1)-(3) inspect the file directly; Playwright e2e renders a real image. Two layers of verification.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 4 Validation: Verify the raw image preview renders from
+      the persisted storage path.
+      [c18 unblocks the next/image rendering path that c17 ships.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-raw-findings.md
+    relevant_excerpt: |
+      §7 Cross-cutting state > next.config.ts (full): existing
+      `images.remotePatterns` allows `i.pinimg.com` (Epic B addition).
+      Epic C must additively allow Firebase Storage host(s) for
+      generated-image preview rendering.
+  - path: next.config.ts
+    relevant_excerpt: |
+      Existing config — `images.remotePatterns` has `i.pinimg.com`.
+      Additive change preserves Epic B; adds Firebase Storage host(s).
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §Foundation Reuse: next.config.ts already allows `i.pinimg.com`
+      images, which supports the Pinterest browse surface Epic C
+      builds on; any generated-image or cached-reference preview host
+      additions are deltas, not a fresh image-policy surface.
+      [c18 ships the delta.]
+
+ui_indicators: 'NO new UI surface — config only; no wireframes; no ui-design step required'

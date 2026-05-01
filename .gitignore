@@ -3,6 +3,7 @@ node_modules/
 .pnp
 .pnp.js
 .yarn/install-state.gz
+.pnpm-store/
 
 # Testing
 coverage/
@@ -64,9 +65,12 @@ playwright/.cache/
 # Codex / local scratch
 /tmp/
 
-# Hive session-only state (not planning artifacts)
-.pHive/interrupts/
-.pHive/cycle-state/
-.pHive/insights/
-.pHive/team-memories/
-.pHive/episodes/
+# Hive session-only state (not planning artifacts).
+# Use **/ prefix so nested .pHive instances (e.g. spawned inside
+# wireframes subtrees) are also ignored.
+**/.pHive/interrupts/
+**/.pHive/cycle-state/
+**/.pHive/insights/
+**/.pHive/team-memories/
+**/.pHive/episodes/
+**/.pHive/metrics/

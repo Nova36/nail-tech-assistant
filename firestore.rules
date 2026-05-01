@@ -6,6 +6,52 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Epic C — references collection.
+    // Owner is in the document field `userId`. userId is immutable on update.
+    match /references/{refId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Epic C — designs collection. Same shape as references.
+    // Cross-doc reference ownership (primaryReferenceId, secondaryReferenceIds[])
+    // is validated at ingest by c8/c9, NOT here — rules-side cross-doc lookups
+    // are expensive and the ingest path already has the reads loaded.
+    match /designs/{designId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Epic C — generations collection.
+    // userId is denormalized onto the row (per c3 design_decision) so rules
+    // can enforce ownership without a get() lookup to the parent Design.
+    // Lifecycle status transitions are NOT enforced here; c15 owns that.
+    match /generations/{generationId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
     // Default deny for all other paths — later epics add narrow rules for their own collections.
     // Convention note: Firestore Security Rules are additive (OR). Default is deny; the explicit
     // `if false` below is defensive — it ensures any accidental permissive rule in a later epic

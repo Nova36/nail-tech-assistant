@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Path-derived ownership: the second segment of the object path IS the
+// owner uid. Storage objects are not documents with field data — the path
+// is the only ownership context. c5's `lib/firebase/storage.ts` helper
+// centralizes path construction (`referencePath(uid, refId)`,
+// `generationPath(uid, genId)`) so call sites cannot hand-roll paths.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{path=**} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == uid;
+    }
+
+    // Default deny for all other paths.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

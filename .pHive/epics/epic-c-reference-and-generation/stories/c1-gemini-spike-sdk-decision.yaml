@@ -1,0 +1,338 @@
+id: c1-gemini-spike-sdk-decision
+epic: epic-c-reference-and-generation
+title: 'Gemini 2.5 Flash Image quality spike + SDK decision artifact (GO/NO-GO + SDK lock + sync-vs-route recommendation)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: []
+
+escalations_addressed:
+  - trigger: provider-boundary
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Story produces .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md
+      with latency table (5+ reference types), sample req/res, SDK pick
+      recommendation (firebase/ai vs @google/generative-ai vs Vertex AI),
+      sync-vs-route recommendation for generateDesign, GO/NO-GO. c13/c14
+      reference the artifact's SDK pick.
+
+description: |
+  Slice 1 of the structured outline. The hard gate that the rest of Epic C
+  rests on. Run real reference-guided generation against Gemini 2.5 Flash
+  Image to answer two questions definitively before c13/c14 implementation:
+
+  1. **Quality**: does Gemini produce "stylized-but-recognizable nail design
+     material" from 5+ reference types (kickoff-decisions #12 acceptance bar)?
+     If yes → GO; if no → NO-GO and the provider boundary at lib/ai/generate.ts
+     swaps to FLUX.1-kontext or gpt-image-1 without changing upstream contracts.
+  2. **SDK + runtime**: which SDK runs cleanly on Next.js Node server runtime?
+     Architect preference is `@google/generative-ai` (Node-canonical); the
+     research brief flagged that context7 only returned browser-oriented
+     `firebase/ai` samples. Vertex AI is a third option if Google Cloud auth
+     is preferred over a single API key.
+
+  The spike is THROWAWAY by design. A `app/spike/gemini/page.tsx` server
+  component or `tests/spike/gemini.spec.ts` is allowed but disposable — the
+  durable artifact is the markdown record, not the spike code. No production
+  wiring of `lib/ai/generate.ts`, no `generations` row writes, no UI state
+  beyond what's needed to drive the spike.
+
+  Latency observation matters: if generation P95 latency exceeds ~30s, c14
+  must use a route handler with streaming progress rather than a single-shot
+  server action. The spike measures this and recommends.
+
+  No UI surface ships from this story. The /design/new workspace lands in
+  c10. This story exists only to make c13–c17 implementable with confidence.
+
+acceptance_criteria:
+  - 'Given the GEMINI_API_KEY (or provider-equivalent) is provisioned in `.env.local` via the secret-rotation script pattern, when the spike runs against 5+ reference types (e.g., minimal nail art, complex patterned nail art, abstract palette, nature-inspired pattern, fashion-editorial), then a latency value (P50/P95) and a sample output image is recorded for each.'
+  - 'Given the spike artifact exists at `.pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md`, when TPM reads it, then it contains: latency table (one row per reference type), sample request payload (one), sample response payload (one), SDK comparison table (firebase/ai vs @google/generative-ai vs Vertex AI), sync-vs-route recommendation for generateDesign, explicit GO/NO-GO verdict, and SDK lock recommendation with rationale.'
+  - 'Given the SDK lock recommendation, when c13/c14 reference it, then those stories install only the recommended SDK (no parallel installation of all three).'
+  - 'Given the GO/NO-GO verdict is GO, when downstream stories (c13–c17) plan their tests, then they assume the recommended SDK and runtime path are stable. Given NO-GO, then the epic pauses for orchestrator + Don to pick a fallback provider before c13 starts.'
+  - 'Given throwaway spike code (e.g., `app/spike/gemini/page.tsx` or `tests/spike/`), when integrate runs, then that code is either deleted in this story or marked for deletion at end of c14 — it does NOT remain in the durable codebase.'
+  - 'Given the spike consumes a real API key, when integrate runs, then `.env.example` documents the required env name (e.g., `GEMINI_API_KEY=`) but the actual key value never appears in commits, chat, or the artifact markdown.'
+  - 'Given the architect preference is `@google/generative-ai`, when the SDK comparison runs, then `firebase/ai` is included as a candidate but evaluated against the actual server-runtime constraint (not a paper preference).'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Gemini 2.5 Flash Image multimodal request shape — what's the exact
+      contents-array structure for "primary reference image + N secondary
+      reference images + text prompt + style hint"? Confirm via context7
+      lookups for `@google/generative-ai` Node SDK and `firebase/ai` web SDK
+      to compare request shapes side-by-side.
+      (2) Authentication — `@google/generative-ai` uses an API key; Vertex AI
+      uses ADC / service account; `firebase/ai` uses the existing Firebase
+      app config but requires App Check on the client. For a Next.js Node
+      server runtime calling from a server action, which auth model has the
+      least friction?
+      (3) Latency baseline — what's the published or community-reported P50
+      latency for Gemini 2.5 Flash Image multimodal requests (4 input images
+      + prompt → 1 output image)? Used to decide whether server-action vs
+      route-handler-with-streaming is the right transport in c14.
+
+      Read the research-brief Open Questions §6.1 and §6.2 for prior framing.
+      Read .pHive/planning/structured-outline.md Slice 1 (lines 132–180) for
+      the outline's framing. Read memory `feedback_secret_rotation_no_releak`
+      for the API-key handling pattern.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write the verification harness BEFORE running the spike. The "tests"
+      here are the spike measurement procedure, not vitest assertions.
+
+      Produce `.pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md`
+      with empty-but-structured sections:
+
+      ```
+      # Gemini 2.5 Flash Image — Spike + SDK Decision
+
+      ## Reference set (5+ types)
+      | # | type | primary ref source | secondary refs | prompt |
+      | --- | --- | --- | --- | --- |
+      | 1 | minimal-nail-art | <pin URL or upload> | ... | ... |
+      | 2 | complex-patterned | ... |
+      | 3 | abstract-palette | ... |
+      | 4 | nature-inspired | ... |
+      | 5 | fashion-editorial | ... |
+
+      ## Latency table
+      | # | type | SDK | P50 latency | P95 (3 runs) | output quality (1-5) |
+
+      ## Sample request payload
+      ```json
+      // one representative request
+
+      ## Sample response payload
+      ```json
+      // one representative response (truncated bytes ok)
+
+      ## SDK comparison
+      | criterion | @google/generative-ai | firebase/ai | Vertex AI |
+      | server-runtime support | ... |
+      | auth model | API key | App Check + Firebase | ADC / SA |
+      | streaming support | ... |
+      | published Node samples | ... |
+      | bundle weight | ... |
+
+      ## sync-vs-route recommendation
+      <one paragraph: server action OK if P95 < 30s, otherwise route + stream>
+
+      ## GO / NO-GO
+      Verdict: <GO | NO-GO>
+      Rationale: <one paragraph>
+
+      ## SDK lock
+      Recommendation: <SDK name + version>
+      Rationale: <one paragraph>
+      ```
+
+      Tester also produces:
+      - The 5-row reference-set spec (5+ rows REQUIRED). Each row names a
+        primary reference (Pinterest pin URL or local fixture path),
+        secondary refs, and prompt text.
+      - A go/no-go evaluation rubric: 3 of 5 reference types must produce
+        "stylized-but-recognizable" output to count as GO. <3 = NO-GO.
+      - The latency rubric: P95 < 30s = sync-eligible; ≥ 30s = route + stream.
+
+      DO NOT write vitest assertions for the spike code itself — the spike
+      is measured manually + recorded in the artifact. Quality is reviewer
+      judgment, not automated.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Run the spike. Make the artifact populate.
+
+      1. Provision GEMINI_API_KEY in `.env.local` via the local script
+         pattern from memory `feedback_secret_rotation_no_releak`. The key
+         value MUST NOT appear in chat, commits, or the artifact markdown.
+         Add `.env.example` entry: `GEMINI_API_KEY=`.
+
+      2. Install ONE candidate SDK first (architect preference:
+         `@google/genai` v1.50.1+; the older `@google/generative-ai`
+         package reached EOL 2025-08-31 — DO NOT install it). Wire a
+         throwaway harness:
+         - `app/spike/gemini/page.tsx` server component that takes a
+           reference set (hard-coded fixture) and renders the result image
+         - OR `tests/spike/gemini.spec.ts` that runs from the command line
+           and writes outputs to `.pHive/epics/epic-c-reference-and-generation/docs/spike-outputs/`
+
+      3. Run all 5 reference-type rows. Capture:
+         - P50 + P95 latency (3 runs each row)
+         - Output image quality (1-5 reviewer score)
+         - Sample request + response payloads (one row, copy verbatim into artifact)
+
+      4. If `@google/generative-ai` produces NO-GO quality, ALSO run a
+         minimal `firebase/ai` comparison with one row to confirm the issue
+         is the model, not the SDK. Skip this step if `@google/generative-ai`
+         produces GO.
+
+      5. Populate the artifact markdown end-to-end:
+         - All rows of the latency table
+         - One sample request + one sample response
+         - SDK comparison table (mark "untested" cells honestly — don't
+           fabricate data for SDKs not actually run)
+         - sync-vs-route recommendation based on observed P95
+         - GO / NO-GO verdict
+         - SDK lock recommendation
+
+      6. Throwaway code disposition:
+         - `app/spike/gemini/page.tsx` (if used): mark for deletion in c14
+           reviewer step OR delete in this story's integrate step.
+         - `tests/spike/gemini.spec.ts` (if used): same.
+         - `.pHive/epics/epic-c-reference-and-generation/docs/spike-outputs/`
+           image samples: keep — they're durable evidence supporting the
+           GO/NO-GO call.
+
+      DO NOT: wire `lib/ai/generate.ts` (c14's job). DO NOT: write
+      `generations` rows. DO NOT: build `/design/new` UI. DO NOT: install all
+      three candidate SDKs in parallel — install one, run, install second
+      only if first fails GO threshold.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the spike answered the gate questions cleanly without sprawling.
+
+      - Artifact exists at the documented path. All sections populated. No
+        "TODO" or "TBD" sections in the GO / NO-GO or SDK lock blocks.
+      - Latency table has at least 5 rows + P50/P95 columns + quality scores.
+      - GO / NO-GO verdict is explicit (not hedged) with one-paragraph
+        rationale tied to the 3-of-5 quality rubric.
+      - SDK lock recommendation names a single SDK + version. If "untested"
+        cells appear in the SDK comparison, they're labelled honestly.
+      - sync-vs-route recommendation cites the observed P95.
+      - GEMINI_API_KEY is in `.env.local` only — confirm via grep that the
+        key value does NOT appear anywhere under git tracking
+        (`git grep "<first-6-chars-of-key>"` should return nothing).
+      - `.env.example` has the new entry with no value.
+      - No production wiring of `lib/ai/generate.ts` (c14's job). No
+        `lib/types.ts` Generation/Reference/Design additions (c3's job).
+      - Throwaway spike code is either deleted or has a clear deletion
+        marker for c14.
+      - If verdict is NO-GO, story stops at review and SendMessage is sent
+        to team-lead flagging the gate failure before integrate.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c1-gemini-spike-sdk-decision`.
+      Commit: `feat(c1): Gemini 2.5 Flash Image spike + SDK decision artifact`.
+      Files committed: spike-gemini-sdk.md, .env.example update,
+      .pHive/.../spike-outputs/<images>. Throwaway spike code: deleted before
+      commit OR retained with a `// REMOVE_BEFORE_C14` comment if c14 review
+      will sweep it.
+
+      DO NOT commit GEMINI_API_KEY value. DO NOT commit anything containing
+      the literal API key string. Pre-commit grep guard (manual).
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 App Router (Node runtime; throwaway spike route under app/spike/gemini)'
+    runtime: 'Node 20+; pnpm 10.22.0'
+    testing: 'Manual spike measurement; reviewer judgment for quality scoring'
+    sdk_candidates: '`@google/genai` (architect preference, Node-canonical, v1.50.1+; replaces EOL `@google/generative-ai` deprecated 2025-08-31) | `firebase/ai` (web-canonical, App Check) | Vertex AI (ADC/service account)'
+  key_files:
+    - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+      purpose: 'Open questions §6.1 (provider gate), §6.2 (SDK choice), §6.6 (image bytes transfer shape) frame the spike questions'
+    - path: .pHive/planning/structured-outline.md
+      purpose: 'Slice 1 (lines 132–180) — outline framing of the spike, including kickoff-decisions #12 quality bar'
+    - path: lib/env.ts
+      purpose: 'Existing zod schema; spike adds GEMINI_API_KEY entry (or provider-equivalent per SDK lock)'
+    - path: .env.example
+      purpose: 'Existing env-key documentation file; spike adds new entry with empty value'
+    - path: lib/firebase/server.ts
+      purpose: 'Reference pattern for server-only env-hydration if `firebase/ai` candidate is run'
+
+files_to_modify:
+  - file: .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md
+    change: 'CREATE; durable artifact recording GO/NO-GO + SDK lock + latency + samples'
+  - file: .pHive/epics/epic-c-reference-and-generation/docs/spike-outputs/
+    change: 'CREATE directory; per-row sample output images for evidence'
+  - file: .env.example
+    change: 'Add `GEMINI_API_KEY=` (or provider-equivalent per SDK lock) with empty value'
+  - file: app/spike/gemini/page.tsx
+    change: 'CREATE if used; THROWAWAY — deleted in this story or c14'
+  - file: tests/spike/gemini.spec.ts
+    change: 'CREATE if used; THROWAWAY — deleted in this story or c14'
+  - file: package.json
+    change: 'Add `@google/genai` (v1.50.1+) to deps if SDK lock is `@google/genai` (deferred to c14 if reviewer prefers c14 owns the install — orchestrator decides at integrate). NOTE: `@google/generative-ai` is the EOL predecessor — do not install.'
+
+design_decisions:
+  - decision: 'Spike is throwaway; durable output is the markdown artifact + sample images, not running spike code'
+    rationale: 'Avoids leaving a /spike/gemini route in production; matches structured-outline Slice 1 explicit "decision gate, not a speculative demo" framing (Risk #2 detailed mitigations)'
+  - decision: 'Architect preference `@google/genai` (v1.50.1+) is the FIRST SDK tested, not all three in parallel'
+    rationale: "Schedule discipline (Mother's Day 10 days out); installing/learning three SDKs to pick one is a sunk cost when architect preference is already opinionated. `firebase/ai` gets compared only if `@google/genai` fails the runtime check. Researcher 2026-04-29 confirmed `@google/generative-ai` reached EOL 2025-08-31 — `@google/genai` is the canonical replacement; do not install the deprecated package."
+  - decision: 'Quality rubric: 3-of-5 reference types must produce stylized-but-recognizable output to count as GO'
+    rationale: 'Kickoff-decisions #12 sets the bar; 3-of-5 is a quantifiable threshold rather than reviewer impression. Lower than 3 = NO-GO triggers provider swap.'
+  - decision: 'sync-vs-route recommendation uses P95 < 30s as the cutoff'
+    rationale: 'Vercel default function timeout (Hobby) is 10s; Pro is 60s. Server actions inherit the same timeout. P95 ≥ 30s makes server-action transport fragile under load and forces c14 to use a route handler with streaming progress.'
+  - decision: 'NO production wiring of lib/ai/generate.ts in this story'
+    rationale: "Provider-boundary escalation: lib/ai/generate.ts is c14's file. Pre-wiring it during the spike would couple the throwaway code to durable code and make c14 a refactor instead of an implementation. Hard separation."
+  - decision: 'GEMINI_API_KEY provisioned via feedback_secret_rotation_no_releak local script pattern'
+    rationale: 'Memory rule already established. Key value must never pass through chat, commits, or artifacts. Local script reads from a `.secrets/` dir and writes to `.env.local` directly.'
+
+cross_cutting:
+  - concern: 'secret handling'
+    notes: 'GEMINI_API_KEY (or provider-equivalent) provisioning via local-script pattern; pre-commit grep guard; .env.example empty value entry; reviewer step explicitly verifies key absence under git tracking'
+  - concern: 'provider boundary discipline'
+    notes: 'No durable code in this story imports the candidate SDK from lib/ — only the throwaway spike harness. Provider boundary at lib/ai/generate.ts stays untouched until c14.'
+
+risks:
+  - severity: high
+    description: 'Quality verdict is NO-GO — Gemini cannot produce stylized-but-recognizable nail-design material from reference inputs'
+    mitigation: 'Provider boundary at lib/ai/generate.ts (built in c14) absorbs the swap. Story stops at review with SendMessage to team-lead. Orchestrator + Don pick a fallback provider (FLUX.1-kontext or gpt-image-1) before c13 starts. Upstream contracts (Reference, Design, request builder inputs in c13) stay unchanged.'
+  - severity: high
+    description: '`@google/generative-ai` does not run cleanly on Next.js Node server runtime (e.g., transitively pulls in browser-only globals via a peer dep)'
+    mitigation: 'Spike implement step catches this immediately on first run. If broken, fall back to `firebase/ai` (with the App Check caveat handled server-side via Firebase Admin SDK) or Vertex AI (ADC). SDK comparison table records the failure mode honestly.'
+  - severity: medium
+    description: 'P95 latency exceeds 30s and forces c14 to use a route handler with streaming, expanding c14 scope beyond what was planned'
+    mitigation: "Spike measures P95 explicitly so c14 plans correctly. If P95 ≥ 30s, c14 task description in this YAML's `escalations_carrying_into_execute` (epic.yaml provider-boundary) is updated by orchestrator before c14 starts."
+  - severity: medium
+    description: 'GEMINI_API_KEY accidentally appears in spike artifact markdown or commit'
+    mitigation: 'Reviewer grep step explicitly checks for first-6-chars of key under git tracking. Pre-commit guard. Memory rule feedback_secret_rotation_no_releak referenced in design_decisions.'
+  - severity: low
+    description: 'Throwaway spike code (`app/spike/gemini/`) survives integrate and ends up in production'
+    mitigation: "Two-pass cleanup: this story's integrate step deletes if possible; c14 reviewer step explicitly checks for spike code remnants and removes any with `REMOVE_BEFORE_C14` markers."
+  - severity: low
+    description: '5 reference-type rows are insufficient signal — model behaves well on 5 types but poorly on real-user inputs later'
+    mitigation: 'Outline Risk #2 detailed mitigation already accepts this — Slice 1 is a directional gate, not a load test. c14 ships with the provider boundary so post-launch quality issues swap providers without rewriting upstream code. Acceptable residual risk.'
+
+references:
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      Open Questions §1: Has the Slice 1 provider decision been recorded
+      anywhere authoritative, and does it clear Gemini 2.5 Flash Image for
+      production generation or require a different provider path?
+      Open Questions §2: Which production SDK is approved for the generation
+      boundary: Firebase AI Logic, @google/generative-ai, or another
+      provider-backed path?
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: Treat the provider boundary as the load-bearing
+      seam. Everything upstream of lib/ai/generate.ts should be
+      provider-agnostic. buildGeminiRequest is the only function that knows
+      Gemini's specific multimodal shape. If we have to swap to FLUX or
+      gpt-image-1, that file is the diff.
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 1: Gemini Quality Spike. Goal: confirm Gemini 2.5 Flash Image
+      can produce stylized-but-recognizable nail design material from
+      reference inputs. Risk #2 Detailed Mitigations: Slice 1 is a decision
+      gate, not a speculative demo. The acceptance bar is not "pretty image."
+      The acceptance bar is "stylized-but-recognizable nail design material
+      that supports the bridge value proposition." (kickoff-decisions #12)
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      Risks Applicable: Risk #2 — Gemini reference-edit quality is not good
+      enough for nail-design output. Mitigation: enforce the Slice 1 quality
+      gate before production AI plumbing is treated as committed.
+
+ui_indicators: 'NO new durable UI surface — throwaway spike harness only; no wireframes; no ui-design step required'

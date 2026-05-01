@@ -56,6 +56,19 @@ type ListPinterestBoardsResult =
         | 'unknown';
     };
 
+type GetPinterestPinResult =
+  | { ok: true; pin: PinterestPin }
+  | {
+      ok: false;
+      reason:
+        | 'invalid_token'
+        | 'insufficient_scope'
+        | 'not_found'
+        | 'rate_limit'
+        | 'network'
+        | 'unknown';
+    };
+
 type ListPinterestBoardPinsResult =
   | { ok: true; items: PinterestPin[]; nextBookmark: string | null }
   | {
@@ -227,6 +240,33 @@ export async function listPinterestBoardPins(opts: {
       items: data.items ?? [],
       nextBookmark: data.bookmark ?? null,
     };
+  } catch {
+    return { ok: false, reason: 'network' };
+  }
+}
+
+export async function getPinterestPin(
+  pinId: string
+): Promise<GetPinterestPinResult> {
+  const mock = getMockMode();
+  if (mock === 'invalid_token') return { ok: false, reason: 'invalid_token' };
+  if (mock === 'insufficient_scope')
+    return { ok: false, reason: 'insufficient_scope' };
+  if (mock === 'network') return { ok: false, reason: 'network' };
+
+  try {
+    const response = await pinterestFetch(
+      `/pins/${encodeURIComponent(pinId)}`,
+      { method: 'GET' }
+    );
+    const error = normalizePinterestResponse(response);
+
+    if (error) {
+      return { ok: false, reason: error.reason };
+    }
+
+    const pin = (await response.json()) as PinterestPin;
+    return { ok: true, pin };
   } catch {
     return { ok: false, reason: 'network' };
   }

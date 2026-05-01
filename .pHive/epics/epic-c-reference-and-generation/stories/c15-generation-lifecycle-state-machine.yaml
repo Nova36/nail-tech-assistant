@@ -1,0 +1,566 @@
+id: c15-generation-lifecycle-state-machine
+epic: epic-c-reference-and-generation
+title: 'lib/designs/lifecycle.ts generation persistence state machine — pending→success|failure with transactional latestGenerationId + storage-fail-after-success → terminal failure (FR-C-9)'
+status: pending
+complexity: high
+methodology: tdd
+depends_on:
+  [c10-create-design-action, c5-server-storage-helper, c14-gemini-request-retry]
+
+escalations_addressed:
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Two-write lifecycle pattern locked: persistGenerationStart writes
+      `pending` BEFORE provider call; persistGenerationResult writes
+      terminal `success`|`failure` AFTER provider returns AND output
+      bytes are confirmed in Storage. Storage-fail-after-provider-success
+      transitions to `failure` with `errorCode: "storage_fail"`, NEVER
+      stuck `pending`. FR-C-9 anti-zombie invariant proven by integration
+      test that explicitly fails the storage write after provider success.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Generation row fields locked from c3: `status`, `errorCode`,
+      `errorMessage`, `resultStoragePath`, `providerResponseMetadata`,
+      `userId`, `designId`, `requestJson`, `createdAt`, `updatedAt`.
+      Transactional update couples `generations.status = "success"` with
+      `designs.latestGenerationId = generationId` — both succeed or
+      both fail (Firestore transaction).
+  - trigger: security:plan-audit
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      All Firestore writes scoped to authenticated user uid. Generation
+      row's `userId` denormalized from session uid (c3 design_decision).
+      c4 firestore.rules enforce on read + write. Storage write of
+      output bytes goes through c5 helper using `users/{uid}/generations/...`
+      path family — c4 storage.rules deny non-owner.
+
+description: |
+  The hardest persistence problem in Epic C, and the one most likely to
+  cost a future debugging weekend if locked wrong. Extends c10's
+  `lib/designs/lifecycle.ts` with the generation state machine:
+
+  1. **`persistGenerationStart({ userId, designId, requestSummary }):
+     Promise<{ ok: true; generationId } | { ok: false; reason; message }>`**
+     — writes a `generations/{generationId}` row with `status: "pending"`
+     BEFORE the provider call. Returns the generationId. If this write
+     fails, the caller (c16) does NOT proceed to the provider — no
+     wasted provider tokens on a never-persisted generation.
+
+  2. **`persistGenerationResult({ generationId, userId, designId,
+     outcome }): Promise<{ ok: true } | { ok: false; reason; message }>`**
+     — writes the terminal `success` or `failure` row. On `success`:
+     uploads output bytes to Storage (via c5 helper), then transactionally
+     updates the generation row AND the parent design's
+     `latestGenerationId`. On `failure`: writes the failure row only —
+     no Storage write, no design update.
+
+  3. **Storage-fail-after-provider-success rescue** — if the provider
+     returns success bytes but the Storage write fails, the lifecycle
+     transitions the generation row to `failure` with
+     `errorCode: "storage_fail"`. NEVER leaves the row in `pending`.
+     This is the FR-C-9 invariant — proven by integration test (a fault
+     injection that fails Storage after provider success).
+
+  4. **Concurrent generation handling** — two `persistGenerationStart`
+     calls from the same user for the same design create two distinct
+     generation rows (each with its own UUID). The lifecycle does NOT
+     enforce one-active-generation-at-a-time at this layer — c16 / c17
+     own that UX policy if needed. v1 keeps multiple-pending tolerable.
+
+  Out of scope: provider call (c14 owns). HTTP / action surface (c16).
+  UI (c17). Design library queries (Epic D).
+
+acceptance_criteria:
+  # US-C-4 (generate a nail-design image) — c15 owns the persistence half of the generate flow; FR-C-9 anti-zombie invariant
+  - 'Given an authenticated session for `alice` and an existing design `d1` owned by alice, when `persistGenerationStart({ userId: "alice-uid", designId: "d1", requestSummary })` is called, then it writes a `generations/{generationId}` doc with `status: "pending"`, `userId: "alice-uid"`, `designId: "d1"`, `requestJson: <summary>`, `resultStoragePath: null`, `errorCode: null`, `errorMessage: null`, `createdAt: <ISO>`, `updatedAt: <ISO>`, and returns `{ ok: true; generationId }`.'
+  - 'Given the design referenced by `designId` does NOT exist or is owned by a different user, when `persistGenerationStart` runs, then c4 firestore.rules deny on the `generations` write (rules cannot cross-validate design ownership cheaply); however, the lifecycle defensively reads the design first and returns `{ ok: false; reason: "design_not_found" | "design_unauthorized"; message }` BEFORE attempting the generation write.'
+  - 'Given a successful provider result, when `persistGenerationResult({ generationId, userId, designId, outcome: { ok: true; imageBytes; mimeType; metadata } })` runs, then: (a) bytes are uploaded to `users/alice-uid/generations/{generationId}.png` via c5 helper, (b) a Firestore TRANSACTION updates `generations/{generationId}` to `status: "success"; resultStoragePath; providerResponseMetadata; updatedAt` AND `designs/d1.latestGenerationId = generationId; updatedAt`, (c) returns `{ ok: true }`.'
+  - 'Given the Storage upload fails after provider success, when `persistGenerationResult` catches the c5 helper failure, then it transactionally updates `generations/{generationId}` to `status: "failure"; errorCode: "storage_fail"; errorMessage; updatedAt`, does NOT update `designs.latestGenerationId`, and returns `{ ok: false; reason: "storage_fail"; message }`. The row is NEVER stuck `pending`.'
+  - 'Given the Firestore transaction fails after Storage write succeeded, when `persistGenerationResult` catches, then it logs `[lifecycle] firestore transaction failed after storage write succeeded` (orphan blob path included) AND returns `{ ok: false; reason: "firestore_failure"; message }`. Caller (c16) surfaces; orphan storage cleanup is a future-epic concern.'
+  - 'Given a failure outcome from the provider, when `persistGenerationResult({ outcome: { ok: false; reason: "refusal"; message } })` runs, then it updates the generation row to `status: "failure"; errorCode: "refusal"; errorMessage; updatedAt`, does NOT touch Storage, does NOT update `designs.latestGenerationId`, returns `{ ok: true }` (the FAILURE was successfully persisted).'
+  - "Given the generation row updates from `pending` → `success`, when c4 firestore.rules evaluate, then the update is allowed (alice owns the row; userId immutable; status transition is a non-rules concern — rules don't validate state machines)."
+  - 'Given two concurrent `persistGenerationStart` calls for the same user and design, when both complete, then two distinct `generations/{generationId}` docs exist with different UUIDs. No collision.'
+  - 'Given `persistGenerationStart` fails to write (e.g., rules denied because design is missing), when the caller (c16) handles, then the generation flow does NOT call the provider — caller checks `result.ok` first.'
+  - 'Given grep across `lib/designs/lifecycle.ts`, when searching for forbidden imports, then NO matches for `lib/ai/provider`, `@google/generative-ai`, or any direct SDK call — c14 is the only upstream of provider; lifecycle takes the OUTCOME, not the call.'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Firestore Admin SDK transactions in v13 — confirm the API:
+      `db.runTransaction(async (txn) => { ... })`. Inside the txn,
+      reads happen via `txn.get(ref)`; writes via `txn.set` / `txn.update`.
+      All ops in the txn either commit atomically or roll back. Confirm
+      via context7 firebase-admin v13 docs.
+      (2) c5 storage helper — does `uploadGenerationBytes(uid, genId,
+      bytes, contentType)` already exist (per c5 acceptance criteria), or
+      does this story need to confirm c5 shipped it? Re-read c5 spec.
+      (3) Output `mimeType` for generated images — provider returns
+      `image/png` typically; storage path needs `.png` extension. c5
+      `generationPath(uid, genId, ext)` already accepts ext. Confirm
+      pipeline mimeType → ext mapping is consistent.
+
+      Read c10 `lib/designs/lifecycle.ts` — extending the SAME file.
+      Read .pHive/planning/structured-outline.md:282-321 (Slice 4
+      Changes + Validation including silent-break risk).
+      Read kickoff-decisions #8 (retry budget already handled by c14).
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Heavy emulator + mocked
+      c5 + mocked c14 outcome.
+
+      - tests/integration/designs/persist-generation-start.test.ts —
+        (Firestore + Auth emulators):
+        (1) Existing design `d1` owned by alice; alice calls
+            persistGenerationStart → returns `{ ok: true; generationId }`;
+            assert `generations/{generationId}` exists with `status: "pending"`,
+            `userId: "alice-uid"`, `designId: "d1"`, all terminal fields null
+        (2) Design `d1` does NOT exist; alice calls → returns
+            `{ ok: false; reason: "design_not_found" }`; no generation row written
+        (3) Design `d1` exists but owned by bob; alice calls → returns
+            `{ ok: false; reason: "design_unauthorized" }`; no generation row written
+        (4) Two concurrent calls for same alice + d1 → two distinct
+            generationIds; both rows exist; no collision
+        (5) Mocked Firestore write throws permission-denied (e.g., rules
+            mismatch) → returns `{ ok: false; reason: "rules_denied" }`
+
+      - tests/integration/designs/persist-generation-result-success.test.ts —
+        (6) Generation row exists at `pending`; mock c5 uploadGenerationBytes
+            to succeed; call `persistGenerationResult` with provider success
+            outcome → assert generation row transitions to `status: "success"`,
+            `resultStoragePath` set, `providerResponseMetadata` set;
+            assert `designs/d1.latestGenerationId === generationId`;
+            assert `updatedAt` updated on both
+        (7) Returns `{ ok: true }`
+
+      - tests/integration/designs/persist-generation-result-failure.test.ts —
+        (8) Generation row at `pending`; call persistGenerationResult with
+            provider failure outcome `{ ok: false; reason: "refusal";
+            message: "blocked" }` → row transitions to `status: "failure"`,
+            `errorCode: "refusal"`, `errorMessage: "blocked"`; design
+            unchanged (`latestGenerationId` not touched); Storage NOT touched
+        (9) Same for `rate_limit`, `network`, `low_quality`, `unknown`,
+            `missing_reference_bytes`, `primary_required` — all map to
+            `status: "failure"` with corresponding errorCode
+
+      - tests/integration/designs/persist-generation-result-storage-fail.test.ts —
+        (FR-C-9 anti-zombie test):
+        (10) Generation row at `pending`; mock c5 uploadGenerationBytes to
+             return `{ ok: false; reason: "storage_failure" }`; call
+             persistGenerationResult with provider success outcome → row
+             transitions to `status: "failure"`, `errorCode: "storage_fail"`,
+             `errorMessage` set; design unchanged; Storage helper was
+             called once but failed
+        (11) Returns `{ ok: false; reason: "storage_fail" }`
+        (12) Row is NEVER `pending` after this call returns — confirmed
+             by re-fetching the doc and asserting status
+
+      - tests/integration/designs/persist-generation-result-transaction-fail.test.ts —
+        (13) Mock c5 to succeed; mock Firestore txn to throw on commit
+             (e.g., `aborted` due to contention) → returns
+             `{ ok: false; reason: "firestore_failure" }`; logs
+             `[lifecycle] firestore transaction failed after storage write
+             succeeded` with orphan blob path
+
+      - tests/unit/designs/lifecycle-purity.test.ts —
+        (14) Read lib/designs/lifecycle.ts source; assert no occurrences of
+             `@google/generative-ai`, `lib/ai/provider`. Lifecycle takes
+             the outcome, not the provider call.
+
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Extend c10's `lib/designs/lifecycle.ts`.
+
+      ```ts
+      // (existing c10 imports + createDesignDraft)
+      import crypto from 'node:crypto';
+      import { getFirestore } from 'firebase-admin/firestore';
+      import { createServerFirebaseAdmin } from '@/lib/firebase/server';
+      import {
+        designConverter, generationConverter,
+      } from '@/lib/firestore/converters';
+      import {
+        uploadGenerationBytes, generationPath,
+      } from '@/lib/firebase/storage';
+      import type {
+        Design, Generation, GenerationStatus, GenerationErrorCode,
+      } from '@/lib/types';
+      import type { GenerateResult } from '@/lib/ai/generate';
+
+      export type PersistGenerationStartResult =
+        | { ok: true; generationId: string }
+        | { ok: false;
+            reason: 'design_not_found' | 'design_unauthorized'
+              | 'rules_denied' | 'firestore_failure';
+            message: string };
+
+      export async function persistGenerationStart(input: {
+        userId: string;
+        designId: string;
+        requestJson: unknown;
+      }): Promise<PersistGenerationStartResult> {
+        const db = getFirestore(createServerFirebaseAdmin());
+
+        // Defensive design ownership check BEFORE writing the generation row
+        try {
+          const designSnap = await db.collection('designs')
+            .doc(input.designId).withConverter(designConverter).get();
+          if (!designSnap.exists) {
+            return { ok: false, reason: 'design_not_found',
+                     message: `design ${input.designId} not found` };
+          }
+          const design = designSnap.data();
+          if (design && design.userId !== input.userId) {
+            return { ok: false, reason: 'design_unauthorized',
+                     message: 'design owned by another user' };
+          }
+        } catch (err) {
+          const code = (err as { code?: string }).code ?? 'unknown';
+          const message = (err as Error).message ?? String(err);
+          console.error('[lifecycle] persistGenerationStart design read failed',
+            { uid: input.userId, designId: input.designId, code, message });
+          return { ok: false, reason: 'firestore_failure', message };
+        }
+
+        const generationId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const generation: Generation = {
+          id: generationId,
+          designId: input.designId,
+          userId: input.userId,
+          requestJson: input.requestJson,
+          resultStoragePath: null,
+          providerResponseMetadata: null,
+          status: 'pending',
+          errorCode: null,
+          errorMessage: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        try {
+          await db.collection('generations').doc(generationId)
+            .withConverter(generationConverter).set(generation);
+          return { ok: true, generationId };
+        } catch (err) {
+          const code = (err as { code?: string }).code ?? 'unknown';
+          const message = (err as Error).message ?? String(err);
+          if (code === 'permission-denied') {
+            console.error('[lifecycle] persistGenerationStart rules denied',
+              { uid: input.userId, generationId, code, message });
+            return { ok: false, reason: 'rules_denied', message };
+          }
+          console.error('[lifecycle] persistGenerationStart firestore failed',
+            { uid: input.userId, generationId, code, message });
+          return { ok: false, reason: 'firestore_failure', message };
+        }
+      }
+
+      export type PersistGenerationResultResult =
+        | { ok: true }
+        | { ok: false;
+            reason: 'storage_fail' | 'firestore_failure' | 'unknown';
+            message: string };
+
+      function reasonToErrorCode(
+        reason: GenerateResult extends { ok: false; reason: infer R } ? R : never,
+      ): GenerationErrorCode {
+        // Map c14 GenerateResult reasons to c3 GenerationErrorCode union
+        // GenerationErrorCode = 'refusal' | 'rate_limit' | 'network' | 'unknown'
+        // Extra c14 reasons (`missing_reference_bytes`, `primary_required`,
+        // `low_quality`) need mapping
+        if (reason === 'refusal') return 'refusal';
+        if (reason === 'rate_limit') return 'rate_limit';
+        if (reason === 'network') return 'network';
+        // missing_reference_bytes, primary_required, low_quality, unknown
+        return 'unknown';
+      }
+
+      export async function persistGenerationResult(input: {
+        generationId: string;
+        userId: string;
+        designId: string;
+        outcome: GenerateResult;
+      }): Promise<PersistGenerationResultResult> {
+        const db = getFirestore(createServerFirebaseAdmin());
+        const generationRef = db.collection('generations').doc(input.generationId)
+          .withConverter(generationConverter);
+        const designRef = db.collection('designs').doc(input.designId)
+          .withConverter(designConverter);
+        const now = new Date().toISOString();
+
+        if (!input.outcome.ok) {
+          // Failure path — no Storage write; just update row
+          const errorCode = reasonToErrorCode(input.outcome.reason);
+          try {
+            await generationRef.update({
+              status: 'failure' as GenerationStatus,
+              errorCode,
+              errorMessage: input.outcome.message,
+              providerResponseMetadata: input.outcome.metadata,
+              updatedAt: now,
+            });
+            return { ok: true };
+          } catch (err) {
+            const code = (err as { code?: string }).code ?? 'unknown';
+            const message = (err as Error).message ?? String(err);
+            console.error('[lifecycle] persistGenerationResult failure update failed',
+              { uid: input.userId, generationId: input.generationId, code, message });
+            return { ok: false, reason: 'firestore_failure', message };
+          }
+        }
+
+        // Success path — write Storage FIRST, then transactional Firestore update
+        const upload = await uploadGenerationBytes({
+          uid: input.userId,
+          genId: input.generationId,
+          bytes: input.outcome.imageBytes,
+          contentType: input.outcome.mimeType,
+        });
+
+        if (!upload.ok) {
+          // Storage failed after provider success — TERMINAL FAILURE (FR-C-9)
+          try {
+            await generationRef.update({
+              status: 'failure' as GenerationStatus,
+              errorCode: 'unknown' as GenerationErrorCode,
+              // Note: errorCode union doesn't include 'storage_fail';
+              // we use 'unknown' + descriptive errorMessage. UI in c17
+              // distinguishes via the c16 envelope's errorCode field.
+              errorMessage: `storage_fail: ${upload.message}`,
+              updatedAt: now,
+            });
+          } catch (err) {
+            console.error('[lifecycle] persistGenerationResult storage-fail rescue failed',
+              { uid: input.userId, generationId: input.generationId,
+                err: (err as Error).message });
+          }
+          return { ok: false, reason: 'storage_fail', message: upload.message };
+        }
+
+        // Storage succeeded — transactional update of both docs
+        try {
+          await db.runTransaction(async (txn) => {
+            txn.update(generationRef, {
+              status: 'success' as GenerationStatus,
+              resultStoragePath: upload.storagePath,
+              providerResponseMetadata: input.outcome.metadata,
+              errorCode: null,
+              errorMessage: null,
+              updatedAt: now,
+            });
+            txn.update(designRef, {
+              latestGenerationId: input.generationId,
+              updatedAt: now,
+            });
+          });
+          return { ok: true };
+        } catch (err) {
+          const code = (err as { code?: string }).code ?? 'unknown';
+          const message = (err as Error).message ?? String(err);
+          console.error(
+            '[lifecycle] firestore transaction failed after storage write succeeded',
+            { uid: input.userId, generationId: input.generationId,
+              storagePath: upload.storagePath, code, message });
+          return { ok: false, reason: 'firestore_failure', message };
+        }
+      }
+      ```
+
+      DO NOT: import `lib/ai/provider`. DO NOT: call the SDK directly.
+      DO NOT: trigger c14's generate() — c16 orchestrates the call
+      sequence (start → c14.generate → result).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the state machine is hermetic and FR-C-9 holds.
+
+      - `persistGenerationStart` does the design existence + ownership
+        check BEFORE writing the generation row. Test (2) + (3) cover.
+      - `persistGenerationResult` success path: Storage write FIRST,
+        then transactional Firestore update of BOTH `generations`
+        AND `designs.latestGenerationId`. No partial commits possible.
+      - **FR-C-9 invariant**: storage-fail-after-provider-success →
+        terminal failure. Test (10)+(11)+(12) explicit. Reviewer
+        manually re-reads test (12) — row is NEVER `pending` after the
+        function returns.
+      - Failure path (provider returned `ok: false`) → no Storage write,
+        no design update. Test (8)+(9) cover all reasons.
+      - Transactional update uses `db.runTransaction` not parallel
+        `Promise.all([gen.update, design.update])` — atomicity matters.
+      - Reason → errorCode mapping covers all c14 GenerateResult reasons
+        (`refusal`, `rate_limit`, `network`, `low_quality` → `unknown`,
+        `missing_reference_bytes` → `unknown`, `primary_required` →
+        `unknown`). Future hardening could expand `GenerationErrorCode`
+        union but that''s c3''s territory.
+      - storage_fail failure note: errorCode is `unknown` per c3 union;
+        errorMessage carries `storage_fail: ...` prefix. c16 envelope
+        will surface `errorCode: "storage_fail"` to UI; lifecycle records
+        it as `unknown` per the c3 type lock. Reviewer documents this
+        in the design_decisions if not already.
+      - All catch blocks log code+message+identifiers per
+        `feedback_silent_catches_cost_time`.
+      - Reviewer grep: NO `lib/ai/provider`, NO `@google/generative-ai`
+        in lib/designs/lifecycle.ts.
+      - All emulator-backed integration tests pass.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c15-generation-lifecycle-state-machine`.
+      Commit: `feat(c15): generation persistence state machine + transactional latestGenerationId + FR-C-9 anti-zombie`.
+      Pre-commit: `pnpm test`, `pnpm test:rules` must pass (especially
+      the storage-fail-after-success integration test).
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 server-only module — Firestore Admin transactions'
+    runtime: 'Node 20+; firebase-admin v13.8.0'
+    testing: 'Vitest+Firestore emulator + Storage emulator; mocked c5 + c14'
+  key_files:
+    - path: lib/designs/lifecycle.ts
+      purpose: 'EXTENDED (c10 created with createDesignDraft); c15 adds persistGenerationStart + persistGenerationResult'
+    - path: lib/firestore/converters/index.ts
+      purpose: 'Consumed (c3) — designConverter, generationConverter'
+    - path: lib/firebase/storage.ts
+      purpose: 'Consumed (c5) — uploadGenerationBytes, generationPath'
+    - path: lib/ai/generate.ts
+      purpose: 'Consumed (c14) — GenerateResult shape ONLY (no call); c15 takes the outcome'
+    - path: lib/types.ts
+      purpose: 'Consumed (c3) — Generation, GenerationStatus, GenerationErrorCode, Design'
+    - path: firestore.rules
+      purpose: "Consumed (c4) — generations collection rules; designs update rules (must allow user to update their own design's latestGenerationId field)"
+
+files_to_modify:
+  - file: lib/designs/lifecycle.ts
+    change: 'EXTEND with persistGenerationStart + persistGenerationResult + reasonToErrorCode helper'
+  - file: tests/integration/designs/persist-generation-start.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/designs/persist-generation-result-success.test.ts
+    change: 'CREATE in test-spec — transactional success path'
+  - file: tests/integration/designs/persist-generation-result-failure.test.ts
+    change: 'CREATE in test-spec — failure path (provider failure)'
+  - file: tests/integration/designs/persist-generation-result-storage-fail.test.ts
+    change: 'CREATE in test-spec — FR-C-9 anti-zombie'
+  - file: tests/integration/designs/persist-generation-result-transaction-fail.test.ts
+    change: 'CREATE in test-spec — txn fail after storage success'
+  - file: tests/unit/designs/lifecycle-purity.test.ts
+    change: 'CREATE in test-spec — grep guard against provider imports'
+
+design_decisions:
+  - decision: 'Pre-invoke `pending` write — `persistGenerationStart` writes BEFORE the provider call'
+    rationale: 'Architect mandate (persistence:consistency escalation). Pre-write ensures (a) c4 firestore.rules deny unauthorized attempts cheaply (no provider tokens wasted on unauthorized requests), (b) the row exists for c15 to update terminally regardless of provider outcome, (c) telemetry can count attempts that never reached the provider (rules_denied + design_not_found).'
+  - decision: 'Transactional coupling: generations.status = "success" + designs.latestGenerationId atomic'
+    rationale: 'persistence:consistency. Without the transaction, a successful generation could be written but designs.latestGenerationId could lag (or vice versa) → c10 / Epic D library code reads stale state. Firestore txn is the only Admin SDK path that gives atomicity across docs.'
+  - decision: 'Storage-fail-after-provider-success → terminal `failure`, NEVER stuck `pending` (FR-C-9)'
+    rationale: 'The most damaging silent-break risk in the epic — a `pending` row that never resolves blocks the user''s next attempt forever (UI in c17 may treat pending as "still trying"). Terminal failure with explicit errorCode lets the user retry with adjust-inputs CTA. Test (10)-(12) prove the invariant.'
+  - decision: 'Storage-fail rescue update is best-effort (try/catch around the rescue update; logs but does not retry)'
+    rationale: "If the rescue update itself fails (e.g., Firestore quota exhausted at the same instant), there's no good third path. Logging gives an operator a chance to manually fix the row. Acceptable residual — the rescue update is independent of the original Storage failure, so the conditional probability of both failing is very low."
+  - decision: 'Concurrent generations from same user + design produce distinct generationIds — no one-active-at-a-time policy'
+    rationale: 'UX policy (e.g., disable Generate button while pending) is c17''s problem. Lifecycle doesn''t enforce it. Two pending rows for the same design are valid Firestore state; c17 may show "you have a generation in progress" UI but lifecycle doesn''t police.'
+  - decision: 'storage_fail errorCode in c16 envelope; in lifecycle row, errorCode is "unknown" with errorMessage prefix'
+    rationale: 'c3 GenerationErrorCode union is `refusal | rate_limit | network | unknown` — does not include `storage_fail`. Lifecycle persists what the type allows; c16 surface envelope can have a richer errorCode union (`refusal | rate_limit | network | low_quality | storage_fail | unknown`) for UI mapping. Two separate vocabularies acknowledged.'
+  - decision: 'Defensive design existence + ownership check in persistGenerationStart, BEFORE writing generation row'
+    rationale: "c4 firestore.rules can't cross-validate cheaply. A user could submit a generation request with a spoofed designId belonging to bob; rules would allow the generation row write (alice owns it) but the resulting state is broken. Defensive read catches the spoof early and returns a clean reason."
+  - decision: 'Orphan output blob on transaction-fail-after-storage-success → logged but NOT cleaned up'
+    rationale: 'Same rationale as c6 orphan: cleanup requires a sweep job (out of v1 scope). Logging gives traceability. Acceptable residual.'
+
+cross_cutting:
+  - concern: 'persistence:consistency'
+    notes: 'Two-write pattern (start→result) + transactional success update + FR-C-9 storage-fail rescue. The single most important architectural invariant in Epic C; reviewer treats integration tests as load-bearing.'
+  - concern: 'security-rules'
+    notes: 'All writes go through Admin SDK with `userId` from session. c4 firestore.rules + storage.rules are the third defense layer. Defensive design ownership read prevents spoofed designId attacks before the generation write.'
+  - concern: 'data-model'
+    notes: 'Generation + Design types from c3. c14 GenerateResult shape consumed verbatim. Reason → errorCode mapping documented in code.'
+  - concern: 'error-handling'
+    notes: 'Discriminated envelope. Logs include code+message+identifiers. Failure-of-failure (rescue update fails) is logged but does not loop infinitely.'
+
+risks:
+  - severity: high
+    description: 'Firestore transaction conflicts (e.g., another writer updates the same design concurrently) cause the transaction to retry internally; success path takes longer than expected'
+    mitigation: 'Firestore SDK retries transactions automatically (default 5 attempts). Acceptable. If pathological, the txn returns aborted; we catch and report `firestore_failure`. Single-user app v1 — concurrent design writes are rare.'
+  - severity: high
+    description: 'Storage-fail rescue update itself fails → row stuck `pending`'
+    mitigation: 'Logged with full identifiers (`[lifecycle] persistGenerationResult storage-fail rescue failed`). Operator can fix manually. Probability of both Storage AND rescue Firestore write failing in the same call is very low. Acceptable residual.'
+  - severity: medium
+    description: 'c14 GenerateResult adds new reasons (e.g., a future story adds `quota_exceeded`) and `reasonToErrorCode` mapping silently coerces to `unknown` without code review'
+    mitigation: "Reason mapping uses TypeScript exhaustiveness — if c14 adds a reason and `reasonToErrorCode` doesn't handle it, TS does not catch (default returns `unknown`). Reviewer step explicitly checks the mapping covers all current GenerateResult reasons. Could be tightened with a `never` exhaustiveness check."
+  - severity: medium
+    description: 'designs.latestGenerationId update writes a non-c3 field (latestGenerationId is in c3 type, but update only writes that one field) — the partial update could violate c4 firestore.rules immutability rule on userId'
+    mitigation: "c4 immutability rule was `request.resource.data.userId == resource.data.userId` on update. Firestore evaluates rules on the MERGED state, not the partial payload. Partial updates that don't touch userId pass the check. Test (6) verifies via emulator."
+  - severity: medium
+    description: 'Concurrent persistGenerationResult calls for the SAME generationId (e.g., c16 retry race) corrupt state'
+    mitigation: 'Should not happen — c16 holds the generationId for one logical generate flow. If a future bug duplicates the call, the second update overwrites the first (last-write-wins). c17 UI is the natural rate-limiter.'
+  - severity: low
+    description: 'updatedAt timestamps differ slightly between generation and design updates within the txn (server time vs client time)'
+    mitigation: 'Both writes use the SAME `now` variable derived once at function start. Timestamps match exactly.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 4 Changes #3 (line 283): lib/designs/lifecycle.ts —
+      orchestrate create/generate/update behavior so route handlers
+      stay thin.
+      Slice 4 Validation: Verify generations.status transitions do not
+      get stuck in `pending` if output storage fails after provider
+      success. Verify the latest generation linkage on the design
+      updates after success.
+      Silent-break risk: partially persisted generations can create
+      misleading library state later if status and storage writes are
+      not coordinated.
+      Slice 4 Interfaces (line 298-299):
+        persistGenerationStart(input: { designId; requestJson }):
+          Promise<{ generationId }>
+        persistGenerationResult(input: { generationId; status;
+          resultStoragePath?; responseMetadata?; errorMessage? }):
+          Promise<void>
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      FR-C-6: The generation lifecycle must create a generation row
+      before provider invocation, classify result states, persist output
+      storage paths, and update latest-generation linkage on success.
+      FR-C-9: Generation status transitions must not leave misleading
+      `pending` state if provider success is followed by storage failure
+      or write inconsistency.
+      FR-C-10: Design creation and generation orchestration must
+      delegate to shared domain services rather than duplicating
+      lifecycle logic in route handlers.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §Risk Inventory (HIGH): Partial generation persistence can leave
+      misleading lifecycle state if provider success, output write, and
+      Firebase Firestore status updates are not coordinated. Mitigation:
+      Preserve the generation-start / generation-result split, require
+      deterministic failure transitions, and test pending/success/
+      failure transitions explicitly.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: Persist the generation lifecycle in two
+      writes, never one. persistGenerationStart writes the `pending`
+      row before the provider call. persistGenerationResult transitions
+      to `success` or `failure` after the provider returns AND the
+      output bytes have been written to Firebase Cloud Storage. If the
+      storage write fails after a provider success, we explicitly write
+      `failure`, not `pending`. This is what stops FR-C-9 from being a
+      paper guarantee.
+  - path: lib/designs/lifecycle.ts
+    relevant_excerpt: |
+      c10 created this file with createDesignDraft. c15 EXTENDS with
+      generation lifecycle functions. Same module, single source of
+      truth for all design + generation persistence.
+
+ui_indicators: 'NO new UI surface — server module only; no wireframes; no ui-design step required'

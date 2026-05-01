@@ -34,6 +34,14 @@ model_tiers:
   implement: codex # developer role delegated to Codex (per TDD pilot)
   review: claude # reviewer role stays Claude
 
+# Plan-skill routing contract (consumed by skills/plan SKILL.md Step 0.2)
+agent_backends:
+  technical-writer: codex
+  architect: codex
+  researcher: claude
+  tpm: claude
+  ui-designer: claude # codex-invoke marks ui-designer as known-incompatible regardless
+
 # Claude-Codex hybrid pilot (piloted in this project)
 # See ~/.claude/plugins/cache/plugin-codex/ for runtime helpers and prompting rules.
 agent_routing:

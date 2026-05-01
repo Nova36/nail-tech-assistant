@@ -1,0 +1,452 @@
+id: c6-pinterest-ingest
+epic: epic-c-reference-and-generation
+title: 'lib/references/ingest.ts — Pinterest pin ingestion (server-proxied: fetch via existing client → best image variant → user-scoped Storage write → `references` doc)'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [c5-server-storage-helper]
+
+escalations_addressed:
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Function returns the c3-locked `Reference` shape verbatim. `source:
+      "pinterest"` and `pinterestPinId: <pinId>` are non-null on every
+      return. No drift between Pinterest-source and upload-source records —
+      c7 will produce the SAME shape with `source: "upload"` and
+      `pinterestPinId: null`.
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Two-write order: bytes to Storage FIRST, Firestore doc AFTER. If the
+      Firestore write fails after a successful Storage write, the orphaned
+      Storage object is logged (background sweep is c5+future epic concern,
+      not c6). If the Storage write fails, no Firestore doc is created and
+      the function returns a typed failure — caller sees a clean rejection,
+      not a half-persisted reference.
+
+description: |
+  First half of `lib/references/ingest.ts`. Implements `ingestPinterestPin`
+  — the function that takes a Pinterest pin ID, fetches the pin metadata
+  via the existing `lib/pinterest/client.ts`, copies the pin's best image
+  variant into Firebase Cloud Storage under the user-scoped path produced
+  by `c5-server-storage-helper`, writes a `references` Firestore document
+  with the c3-locked shape, and returns the normalized `Reference`.
+
+  Server-proxied per design-discussion §My Proposed Approach + research-brief
+  Open Q6 — image bytes are fetched on the server (Node `fetch`), never
+  signed-URL'd to the browser. This satisfies the "block invalid reference
+  state instead of silently pretending a pin is usable when the durable
+  references copy failed" requirement from US-C-1 acceptance criteria.
+
+  Image variant selection: Pinterest pins expose `media.images` with the
+  variants `'150x150' | '400x300' | '600x' | '1200x'`. Real responses
+  may omit larger variants. Function picks the largest available with a
+  fixed fallback chain `'1200x' → '600x' → '400x300' → '150x150'`. If
+  none are present, the function returns a typed failure.
+
+  Pinterest fetch errors map through the existing `lib/pinterest/errors.ts`
+  taxonomy (`invalid_token`, `insufficient_scope`, `not_found`,
+  `rate_limit`, `network`, `unknown`). Storage failures map through the
+  c5 helper's discriminated envelope. Firestore failures get caught with
+  code+message logging per `feedback_silent_catches_cost_time`.
+
+  Out of scope: server action wrapper (c9 wraps this for the UI),
+  multipart file upload (c7), reference-set builder logic (c8), design
+  creation (c10), generation lifecycle (c14+).
+
+acceptance_criteria:
+  - 'Given a valid `pinId` for a pin owned by the configured Pinterest token holder and an authenticated user `alice`, when `ingestPinterestPin({ userId: "alice-uid", pinId })` is called, then it returns `{ ok: true; reference: <Reference> }` with `source: "pinterest"`, `pinterestPinId: <pinId>`, `sourceUrl: <pin URL or null>`, `storagePath: "users/alice-uid/references/<refId>.<ext>"`, `userId: "alice-uid"`, `id: <refId>`, `createdAt: <ISO 8601>`.'
+  - 'Given a pin response with `media.images: { "1200x": {...}, "600x": {...} }`, when `ingestPinterestPin` runs, then it fetches the `1200x` URL (largest available).'
+  - 'Given a pin response with `media.images: { "400x300": {...} }` (missing larger variants), when `ingestPinterestPin` runs, then it fetches the `400x300` URL.'
+  - 'Given a pin response with empty or missing `media.images`, when `ingestPinterestPin` runs, then it returns `{ ok: false; reason: "no_image_variant"; message }` and does NOT write to Storage or Firestore.'
+  - 'Given the Pinterest API returns 401 (invalid token), when `ingestPinterestPin` runs, then it returns `{ ok: false; reason: "invalid_token"; message }` propagating the existing `lib/pinterest/errors.ts` taxonomy.'
+  - 'Given the Pinterest API returns 404 (`not_found`), when `ingestPinterestPin` runs, then it returns `{ ok: false; reason: "not_found"; message }`.'
+  - 'Given the Pinterest API returns 429 (rate limit), when `ingestPinterestPin` runs, then it returns `{ ok: false; reason: "rate_limit"; message }` (no retry — caller decides).'
+  - 'Given the image-bytes fetch from `i.pinimg.com` fails (network or non-200), when `ingestPinterestPin` runs, then it returns `{ ok: false; reason: "image_fetch_failed"; message }` and does NOT write to Storage or Firestore.'
+  - 'Given the c5 storage helper returns `{ ok: false; reason: "storage_failure" }`, when `ingestPinterestPin` propagates it, then it returns `{ ok: false; reason: "storage_failure"; message }` and does NOT write a Firestore doc (no orphaned reference).'
+  - 'Given the Firestore write fails after the Storage write succeeds, when `ingestPinterestPin` catches the error, then it logs `console.error("[ingest] firestore write failed after storage write succeeded", { uid, refId, storagePath, code, message })` AND returns `{ ok: false; reason: "firestore_failure"; message }`. The orphaned Storage object stays — sweep is a future-epic concern.'
+  - 'Given a pin without a `media.images` `1200x` variant but with `600x` AND a non-image `media.media_type` (e.g., video), when `ingestPinterestPin` runs, then it returns `{ ok: false; reason: "unsupported_media_type"; message }` (v1 supports image pins only).'
+
+steps:
+  - id: research
+    description: |
+      Max 3 focused questions:
+      (1) Pinterest pin image fetch — does `i.pinimg.com` require any
+      Authorization header for direct GET on the variant URLs (e.g.,
+      `https://i.pinimg.com/600x/<hash>.jpg`)? Or are they public CDN
+      objects accessible without the bearer token? If they require auth,
+      the helper must inject `Authorization: Bearer ${env.PINTEREST_ACCESS_TOKEN}`;
+      if not, plain `fetch(url)` works.
+      (2) Pinterest response — `media.media_type` enum: confirm canonical
+      values (likely `'image' | 'video' | 'multiple_images' | 'story'` —
+      v1 supports `'image'` only; the others should yield
+      `unsupported_media_type`). Read `lib/pinterest/types.ts` and
+      `lib/pinterest/__fixtures__/pins.ts`.
+      (3) Pinterest single-pin lookup — does the existing
+      `lib/pinterest/client.ts` have a `getPinterestPin(pinId)` function?
+      Per c1 batch research the client only has `verifyPinterestToken`,
+      `listPinterestBoards`, `listPinterestBoardPins`. If pin-detail GET
+      is needed (`GET /v5/pins/{pin_id}`), this story EXTENDS the
+      Pinterest client with that function — research confirms whether the
+      board-pins listing is sufficient (we already have the pin in memory
+      from c11/c12 selection) or whether a re-fetch is required.
+
+      Memory anchors:
+      `feedback_silent_catches_cost_time`,
+      `feedback_codex_exec_quirks` (no test-shim or node_modules patches),
+      `feedback_env_hydration_import_order`.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Heavy MSW use (c2 ships
+      the harness).
+
+      - tests/unit/references/ingest-pinterest-happy-path.test.ts —
+        (1) MSW handler returns a pin with `media.images: { "1200x": ... }`
+            mocked image bytes for `1200x` URL
+        (2) Mock c5 storage helper to return `{ ok: true; storagePath: ... }`
+        (3) Mock Firestore Admin SDK doc write to succeed
+        (4) Call `ingestPinterestPin({ userId: "alice", pinId: "p1" })`
+        (5) Assert returned `reference.source === "pinterest"`,
+            `pinterestPinId === "p1"`, `userId === "alice"`,
+            `storagePath` matches `users/alice/references/<refId>.jpg`,
+            `id` is a non-empty string, `createdAt` is a valid ISO 8601
+
+      - tests/unit/references/ingest-pinterest-variant-selection.test.ts —
+        (1) Pin with all 4 variants → fetches `1200x` URL
+        (2) Pin with `600x` only → fetches `600x` URL
+        (3) Pin with `400x300` only → fetches `400x300` URL
+        (4) Pin with `150x150` only → fetches `150x150` URL
+        (5) Pin with NO variants → returns `{ ok: false; reason: "no_image_variant" }`
+
+      - tests/unit/references/ingest-pinterest-error-paths.test.ts —
+        (1) MSW returns 401 → reason `invalid_token`, no Storage write,
+            no Firestore write
+        (2) MSW returns 403 → reason `insufficient_scope`
+        (3) MSW returns 404 → reason `not_found`
+        (4) MSW returns 429 → reason `rate_limit`
+        (5) Image-bytes fetch (i.pinimg.com) returns 500 → reason
+            `image_fetch_failed`, no Storage write, no Firestore write
+        (6) c5 helper returns `storage_failure` → no Firestore write,
+            propagates `storage_failure`
+        (7) Firestore mock throws after Storage write succeeded → logs
+            `[ingest] firestore write failed after storage write succeeded`
+            with `code+message+uid+refId+storagePath`, returns
+            `firestore_failure`
+        (8) `media.media_type === "video"` → reason `unsupported_media_type`,
+            no Storage or Firestore writes
+
+      - tests/integration/references/ingest-pinterest-real-emulator.test.ts —
+        (NEW emulator-backed test) (runs in same emulator-wrapped lane
+        as c4/c5 storage tests):
+        (1) MSW mocks Pinterest API + image bytes. Real Firestore + Storage
+            emulators (c4 wired). End-to-end ingest → assert document at
+            `references/{refId}` exists with correct fields, assert bytes
+            at `users/alice/references/<refId>.jpg` are readable.
+
+      Tests use mocked Firestore Admin via vitest's `vi.mock` for unit
+      lane; real emulator for integration lane.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Mirror the existing `lib/pinterest/client.ts`
+      style (server-only, env-bound, normalized errors).
+
+      1. If research confirms a pin-detail re-fetch is needed, EXTEND
+         `lib/pinterest/client.ts` with:
+         ```ts
+         export async function getPinterestPin(pinId: string):
+           Promise<GetPinterestPinResult> { ... }
+         ```
+         Reuses internal `pinterestFetch(path, init)` helper. Returns
+         discriminated `{ ok: true; pin: PinterestPin } | { ok: false; reason }`.
+         If c11/c12 always pass the pin object inline (not just pinId),
+         this extension is unnecessary — researcher decides.
+
+      2. Create `lib/references/ingest.ts`:
+         ```ts
+         import 'server-only';
+         import crypto from 'node:crypto';
+         import { getFirestore } from 'firebase-admin/firestore';
+         import { createServerFirebaseAdmin } from '@/lib/firebase/server';
+         import {
+           uploadReferenceBytes,
+         } from '@/lib/firebase/storage';
+         import { getPinterestPin } from '@/lib/pinterest/client'; // if added
+         import { referenceConverter } from '@/lib/firestore/converters';
+         import type { Reference, PinterestPin } from '@/lib/types';
+
+         type IngestPinterestPinResult =
+           | { ok: true; reference: Reference }
+           | { ok: false;
+               reason: 'invalid_token' | 'insufficient_scope' | 'not_found'
+                 | 'rate_limit' | 'network' | 'no_image_variant'
+                 | 'unsupported_media_type' | 'image_fetch_failed'
+                 | 'storage_failure' | 'firestore_failure' | 'unknown';
+               message: string };
+
+         const VARIANT_FALLBACK = ['1200x', '600x', '400x300', '150x150'] as const;
+
+         function pickBestImageVariant(pin: PinterestPin):
+           { url: string; width?: number } | null {
+           const images = pin.media?.images;
+           if (!images) return null;
+           for (const v of VARIANT_FALLBACK) {
+             const variant = images[v];
+             if (variant?.url) return variant;
+           }
+           return null;
+         }
+
+         function inferContentType(url: string): string {
+           const lower = url.toLowerCase();
+           if (lower.endsWith('.png')) return 'image/png';
+           if (lower.endsWith('.webp')) return 'image/webp';
+           return 'image/jpeg'; // pinimg defaults
+         }
+
+         export async function ingestPinterestPin(input: {
+           userId: string;
+           pinId: string;
+         }): Promise<IngestPinterestPinResult> {
+           // 1. Fetch pin metadata
+           const pinResult = await getPinterestPin(input.pinId);
+           if (!pinResult.ok) return pinResult; // discriminated propagation
+
+           const pin = pinResult.pin;
+           if (pin.media?.media_type && pin.media.media_type !== 'image') {
+             return { ok: false, reason: 'unsupported_media_type',
+                      message: `media_type ${pin.media.media_type} not supported in v1` };
+           }
+
+           const variant = pickBestImageVariant(pin);
+           if (!variant) {
+             return { ok: false, reason: 'no_image_variant',
+                      message: `pin ${input.pinId} has no usable image variant` };
+           }
+
+           // 2. Fetch image bytes (server-proxied)
+           let bytes: Buffer;
+           try {
+             const res = await fetch(variant.url);
+             if (!res.ok) {
+               console.error('[ingest] image fetch non-200',
+                 { pinId: input.pinId, status: res.status, url: variant.url });
+               return { ok: false, reason: 'image_fetch_failed',
+                        message: `image fetch failed: ${res.status}` };
+             }
+             bytes = Buffer.from(await res.arrayBuffer());
+           } catch (err) {
+             const code = (err as { code?: string }).code ?? 'unknown';
+             const message = (err as Error).message ?? String(err);
+             console.error('[ingest] image fetch threw',
+               { pinId: input.pinId, code, message });
+             return { ok: false, reason: 'image_fetch_failed', message };
+           }
+
+           // 3. Write to Storage (FIRST — Firestore is second)
+           const refId = crypto.randomUUID();
+           const contentType = inferContentType(variant.url);
+           const upload = await uploadReferenceBytes({
+             uid: input.userId, refId, bytes, contentType,
+           });
+           if (!upload.ok) return upload; // propagates `storage_failure`
+
+           // 4. Write Firestore doc (AFTER bytes are durable)
+           const reference: Reference = {
+             id: refId, userId: input.userId,
+             source: 'pinterest', sourceUrl: pin.link ?? null,
+             storagePath: upload.storagePath,
+             pinterestPinId: input.pinId,
+             createdAt: new Date().toISOString(),
+           };
+           try {
+             const db = getFirestore(createServerFirebaseAdmin());
+             await db.collection('references').doc(refId)
+               .withConverter(referenceConverter).set(reference);
+             return { ok: true, reference };
+           } catch (err) {
+             const code = (err as { code?: string }).code ?? 'unknown';
+             const message = (err as Error).message ?? String(err);
+             console.error(
+               '[ingest] firestore write failed after storage write succeeded',
+               { uid: input.userId, refId, storagePath: upload.storagePath,
+                 code, message });
+             return { ok: false, reason: 'firestore_failure', message };
+           }
+         }
+         ```
+
+      3. NO server action wrapper here — c9 wraps this. NO upload variant
+         (c7 ships its own ingest function in the same file or a sibling
+         module).
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the contract is tight and the persistence ordering is correct.
+
+      - `lib/references/ingest.ts` imports `'server-only'` at top.
+      - Storage write happens BEFORE Firestore write (line-order check).
+      - On Storage failure, no Firestore write is attempted.
+      - On Firestore failure post-Storage success, the `[ingest] firestore
+        write failed after storage write succeeded` log includes uid, refId,
+        storagePath, code, message.
+      - All error paths return discriminated `{ ok: false; reason; message }`
+        — no thrown errors escape the function.
+      - Variant-selection fallback chain is `'1200x' → '600x' → '400x300'
+        → '150x150'` exactly.
+      - `unsupported_media_type` is checked BEFORE variant selection.
+      - Returned `Reference.source === 'pinterest'` and
+        `pinterestPinId === input.pinId` invariants hold (both verified
+        by test).
+      - `crypto.randomUUID()` is the refId source — does NOT use Pinterest
+        pin ID as Firestore doc ID (multiple users could ingest the same
+        pin; refId is per-user-per-ingest).
+      - All vitest unit + integration tests pass.
+      - No node_modules patches; no test shims beyond what c2 MSW + c5
+        emulator setup provides.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c6-pinterest-ingest`.
+      Commit: `feat(c6): server-proxied Pinterest pin ingestion + references doc write`.
+      Pre-commit: `pnpm test`, `pnpm test:rules` (or :storage) must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 (server-only module; consumed by c9 server action)'
+    runtime: 'Node 20+; firebase-admin v13.8.0; node fetch for i.pinimg.com'
+    testing: 'Vitest unit (mocked Firestore + MSW for Pinterest); vitest+emulator integration'
+  key_files:
+    - path: lib/pinterest/client.ts
+      purpose: 'Existing — pinterestFetch internal helper + verify/listBoards/listBoardPins; this story may extend with getPinterestPin(pinId)'
+    - path: lib/pinterest/types.ts
+      purpose: 'Consumed — PinterestPin shape with media.images variants'
+    - path: lib/pinterest/errors.ts
+      purpose: 'Consumed — normalizePinterestResponse() + PinterestError union; reasons reused verbatim'
+    - path: lib/firebase/storage.ts
+      purpose: 'Consumed (c5) — uploadReferenceBytes + referencePath; storage write goes through this only'
+    - path: lib/firebase/server.ts
+      purpose: 'Consumed — createServerFirebaseAdmin() for Firestore handle'
+    - path: lib/firestore/converters/index.ts
+      purpose: 'Consumed (c3) — referenceConverter for Firestore doc shape'
+    - path: lib/types.ts
+      purpose: 'Consumed (c3) — Reference interface'
+    - path: tests/__mocks__/handlers/pinterest.ts
+      purpose: 'Consumed (c2) — Pinterest MSW handlers; story-specific overrides via server.use()'
+  external_apis:
+    - 'Pinterest API v5 — GET /v5/pins/{pin_id} (if research confirms re-fetch needed)'
+    - 'Pinterest CDN — i.pinimg.com (image bytes)'
+
+files_to_modify:
+  - file: lib/pinterest/client.ts
+    change: 'EXTEND with getPinterestPin(pinId) IF research confirms (otherwise UNCHANGED — c11 passes pin object inline)'
+  - file: lib/references/ingest.ts
+    change: 'CREATE; ingestPinterestPin function only (upload ingestion is c7)'
+  - file: tests/unit/references/ingest-pinterest-happy-path.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/references/ingest-pinterest-variant-selection.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/references/ingest-pinterest-error-paths.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/references/ingest-pinterest-real-emulator.test.ts
+    change: 'CREATE in test-spec (emulator lane)'
+
+design_decisions:
+  - decision: 'Server-proxied image fetch (Node fetch on i.pinimg.com), NOT signed-URL or browser-direct download'
+    rationale: 'design-discussion §My Proposed Approach + research-brief Open Q6 lock server-proxied. Atomic durability: by the time `references` doc exists, bytes are in OUR bucket — no future broken-image risk if pinterest revokes the pin or rotates CDN URLs. Worth the bandwidth cost on Vercel.'
+  - decision: 'Image-bytes write to Storage BEFORE Firestore doc write (two-phase, in this order)'
+    rationale: 'persistence:consistency escalation. If Firestore write fails after Storage write, the orphan Storage object is a sweep concern; if Storage write fails after Firestore write, every reader sees a doc pointing at a non-existent path. Reverse order = bad. This order = caller sees clean rejection on any failure.'
+  - decision: 'Variant fallback chain: 1200x → 600x → 400x300 → 150x150'
+    rationale: 'research-brief §New Surfaces > External Integrations notes Pinterest pins surface 4 variants; largest available wins. Generation quality benefits from larger source images. 150x150 fallback is a "rather have something than nothing" bottom rung — c14 buildGeminiRequest can decide whether 150x150 is worth sending to the model.'
+  - decision: 'refId = crypto.randomUUID(), NOT pinId'
+    rationale: 'Two users could pin the same pin; both should get distinct reference docs. refId-as-pinId would create a write-collision under c4 owner rules anyway (UID mismatch on the second writer). Random UUID is collision-free + per-user-per-ingest.'
+  - decision: 'unsupported_media_type checked BEFORE image variant selection'
+    rationale: 'A video pin might still have a thumbnail variant in `media.images`; we should not silently use the thumbnail and pretend it represents a video. Explicit reject preserves the contract that `Reference` always points at an image.'
+  - decision: 'No retry on Pinterest fetch failures (rate_limit, network)'
+    rationale: 'Caller (c9 server action wrapping) decides retry policy. Ingest is the lower layer; retry belongs higher in the stack where UX context exists. Aligns with FR-C-7''s "one silent retry" being a c14/c16 concern, not c6.'
+  - decision: 'Orphaned Storage object on Firestore-write-after-Storage-success failure is logged but NOT cleaned up'
+    rationale: 'Cleanup requires either a transaction (Firestore + Storage are not transactionally linked) or a sweeper job (out of v1 scope). Logged so a future epic can implement a sweep. Acceptable residual: orphan blobs cost ~0 storage; security rules deny access by anyone other than the owner.'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'Storage write goes through c5 helper which constructs `users/{uid}/references/<refId>.<ext>` — c4 storage.rules ALLOW only when uid in path matches `request.auth.uid`. The Admin SDK bypasses rules (server context), but call-site discipline (always pass `userId` from authenticated session) keeps the path correct. c9 action verifies session uid matches input userId.'
+  - concern: 'error-handling'
+    notes: 'Every external call (Pinterest API, image fetch, c5 helper, Firestore write) returns or maps into the discriminated reason taxonomy. No silent catches. Logging includes code+message+identifiers per `feedback_silent_catches_cost_time`. Reason names align with `lib/pinterest/errors.ts` taxonomy where overlap exists.'
+  - concern: 'data-model'
+    notes: 'Returned Reference matches c3 lock byte-for-byte. Adding fields requires updating c3 first, then this story.'
+
+risks:
+  - severity: high
+    description: 'i.pinimg.com requires Authorization header that vanilla `fetch(url)` does not send → image-fetch_failed on every ingest'
+    mitigation: 'researcher question (1) confirms before implementation. If auth required, helper injects `Authorization: Bearer ${env.PINTEREST_ACCESS_TOKEN}` — but bearer on a CDN GET is unusual; more likely public CDN. Test against real Pinterest pin URL during integrate.'
+  - severity: medium
+    description: 'Firestore write fails after Storage success → orphan blob accumulates'
+    mitigation: 'Logged with full identifiers per `feedback_silent_catches_cost_time` — an operator can identify orphans via log query. Sweep job is a future-epic concern. Acceptable residual for v1.'
+  - severity: medium
+    description: 'Pinterest pin re-fetch (`getPinterestPin`) doubles the API quota cost per ingest if c11 already has the pin object'
+    mitigation: 'researcher question (3) decides: if c11 passes pin object inline, this story does not extend client.ts. The function signature could be `ingestPinterestPin({ userId, pin })` instead of `({ userId, pinId })`. TPM resolves at c11 design.'
+  - severity: medium
+    description: 'Pinterest `media.images` variants drift (e.g., new `2400x` variant added) — variant selection ignores it'
+    mitigation: 'Fallback chain is conservative + extensible. Adding a new highest-priority variant is a one-line change to `VARIANT_FALLBACK`.'
+  - severity: low
+    description: 'Content type inference is URL-extension-based; pin URL ends in `.jpg` but actual bytes are PNG'
+    mitigation: 'Pinterest CDN historically serves consistent extension/MIME; if drift discovered, switch to `Content-Type` response header inspection on the fetch result.'
+  - severity: low
+    description: 'No size cap on the fetched image bytes — pathological pin (very large GIF or HEIF) eats memory'
+    mitigation: 'Pinterest CDN serves resized variants <5 MB typical; 1200x cap is bounded. If a real OOM emerges, add a `Content-Length` cap check before reading bytes.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #7 (line 236): lib/references/ingest.ts — normalize
+      Pinterest pin ingestion and direct upload ingestion into one
+      internal record shape.
+      Slice 3 Validation: Verify uploaded images and Pinterest images
+      both become docs in the same `references` collection shape.
+      Verify Security Rules prevent another user from reading or writing
+      a reference doc.
+      Silent-break risk: Pinterest and upload paths might drift into
+      incompatible shapes, creating branching bugs in Slice 4.
+  - path: .pHive/planning/vertical-plan.md
+    relevant_excerpt: |
+      Slice 3 — Reference Collection. WHAT WORKS AFTER THIS STEP: User
+      can mix one Pinterest pin (primary) with optional secondary
+      Pinterest pins and uploaded photos into a single reference panel,
+      both sources persisted as the same `references` shape.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §My Proposed Approach: Normalize references at ingest, not at
+      generation. Both Pinterest pins and uploads land as the same
+      Reference shape. The Pinterest path additionally fetches
+      media.images['600x'] (or larger if present), copies the bytes to
+      Firebase Cloud Storage under references/{userId}/{refId}, and
+      records the Firebase Cloud Storage path. The upload path goes
+      straight to the same bucket. By the time buildGeminiRequest runs,
+      both paths look identical. This is FR-C-1.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §What Could Go Wrong (MEDIUM): Pinterest and upload reference shapes
+      drift. If the ingest functions are written by separate stories on
+      separate days, we end up with two slightly different record shapes
+      and Slice 4 has to branch. Mitigation: write `lib/references/ingest.ts`
+      as one module with two entry points sharing one normalization
+      function and one shared test for "both sources produce identical
+      record shapes."
+  - path: lib/pinterest/errors.ts
+    relevant_excerpt: |
+      Existing taxonomy: invalid_token | insufficient_scope | not_found
+      | rate_limit | network | unknown. Reused verbatim by this story.
+
+ui_indicators: 'NO new UI surface — server module only; no wireframes; no ui-design step required'

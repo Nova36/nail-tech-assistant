@@ -1,0 +1,400 @@
+id: c3-data-model-types-converters
+epic: epic-c-reference-and-generation
+title: '`Reference` + `Design` + `Generation` type contracts + Firestore converters (ordered-array secondary refs locked; pure contract — no behavior)'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+escalations_addressed:
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Locks Reference / Design / Generation TypeScript shapes + Firestore
+      converters BEFORE any consumer story (c4 rules, c6 ingest, c9 design
+      create, c13 request builder, c15 lifecycle) is implemented. Locks
+      ordered-secondary-references as Design.secondaryReferenceIds: string[]
+      array (NOT subcollection per design-discussion-q3 + research-brief-q4).
+      Converters are pure (no Firestore admin imports at module scope); they
+      only translate between Firestore document data and typed records.
+
+description: |
+  Foundation contract story. Defines the three durable record types Epic C
+  introduces and the Firestore converters that translate between document
+  data and typed records. Pure contract work — no behavior, no I/O, no SDK
+  side effects at module load. Every downstream story (c4, c6, c8, c9, c13,
+  c15, c16) consumes these types or converters.
+
+  This is the kind of story that pays for itself many times over if locked
+  correctly and creates compounding rework if locked wrong. Two decisions
+  are explicitly settled here, not deferred:
+
+  1. **`Design.secondaryReferenceIds: string[]` ordered array** (NOT a
+     `design_secondary_references` subcollection). Bounded list, single-doc
+     read, single-doc write — appropriate for v1 single-user scope.
+     design-discussion §My Proposed Approach + research-brief Open Q4.
+  2. **`Reference.source: 'pinterest' | 'upload'`** with `pinterestPinId`
+     nullable. Both sources land as the same record shape; the source
+     discriminator is metadata, not a polymorphic schema.
+
+  Generation lifecycle states are also locked: `'pending' | 'success' |
+  'failure'`. Error code enum is `'refusal' | 'rate_limit' | 'network' |
+  'unknown'` per outline Slice 4 Interfaces. Nullable fields are explicit
+  (no implicit undefined-vs-missing ambiguity in Firestore).
+
+  This story does NOT write any rules, any indexes, any storage, any API
+  surface. c4 (rules), c6 (ingest), c9 (design create), c15 (lifecycle) own
+  those concerns. c3 only ships type definitions and converters.
+
+acceptance_criteria:
+  - 'Given `lib/types.ts` is read, when the file exports are listed, then `Reference`, `Design`, `Generation`, `GenerationStatus`, and `GenerationErrorCode` are exported alongside the existing `NailShape`, `AuthUser`, `Profile`.'
+  - 'Given the `Design` type, when `secondaryReferenceIds` is inspected, then it is typed as `string[]` (ordered array) — NOT a separate collection reference, NOT a `Set<string>`, NOT an unordered structure.'
+  - 'Given the `Reference` type, when `source` is inspected, then it is typed as `"pinterest" | "upload"` (literal union, NOT `string`). When `pinterestPinId` is inspected, then it is typed as `string | null` and is non-null only when `source === "pinterest"` (invariant enforced by ingest in c6, NOT by the type — the type stays simple and lets the converter validate).'
+  - 'Given the `Generation` type, when `status` is inspected, then it is typed as `"pending" | "success" | "failure"`. When `errorCode` is inspected, then it is typed as `GenerationErrorCode | null` where the union is exactly `"refusal" | "rate_limit" | "network" | "unknown"`.'
+  - 'Given `lib/firestore/converters/references.ts`, when its exported `referenceConverter` is used with `db.collection("references").withConverter(referenceConverter)`, then `toFirestore(ref: Reference)` produces a plain Firestore document with the same field names as the type, and `fromFirestore(snapshot)` returns a typed `Reference` with all fields populated and an `id` field set to `snapshot.id`.'
+  - 'Given `lib/firestore/converters/designs.ts`, when its `designConverter` runs `fromFirestore` on a snapshot whose data lacks `secondaryReferenceIds`, then it returns a typed `Design` with `secondaryReferenceIds: []` (empty array, NOT undefined). Same default-empty behavior for `promptText: null`, `latestGenerationId: null`.'
+  - 'Given `lib/firestore/converters/generations.ts`, when its `generationConverter` runs `fromFirestore` on a snapshot with `status: "pending"`, then it returns a typed `Generation` with `resultStoragePath: null`, `errorCode: null`, `errorMessage: null` (the pending state does not yet have terminal fields).'
+  - 'Given the converters, when a Firestore document contains an unexpected `status` value (e.g., `"cancelled"`), then `fromFirestore` throws a typed error rather than silently coercing — converters validate the discriminated union closure.'
+  - 'Given the converters do not import `firebase-admin/firestore` at module scope (server-only barrel), when the file is imported in a vitest environment, then no `process.env.FIREBASE_*` lookups happen at import time — converters are pure data translators.'
+
+steps:
+  - id: research
+    description: |
+      Max 2 focused questions:
+      (1) Firestore converter idiom for `firebase-admin/firestore` v13.8.0 —
+      `withConverter(converter)` API: does the v13 admin SDK expect
+      `FirestoreDataConverter<AppModel, DbModel>` or just
+      `FirestoreDataConverter<AppModel>`? The web SDK and admin SDK
+      diverged in some versions; confirm shape via context7 lookup of
+      `firebase-admin` v13 docs.
+      (2) Read the existing `lib/types.ts` (it's tiny) and confirm export
+      style (named `export type` vs `export interface`). Match the
+      existing convention exactly so this story is additive and stylistically
+      consistent.
+
+      Read `.pHive/epics/epic-c-reference-and-generation/docs/research-brief.md`
+      §Contract Anchors for the type sketch already drafted there. Read
+      `.pHive/planning/structured-outline.md:248-257` for Slice 3 Interfaces
+      and `296-308` for Slice 4 Interfaces — those are the canonical sources.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE types or converters exist.
+
+      - tests/unit/types/reference.test.ts —
+        (1) Type-only test: `const r: Reference = { id: 'r1', userId: 'u1',
+            source: 'pinterest', sourceUrl: 'https://...', storagePath:
+            'users/u1/references/r1', pinterestPinId: 'p1', createdAt:
+            '2026-04-29T00:00:00Z' }` — compiles cleanly. (Use `expectTypeOf`
+            from vitest if needed.)
+        (2) `source: 'invalid'` does NOT compile — assert via @ts-expect-error.
+        (3) Same shape with `source: 'upload', pinterestPinId: null` compiles.
+
+      - tests/unit/types/design.test.ts —
+        (1) `Design` with `secondaryReferenceIds: ['r2', 'r3']` compiles;
+            with `secondaryReferenceIds: 'r2'` does NOT compile.
+        (2) `nailShape: 'almond'` compiles; `nailShape: 'badshape'` does NOT.
+        (3) `latestGenerationId: null` compiles; `latestGenerationId: 'g1'`
+            compiles; `latestGenerationId: undefined` does NOT compile
+            (explicit `null`, never `undefined`).
+
+      - tests/unit/types/generation.test.ts —
+        (1) `Generation` with `status: 'pending'` + `resultStoragePath: null`
+            compiles.
+        (2) `errorCode: 'refusal'` compiles; `errorCode: 'cancelled'` does NOT.
+        (3) `Generation` `requestJson: unknown` accepts any shape (this is
+            intentional — pre-flight payload archival).
+
+      - tests/unit/firestore/converters/references.test.ts —
+        (1) `referenceConverter.toFirestore(ref)` returns object with same
+            field names minus `id` (id is the document key, not a field).
+        (2) `referenceConverter.fromFirestore(mockSnapshot)` returns a
+            typed `Reference` with `id` populated from `snapshot.id`.
+        (3) Round-trip: `fromFirestore(toFirestore(ref))` (with id injection)
+            equals the original ref.
+
+      - tests/unit/firestore/converters/designs.test.ts —
+        (1) `fromFirestore` on a doc lacking `secondaryReferenceIds` returns
+            `secondaryReferenceIds: []`, `promptText: null`,
+            `latestGenerationId: null`.
+        (2) `toFirestore(design)` with `secondaryReferenceIds: ['r2', 'r3']`
+            preserves array ORDER (assert by index).
+        (3) `fromFirestore` on a doc with `nailShape: 'unknown'` throws a
+            typed error (validation closure).
+
+      - tests/unit/firestore/converters/generations.test.ts —
+        (1) `fromFirestore` on a `pending` doc has all terminal fields null.
+        (2) `fromFirestore` on a `success` doc has `resultStoragePath: string`
+            and `errorCode: null`, `errorMessage: null`.
+        (3) `fromFirestore` on a `failure` doc has `errorCode` set to one of
+            the 4 union members; `'cancelled'` throws.
+
+      Vitest mocked snapshot shape:
+      ```ts
+      const mockSnapshot = (id: string, data: Record<string, unknown>) =>
+        ({ id, data: () => data } as unknown as
+          import('firebase-admin/firestore').QueryDocumentSnapshot);
+      ```
+
+      DO NOT write tests against a real Firestore instance. DO NOT import
+      from `lib/firebase/server.ts`. Converters are pure — tests use mocked
+      snapshots only.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make the failing tests pass.
+
+      1. Extend `lib/types.ts` — additive only, preserve existing exports:
+         ```
+         export type GenerationStatus = 'pending' | 'success' | 'failure';
+         export type GenerationErrorCode =
+           'refusal' | 'rate_limit' | 'network' | 'unknown';
+         export type ReferenceSource = 'pinterest' | 'upload';
+
+         export interface Reference {
+           id: string;
+           userId: string;
+           source: ReferenceSource;
+           sourceUrl: string | null;
+           storagePath: string;
+           pinterestPinId: string | null;
+           createdAt: string; // ISO 8601
+         }
+
+         export interface Design {
+           id: string;
+           userId: string;
+           name: string | null;
+           primaryReferenceId: string;
+           secondaryReferenceIds: string[]; // ORDERED, locked per design-discussion §3
+           promptText: string | null;
+           nailShape: NailShape;
+           latestGenerationId: string | null;
+           createdAt: string;
+           updatedAt: string;
+         }
+
+         export interface Generation {
+           id: string;
+           designId: string;
+           userId: string; // denormalized for rules-derived owner check
+           requestJson: unknown;
+           resultStoragePath: string | null;
+           providerResponseMetadata: unknown;
+           status: GenerationStatus;
+           errorCode: GenerationErrorCode | null;
+           errorMessage: string | null;
+           createdAt: string;
+           updatedAt: string;
+         }
+         ```
+
+         Note: existing `NailShape` already has `'almond' | 'coffin' |
+         'square' | 'round' | 'oval'` — Design uses it directly. Outline
+         Slice 3 lists `'almond' | 'coffin' | 'square' | 'stiletto'` — the
+         existing `NailShape` is the source of truth (already in repo); if
+         outline drift matters, document in design_decisions.
+
+      2. Create `lib/firestore/converters/references.ts`:
+         - Import only types from `firebase-admin/firestore` (the SDK side
+           effects happen at the call site via `withConverter`, NOT here).
+         - Export `referenceConverter: FirestoreDataConverter<Reference>`.
+         - `toFirestore(ref)` strips `id` and returns the rest.
+         - `fromFirestore(snapshot)` reads `snapshot.data()`, validates
+           `source` ∈ {pinterest, upload}, returns typed `Reference` with
+           `id: snapshot.id`.
+         - Validation throws `new Error('referenceConverter:
+           invalid <field>: <value>')` on any closure violation.
+
+      3. Create `lib/firestore/converters/designs.ts`:
+         - Same pattern. `fromFirestore` defaults `secondaryReferenceIds: []`,
+           `promptText: null`, `latestGenerationId: null`, `name: null`.
+         - Validates `nailShape` against the `NailShape` union (use a
+           runtime helper `isNailShape(x): x is NailShape`).
+
+      4. Create `lib/firestore/converters/generations.ts`:
+         - Same pattern. `fromFirestore` validates `status` and `errorCode`
+           (when status === 'failure').
+         - `errorCode` MUST be non-null when status === 'failure';
+           validation throws if violated.
+
+      5. Create `lib/firestore/converters/index.ts` — barrel re-export of
+         the three converters for ergonomic imports.
+
+      DO NOT: add a `Reference` runtime validator function (e.g., zod
+      schema). Converters carry the validation; downstream stories (c6,
+      c9) call converters at the I/O boundary. DO NOT: import `'server-only'`
+      in the converter files — they are pure data translators usable from
+      either side. DO NOT: write any rules, indexes, storage helpers, or
+      server actions.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the contract is complete and pure.
+
+      - `lib/types.ts` exports the 5 new symbols + retains existing exports.
+      - `Design.secondaryReferenceIds` is `string[]`. Reviewer manually
+        confirms via grep that no subcollection-style API surface (e.g.,
+        `design_secondary_references` collection name) appears anywhere.
+      - `Reference.source` is the literal union; `pinterestPinId` is
+        `string | null` (nullable explicit, never optional `?`).
+      - All three converters: `toFirestore` strips `id`; `fromFirestore`
+        injects `snapshot.id`; round-trip preserves field order in arrays.
+      - `nailShape` validation uses the existing `NailShape` union from
+        `lib/types.ts`. If the outline's `'stiletto'` divergence matters,
+        document in design_decisions and surface to TPM (do not silently
+        change `lib/types.ts` `NailShape` in this story).
+      - All vitest tests pass; type-level tests use `@ts-expect-error` for
+        negative cases.
+      - `lib/firestore/converters/*.ts` files do NOT import `'server-only'`,
+        do NOT import `firebase-admin/app`, do NOT call `process.env.*` at
+        module scope.
+      - No new files outside `lib/types.ts`, `lib/firestore/converters/*.ts`,
+        and the test files. Specifically: no `firestore.rules` change, no
+        `firestore.indexes.json` change, no `lib/firebase/storage.ts`, no
+        `lib/references/*`, no `lib/designs/*`, no `lib/ai/*`. Those are
+        c4/c5/c6/c9/c13's files.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c3-data-model-types-converters`.
+      Commit: `feat(c3): Reference/Design/Generation types + Firestore converters`.
+      Files committed: lib/types.ts (extended), lib/firestore/converters/*.ts,
+      tests/unit/types/*.test.ts, tests/unit/firestore/converters/*.test.ts.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 (no app/ changes — pure type contract)'
+    runtime: 'Node 20+; pnpm 10.22.0; vitest 3.2.4'
+    persistence: 'Firebase Firestore via firebase-admin v13.8.0; converters use FirestoreDataConverter idiom'
+  key_files:
+    - path: lib/types.ts
+      purpose: 'Existing — has NailShape, AuthUser, Profile; story extends additively with 5 new exports'
+    - path: lib/firestore/converters/references.ts
+      purpose: 'CREATE; pure data translator for the references collection'
+    - path: lib/firestore/converters/designs.ts
+      purpose: 'CREATE; pure data translator for the designs collection'
+    - path: lib/firestore/converters/generations.ts
+      purpose: 'CREATE; pure data translator for the generations collection'
+    - path: lib/firestore/converters/index.ts
+      purpose: 'CREATE; barrel re-export'
+    - path: .pHive/planning/structured-outline.md
+      purpose: 'Slice 3 Interfaces (lines 246-260) + Slice 4 Interfaces (lines 294-309) — canonical source of method shapes; record types derived from these'
+    - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+      purpose: '§Contract Anchors — pre-drafted type sketch; this story formalizes it'
+
+files_to_modify:
+  - file: lib/types.ts
+    change: 'Extend additively with Reference, Design, Generation, GenerationStatus, GenerationErrorCode, ReferenceSource exports'
+  - file: lib/firestore/converters/references.ts
+    change: 'CREATE'
+  - file: lib/firestore/converters/designs.ts
+    change: 'CREATE'
+  - file: lib/firestore/converters/generations.ts
+    change: 'CREATE'
+  - file: lib/firestore/converters/index.ts
+    change: 'CREATE — barrel'
+  - file: tests/unit/types/reference.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/types/design.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/types/generation.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/firestore/converters/references.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/firestore/converters/designs.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/firestore/converters/generations.test.ts
+    change: 'CREATE in test-spec'
+
+design_decisions:
+  - decision: 'Design.secondaryReferenceIds is `string[]` ordered array (NOT a `design_secondary_references` subcollection)'
+    rationale: 'design-discussion §My Proposed Approach + research-brief Open Q4. v1 single-user; bounded list (UX caps secondary count); single-doc read; single-doc write. Subcollection is overkill until "100+ refs per design" is a real requirement. Locked here so c4 (rules) and c9 (design create) can build against a stable shape.'
+  - decision: 'Reference.source is `"pinterest" | "upload"` literal union, not polymorphic schema variants'
+    rationale: 'Both ingest paths produce the SAME record shape (per FR-C-1). Source discriminates origin metadata; downstream code (c13 buildGeminiRequest) does not care about origin. Simpler than tagged-variant `{ source: "pinterest"; pinId: string } | { source: "upload"; localPath: string }` — the variant constraint is enforced by ingest validation in c6, not the type.'
+  - decision: 'Generation lifecycle states are exactly `"pending" | "success" | "failure"` — no `"cancelled"`, no `"queued"`, no `"streaming"`'
+    rationale: "Outline Slice 4 Interfaces (line 296-308) names exactly these three. Adding states without a use case is speculative. Cancellation is not a v1 concern; streaming progress is c14's decision (per c1 spike) but does not require a new persisted state — streaming happens transport-side, the row stays `pending` until terminal."
+  - decision: 'GenerationErrorCode union is `"refusal" | "rate_limit" | "network" | "unknown"`'
+    rationale: 'Outline Slice 4 Interfaces (line 280) names exactly these four. Maps cleanly onto the one-silent-retry policy from FR-C-7: `network` and `rate_limit` are retryable; `refusal` and `unknown` are not. lib/generations/errors.ts in c14/c16 owns the classification logic.'
+  - decision: 'Nullable fields are explicit `| null` (never optional `?: T`)'
+    rationale: 'Firestore stores `null` and missing-field as semantically distinct values. Optional `?: T` confuses "field absent in this document" with "field set to null". Explicit `| null` removes the ambiguity. Converters default missing → null (per acceptance criteria).'
+  - decision: 'Converters live in `lib/firestore/converters/` (NOT `lib/firebase/converters/` or `lib/db/converters/`)'
+    rationale: 'Outline Slice 3 Changes #2 names this exact path. Matches the principle that `lib/firebase/` holds SDK init + auth, while `lib/firestore/` holds pure data shaping. Future converters (e.g., `chat_turns` if Slice 7 ever ships) follow the same pattern.'
+  - decision: 'Generation.userId is denormalized onto the row (not derived through Design.userId)'
+    rationale: 'c4 storage.rules + firestore.rules validate `request.auth.uid == resource.data.userId` directly; rules cannot do a get() lookup to Design without a performance hit. Denormalization keeps rules cheap. c15 lifecycle ensures consistency at write-time.'
+  - decision: 'Outline Slice 3 lists `nailShape: "almond" | "coffin" | "square" | "stiletto"`; lib/types.ts has `"almond" | "coffin" | "square" | "round" | "oval"` — DEFER to lib/types.ts as source of truth'
+    rationale: 'lib/types.ts is durable code; outline is planning. If "stiletto" matters for v1 product, that''s a separate change in lib/types.ts (probably needed) but not c3 scope. c3 reuses NailShape verbatim. Surface to TPM for resolution before c10 ships the shape selector.'
+
+cross_cutting:
+  - concern: 'data model'
+    notes: "This story is the canonical place where Epic C's domain types are defined. Future epics that touch references/designs/generations import from these files. Adding a field requires updating the type, the converter, and the converter tests in lockstep — no shortcuts. Memory `feedback_silent_catches_cost_time` analog: silent type drift between document data and code is the type-system equivalent of a silent catch."
+
+risks:
+  - severity: medium
+    description: 'Subcollection-vs-array decision proves wrong if a future user adds 100+ secondary references to one design'
+    mitigation: 'design-discussion locks array for v1 single-user. If the constraint becomes real, migration is a one-time backfill from `Design.secondaryReferenceIds` to a `design_secondary_references` subcollection, with `Design.secondaryReferenceIds` retained as a denormalized list for backwards-compat. Out of scope for c3.'
+  - severity: medium
+    description: 'NailShape outline-vs-code drift (`stiletto` missing in lib/types.ts NailShape) creates downstream confusion in c10 shape selector'
+    mitigation: 'design_decisions explicitly defers to lib/types.ts as source of truth + flags the divergence. Reviewer step surfaces to TPM. If product needs stiletto, separate atomic change to lib/types.ts before c10.'
+  - severity: low
+    description: 'Converter validation throws are too aggressive — a half-written document mid-migration crashes reads'
+    mitigation: 'Converters validate the discriminated unions only (status, source, errorCode, nailShape). Other fields default to null/empty. Throws are reserved for closure violations (e.g., `status: "cancelled"`) which indicate a code bug, not data drift.'
+  - severity: low
+    description: 'firebase-admin v13 FirestoreDataConverter signature differs from web SDK; tests pass but production fails at runtime'
+    mitigation: 'researcher question (1) confirms the v13 admin signature via context7 before implementation. Implement step uses the admin SDK type explicitly.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Interfaces (lines 248-260):
+        ingestPinterestPin(input: { userId: string; pinId: string }):
+          Promise<ReferenceRecord>
+        ingestUpload(input: { userId: string; file: File }):
+          Promise<ReferenceRecord>
+        buildReferenceSet(input: { primaryReferenceId: string;
+          secondaryReferenceIds: string[]; promptText?: string }): {...}
+        createDesign(input: { userId, primaryReferenceId,
+          secondaryReferenceIds: string[], promptText?, nailShape:
+          'almond' | 'coffin' | 'square' | 'stiletto' }):
+          Promise<{ designId: string }>
+
+      Slice 4 Interfaces (lines 296-308):
+        generateDesign(input: { designId: string }): Promise<
+          | { status: 'success'; generationId; resultStoragePath }
+          | { status: 'failure'; generationId;
+              errorCode: 'refusal' | 'rate_limit' | 'network' | 'unknown';
+              message: string }>
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §Contract Anchors:
+        type Reference = { id; userId; source: 'pinterest'|'upload';
+          sourceUrl; storagePath; pinterestPinId; createdAt };
+        type Design = { id; userId; name; primaryReferenceId;
+          secondaryReferenceIds: string[]; promptText; nailShape;
+          latestGenerationId; createdAt; updatedAt };
+        type Generation = { id; designId; requestJson;
+          resultStoragePath; providerResponseMetadata; status;
+          errorMessage; createdAt };
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: For ordered secondary references: my opinion
+      is an ordered array on the `designs` document, not a subcollection.
+      The list is bounded (UX limits secondary count to a small number),
+      and an array keeps reads to one document. The subcollection option
+      is overkill for v1 single-user.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-raw-findings.md
+    relevant_excerpt: |
+      §3 Reference data model gaps > Search results: `lib/types.ts` is
+      ENTIRELY: NailShape | AuthUser | Profile. No Reference, Design,
+      Generation types exist yet. firestore.rules has only /profiles/{uid}
+      + default-deny.
+
+ui_indicators: 'NO new UI surface — pure type contract; no wireframes; no ui-design step required'

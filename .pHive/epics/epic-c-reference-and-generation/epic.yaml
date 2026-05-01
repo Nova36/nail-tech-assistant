@@ -1,0 +1,412 @@
+name: epic-c-reference-and-generation
+title: 'Reference Collection + AI Generation Pipeline — normalized references model, durable design drafts, Gemini 2.5 Flash Image generation lifecycle (Slices 3+4)'
+description: |
+  Slices 3 and 4 of the Nail Tech Assistant build, sequenced after Epic B's
+  Pinterest browse shipped. The first epic to actually do the thing the product
+  is named after: take a user's inspiration, hand it to a generative model, and
+  produce a candidate nail design they can save.
+
+  Flow: reference assembly (Pinterest pins + uploads) → optional prompt + nail
+  shape → durable design draft → multimodal generation → raw image preview or
+  guided failure. First time Firebase Cloud Storage and three new Firestore
+  collections (`references`, `designs`, `generations`) light up outside
+  `profiles`. First time the app integrates a generation provider.
+
+  In scope: `/design/new` workspace, normalized `references` records (Pinterest
+  + upload sources), durable `designs` records, `generations` lifecycle that
+  cannot get stuck in `pending`, generation provider boundary at
+  `lib/ai/generate.ts`, MSW test harness, Firebase Cloud Storage helper +
+  rules, Firestore + Storage rules tests, Slice-1 Gemini quality spike.
+
+  Out of scope: visualizer (Slice 5), shape-aware compositing, design library /
+  reopen / regenerate (Slice 6), chat refinement (Slice 7, P1). Brand locked
+  at `.pHive/brand/brand-system.yaml` — no creative palette / typography /
+  naming choices in this epic.
+
+  Sign-off anchors: PRD US-C-1 (mixed-source reference assembly), US-C-2
+  (optional prompt as first-class input), US-C-3 (durable design draft), US-C-4
+  (generate nail-design image), US-C-5 (raw result or guided failure).
+  FR-C-1..FR-C-10. Risk #2 (Gemini quality) gated by Slice-1 spike (c1).
+  Mother's Day 2026-05-10 deadline shapes scope discipline — Slice 7 already
+  cuttable per outline; this epic does not touch it.
+
+target_codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+methodology: tdd
+
+planning_artifacts:
+  research_brief: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+  research_raw: .pHive/epics/epic-c-reference-and-generation/docs/research-raw-findings.md
+  design_discussion: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+  prd: .pHive/planning/prd.md
+  structured_outline: .pHive/planning/structured-outline.md
+  vertical_plan: .pHive/planning/vertical-plan.md
+  horizontal_plan: .pHive/planning/horizontal-plan.md
+
+slice_covered: 'Slices 3 + 4 — Reference Collection + AI Generation Pipeline (Vertical Plan §3-4)'
+
+agent_routing:
+  researcher: claude
+  tester: claude
+  developer: codex
+  reviewer: claude
+  integrator: claude
+  ui_designer: claude
+  tpm_validator: claude-opus-4-7
+
+quality_gates:
+  typecheck: required
+  lint: required
+  unit_tests: required
+  rules_tests: required # @firebase/rules-unit-testing on c4 — firestore.rules + storage.rules per-collection allow/deny matrix
+  e2e_tests: recommended
+  spike_decision_artifact: required # c1 — .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md GO/NO-GO + SDK lock
+
+acceptance_at_epic_completion: |
+  - PRD US-C-1: From `/design/new`, the user can choose one Pinterest pin as
+    primary, add additional Pinterest pins and/or uploaded photos as ordered
+    secondary references, and see the assembled set in one reference panel.
+    Both sources land as the same `Reference` shape in Firestore.
+  - PRD US-C-2: The optional prompt is preserved as a first-class input on the
+    durable `Design` record and is passed through to `buildGeminiRequest(...)`.
+  - PRD US-C-3: A durable `Design` record exists before generation, owned by
+    the authenticated user, with primary reference, ordered secondary refs,
+    optional prompt, and selected nail shape. Security Rules deny cross-user
+    reads/writes.
+  - PRD US-C-4: Pressing generate runs a `pending` → `success`|`failure`
+    lifecycle. `success` persists the output image to Firebase Cloud Storage
+    and updates `Design.latestGenerationId`. `failure` classifies the error
+    code (`refusal` | `rate_limit` | `network` | `unknown`) with one silent
+    auto-retry on transient codes only.
+  - PRD US-C-5: Raw generated image is viewable from a `GenerationPreview`
+    component without the visualizer. Failures present `GenerationErrorState`
+    with adjust-inputs CTA.
+  - FR-C-9: Storage failure after provider success transitions the row to
+    `failure`, never `pending`. Verified by integration test.
+  - Quality gates: typecheck + lint + unit tests + rules tests pass. E2E
+    happy + guided-failure flows pass (recommended).
+  - c1 spike artifact records GO/NO-GO + SDK lock; if NO-GO, provider boundary
+    swap (FLUX.1-kontext or `gpt-image-1`) does not require story re-decomposition.
+
+dependencies_external:
+  - Gemini API key (or provider-equivalent per c1 SDK lock) — user-owned
+    prerequisite, configured in Vercel env + local `.env.local` via the
+    `feedback_secret_rotation_no_releak` script pattern (never through chat).
+  - Firebase Cloud Storage bucket region selection — user-owned, before c4.
+  - Pinterest static token (inherited from Epic B; still valid).
+
+risks_applicable:
+  - 'Risk #2: Gemini reference-edit quality below "stylized-but-recognizable" bar — addressed by c1 spike GO/NO-GO gate before c6+ implementation; provider boundary at lib/ai/generate.ts protects swap'
+  - 'Risk: Firebase AI Logic web SDK does not run cleanly on Next.js Node runtime — addressed by c1 spike SDK lock recommendation (architect preference @google/generative-ai)'
+  - 'Risk: zombie generation rows (pending forever after provider success + storage failure) — addressed by two-write lifecycle (persistGenerationStart + persistGenerationResult) + integration test asserting failure transition (FR-C-9)'
+  - 'Risk: Pinterest + upload reference shapes drift into incompatible records — addressed by c3 single Reference contract + shared ingest module in c6'
+  - 'Risk: storage rules permit too much / break legit uploads (greenfield in repo) — addressed by c4 per-path allow/deny matrix using @firebase/rules-unit-testing'
+  - 'Risk: secret leak through chat during Gemini key provisioning — addressed by feedback_secret_rotation_no_releak local-script pattern referenced in c1 dependencies_external'
+
+stories:
+  - id: c1-gemini-spike-sdk-decision
+    title: 'Gemini 2.5 Flash Image quality spike + SDK decision artifact (GO/NO-GO + SDK lock + sync-vs-route recommendation)'
+    complexity: medium
+    depends_on: []
+  - id: c2-msw-install-harness
+    title: 'MSW install + vitest setup wiring + Pinterest/Gemini handler stubs (testing harness prerequisite)'
+    complexity: low
+    depends_on: []
+  - id: c3-data-model-types-converters
+    title: '`Reference` + `Design` + `Generation` type contracts + Firestore converters (ordered-array secondary refs locked; pure contract — no behavior)'
+    complexity: low
+    depends_on: []
+  - id: c4-firestore-storage-rules
+    title: 'firestore.rules + storage.rules + indexes + firebase.json Storage emulator (per-collection allow/deny matrix; default-deny preserved)'
+    complexity: medium
+    depends_on: [c3-data-model-types-converters]
+  - id: c5-server-storage-helper
+    title: 'lib/firebase/storage.ts — server-only Firebase Cloud Storage helper + owner-scoped path API (mirrors lib/firebase/server.ts pattern)'
+    complexity: medium
+    depends_on: [c4-firestore-storage-rules]
+  - id: c6-pinterest-ingest
+    title: 'lib/references/ingest.ts — Pinterest pin ingestion (server-proxied: fetch via existing client → best image variant → user-scoped Storage write → references doc)'
+    complexity: medium
+    depends_on: [c5-server-storage-helper]
+  - id: c7-upload-ingest-route
+    title: 'lib/references/ingest.ts upload ingestion + app/api/references/upload/route.ts multipart route handler (server-proxied; route-not-action because multipart)'
+    complexity: medium
+    depends_on: [c5-server-storage-helper]
+  - id: c8-reference-set-builder
+    title: 'lib/references/reference-set.ts — pure one-primary + ordered-secondary builder with exhaustive invariant tests (no I/O)'
+    complexity: low
+    depends_on: [c3-data-model-types-converters]
+  - id: c9-select-pin-action
+    title: 'selectPinterestPin server action — thin wrapper around ingestPinterestPin with session uid + discriminated envelope'
+    complexity: low
+    depends_on: [c6-pinterest-ingest, c8-reference-set-builder]
+  - id: c10-create-design-action
+    title: 'createDesign server action + lib/designs/lifecycle.ts (draft create only; latestGenerationId: null at create time)'
+    complexity: medium
+    depends_on: [c8-reference-set-builder, c4-firestore-storage-rules]
+  - id: c11-design-new-workspace-ui
+    title: 'app/(authenticated)/design/new/page.tsx workspace + ReferencePanel + UploadZone + PromptInput (Pinterest selection embedded; primary/secondary affordance; disabled-Generate on invalid state)'
+    complexity: high
+    depends_on:
+      [c9-select-pin-action, c7-upload-ingest-route, c10-create-design-action]
+  - id: c12-sidebar-library-scaffold
+    title: 'Studio sidebar nav: New Design + Library scaffold (option B locked: NO Pinterest top-level entry; /library empty-state placeholder only — full Library = Epic D)'
+    complexity: low
+    depends_on: [c11-design-new-workspace-ui]
+  - id: c13-ai-env-provider-boundary
+    title: 'AI credentials env schema + lib/ai/provider.ts boundary scaffold (interface only; provider call site isolated from Firestore + Storage)'
+    complexity: low
+    depends_on: [c1-gemini-spike-sdk-decision]
+  - id: c14-gemini-request-retry
+    title: 'lib/ai/generate.ts — buildGeminiRequest + one-silent-retry policy (transient errors only; refusal + low_quality NOT retried)'
+    complexity: medium
+    depends_on: [c13-ai-env-provider-boundary, c8-reference-set-builder]
+  - id: c15-generation-lifecycle-state-machine
+    title: 'lib/designs/lifecycle.ts generation persistence state machine — pending→success|failure with transactional latestGenerationId + storage-fail-after-success → terminal failure (FR-C-9)'
+    complexity: high
+    depends_on:
+      [
+        c10-create-design-action,
+        c5-server-storage-helper,
+        c14-gemini-request-retry,
+      ]
+  - id: c16-generate-design-surface
+    title: 'generateDesign mutation surface — orchestrates persistGenerationStart → c14.generate → persistGenerationResult; surface choice (action vs route) locked by c1 spike P95'
+    complexity: medium
+    depends_on:
+      [c15-generation-lifecycle-state-machine, c14-gemini-request-retry]
+  - id: c17-generation-ui
+    title: '<GenerateButton> + <GenerationPreview> + <GenerationErrorState> — polished pending state, raw image preview, 5-state error taxonomy with adjust-inputs CTA'
+    complexity: high
+    depends_on: [c16-generate-design-surface, c11-design-new-workspace-ui]
+  - id: c18-image-host-config
+    title: 'next.config.ts — add Firebase Storage host to images.remotePatterns (unblocks <GenerationPreview> next/image rendering)'
+    complexity: low
+    depends_on: [c17-generation-ui]
+
+min_viable_ship_cut:
+  stories:
+    [
+      c1-gemini-spike-sdk-decision,
+      c2-msw-install-harness,
+      c3-data-model-types-converters,
+      c4-firestore-storage-rules,
+      c5-server-storage-helper,
+      c6-pinterest-ingest,
+      c7-upload-ingest-route,
+      c8-reference-set-builder,
+      c9-select-pin-action,
+      c10-create-design-action,
+      c11-design-new-workspace-ui,
+      c12-sidebar-library-scaffold,
+      c13-ai-env-provider-boundary,
+      c14-gemini-request-retry,
+      c15-generation-lifecycle-state-machine,
+      c16-generate-design-surface,
+      c17-generation-ui,
+    ]
+  rationale: |
+    c1–c17 satisfies US-C-1..US-C-5 + FR-C-1..FR-C-10 in full. c18 (next.config
+    image-host allowance) is cuttable per c18 design_decisions — c17 falls back
+    to `<img unoptimized>` if Mother's Day 2026-05-10 pressure hits. c1 spike
+    is the hard gate — if NO-GO, the epic pauses for provider swap before
+    c13/c14 implementation (lib/ai/provider.ts boundary keeps c3–c12 + c15–c17
+    unchanged). Slice 7 (chat refinement) explicitly excluded per outline P0/P1
+    split.
+
+escalations_carrying_into_execute:
+  - trigger: external-integration:provider-boundary
+    severity: major
+    placement: pre-exec
+    target_stories:
+      [
+        c1-gemini-spike-sdk-decision,
+        c13-ai-env-provider-boundary,
+        c14-gemini-request-retry,
+      ]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      Risk #2 (Gemini quality) is the epic's load-bearing unknown. Slice-1
+      spike must clear with GO + SDK lock before c13/c14 implementation. If
+      NO-GO, lib/ai/provider.ts is the only swap site (FLUX.1-kontext or
+      gpt-image-1); upstream contracts (Reference, Design, request builder
+      inputs) stay unchanged.
+    satisfied_by: |
+      c1 produces .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md
+      with latency table (5+ reference types), sample req/res, SDK lock
+      (firebase/ai vs @google/generative-ai vs Vertex AI), sync-vs-route
+      recommendation, GO/NO-GO. c13/c14 reference the artifact's SDK pick.
+  - trigger: security:plan-audit
+    severity: major
+    placement: pre-exec
+    target_stories: [c4-firestore-storage-rules, c5-server-storage-helper]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      Greenfield Storage in repo — no storage.rules, no emulator wiring, no
+      getStorage() callers. Three new Firestore collections also greenfield.
+      Default-deny posture must be preserved across all paths; cross-user
+      access must be denied by path-derived `request.auth.uid == userId`
+      rules.
+    satisfied_by: |
+      c4 writes per-collection + per-path allow/deny matrix tests using
+      @firebase/rules-unit-testing FIRST (TDD red), implements rules to pass.
+      Tests cover: owner allow, non-owner deny, unauth deny, cross-user UID
+      mismatch deny, default-deny on undeclared paths.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    target_stories:
+      [
+        c3-data-model-types-converters,
+        c6-pinterest-ingest,
+        c7-upload-ingest-route,
+        c10-create-design-action,
+        c15-generation-lifecycle-state-machine,
+        c16-generate-design-surface,
+        c17-generation-ui,
+      ]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      Reference / Design / Generation are the durable contracts that c6–c17
+      depend on. Locking them WRONG (e.g. subcollection vs array for ordered
+      secondary refs) creates compounding rework. Locking them RIGHT lets
+      every downstream story write tests against stable shapes.
+    satisfied_by: |
+      c3 locks: Design.secondaryReferenceIds: string[] (ordered array, NOT
+      subcollection per design-discussion-q3 + research-brief-q4); Reference
+      with `source: 'pinterest' | 'upload'` + `storagePath` + nullable
+      `pinterestPinId`; Generation with `status: 'pending' | 'success' |
+      'failure'` + nullable `resultStoragePath` + nullable `errorCode`.
+      Converters are pure (no side effects), exhaustively unit-tested.
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    target_stories:
+      [
+        c5-server-storage-helper,
+        c6-pinterest-ingest,
+        c7-upload-ingest-route,
+        c14-gemini-request-retry,
+        c15-generation-lifecycle-state-machine,
+        c16-generate-design-surface,
+      ]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      FR-C-9 anti-zombie: provider success followed by storage write failure
+      must NOT leave row in `pending`. The risk is a real category, not
+      hypothetical — storage SDK calls and Firestore SDK calls are independent
+      network operations. Mitigation must be in the lifecycle module itself,
+      not relied-upon at the call site.
+    satisfied_by: |
+      c15 implements two-write pattern: persistGenerationStart writes
+      `pending` BEFORE provider call; persistGenerationResult writes
+      `success`|`failure` AFTER provider returns AND output bytes confirmed
+      written. Failure of storage-after-success transitions to `failure` with
+      classified errorCode. Integration test in c15 explicitly fails the
+      storage write to assert the failure transition.
+  - trigger: api:surface-boundary
+    severity: moderate
+    placement: pre-exec
+    target_stories:
+      [
+        c7-upload-ingest-route,
+        c9-select-pin-action,
+        c10-create-design-action,
+        c16-generate-design-surface,
+      ]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      Outline names BOTH server actions and route handlers for the same
+      lifecycle steps. Repo prior art (loginAction, loadMoreBoards) uses
+      server actions; route handlers exist only for /api/auth/session +
+      /api/health. Lifecycle drift would emerge if both transports are kept
+      "primary".
+    satisfied_by: |
+      c9/c10/c16 use server actions only with loginAction-style discriminated
+      envelope `{ status: 'success'; data } | { status: 'rejected'; reason;
+      message }`. c7 multipart route handler is the documented exception
+      (multipart streaming requires Node Buffer access). Other route handlers
+      from outline manifest NOT created. Decision cited in c9 + c7 design_decisions.
+  - trigger: ui:major
+    severity: major
+    placement: pre-exec
+    target_stories:
+      [
+        c11-design-new-workspace-ui,
+        c12-sidebar-library-scaffold,
+        c17-generation-ui,
+      ]
+    raised_by: ui-designer
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      `/design/new` is a NEW user-facing surface combining pin browse, upload,
+      prompt entry, shape selection, generate button, pending state, raw
+      preview, and guided failure. No pre-supplied wireframe exists. UI
+      decisions retrofitted into already-built code is the documented Epic B
+      pain point.
+    satisfied_by: |
+      ui-design step inserted between research and test-spec for c11/c12/c17
+      per references/wireframe-protocol.md Touchpoint 1; renditions: 3 each;
+      blocking on Don approval before execute. Reuse Epic A/B warm-shell
+      visual language; brand tokens locked at .pHive/brand/brand-system.yaml.
+  - trigger: ui:animations
+    severity: minor
+    placement: pre-exec
+    target_stories: [c11-design-new-workspace-ui, c17-generation-ui]
+    raised_by: 'tpm + ui-designer'
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      Generation pending state needs felt-quality motion (latency-acknowledging
+      shimmer / progress affordance) per Don's bar from Epic A/B. Memory
+      `feedback_animations_sidecar_review` confirms animations-specialist
+      sidecar at reviewer step caught real prefers-reduced-motion gap on b2.
+    satisfied_by: |
+      animations-specialist sidecar at execute time on c11 + c17 — reviewer
+      step spawns dual-persona pattern (`ui:animations append`). Concerns:
+      pending-state shimmer envelope, success state-transition, error-state
+      reveal, prefers-reduced-motion handling.
+  - trigger: testing:harness-prereq
+    severity: moderate
+    placement: pre-exec
+    target_stories:
+      [c2-msw-install-harness, c14-gemini-request-retry, c17-generation-ui]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      MSW is NOT installed today. Outline + horizontal-plan + vertical-plan
+      all assume Pinterest and Gemini behavior is mocked through MSW. c14
+      (request builder + retry tests) and c17 (e2e error-path) cannot land
+      their tests until c2 ships.
+    satisfied_by: |
+      c2 installs `msw` as devDep, wires `tests/setup/integration.ts` to start
+      a node MSW server in beforeAll, adds Pinterest + Gemini handler stubs
+      under `tests/__mocks__/handlers/`. Subsequent stories register
+      story-specific handler overrides at test time. Vitest setup change is
+      additive — no node_modules patches per `feedback_codex_exec_quirks`.
+  - trigger: ui:scope-boundary
+    severity: moderate
+    placement: pre-exec
+    target_stories:
+      [
+        c11-design-new-workspace-ui,
+        c12-sidebar-library-scaffold,
+        c17-generation-ui,
+      ]
+    raised_by: tpm
+    raised_at: '2026-04-29T15:51:00Z'
+    reason: |
+      Slice 5 (visualizer + shape selector) and Slice 6 (design library +
+      regenerate) are explicitly out of scope. /design/new and
+      GenerationPreview can absorb visualizer scope through "well, while we're
+      here..." creep. Schedule pressure (Mother's Day 10 days out) makes scope
+      discipline load-bearing.
+    satisfied_by: |
+      c11/c12/c17 acceptance criteria explicitly forbid: 5-nail hand layout,
+      shape mask compositing, save-to-library button, regenerate button,
+      design detail page, library grid. c12 also forbids re-adding Pinterest
+      to sidebar (option B locked). Raw image preview only. Reviewer step
+      asserts none of those surfaces shipped.

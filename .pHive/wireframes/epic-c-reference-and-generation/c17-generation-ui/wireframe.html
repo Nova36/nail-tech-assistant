@@ -1,0 +1,2476 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>c17 — /design/new · Step 3 · Confirm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --background: #faf7f2;
+        --foreground: #3d3530;
+        --card: #f0ebe3;
+        --primary: #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint: #d4a5a8;
+        --accent: #c9a96e;
+        --secondary: #efe8de;
+        --muted-foreground: #8c7e78;
+        --destructive: #a8443a;
+      }
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+      html,
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        min-height: 100vh;
+      }
+      .font-fraunces {
+        font-family: 'Fraunces', Georgia, serif;
+      }
+      .text-primary {
+        color: var(--primary);
+      }
+      .text-muted-foreground {
+        color: var(--muted-foreground);
+      }
+      .text-destructive {
+        color: var(--destructive);
+      }
+      .bg-card {
+        background-color: var(--card);
+      }
+
+      /* Frame chrome */
+      .frame {
+        margin: 28px auto;
+        background: var(--background);
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.12);
+        width: 1280px;
+        max-width: calc(100vw - 32px);
+      }
+      .frame-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid rgb(140 126 120 / 0.2);
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .frame-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+      }
+      .frame-bar .dot.b {
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .frame-bar .dot.c {
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      .frame-bar .tag {
+        margin-left: auto;
+        border: 1px solid rgb(140 126 120 / 0.3);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+      }
+
+      .frame-label {
+        margin: 24px auto 0;
+        max-width: 1280px;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 0 4px;
+        flex-wrap: wrap;
+      }
+      .frame-num {
+        font-family: 'Fraunces', serif;
+        font-size: 14px;
+        color: var(--primary);
+        font-style: italic;
+      }
+      .frame-title {
+        font-family: 'Fraunces', serif;
+        font-size: 28px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+      }
+      .frame-sub {
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+
+      aside.anno {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(250, 247, 242, 0.85);
+        border: 1px dashed rgb(140 126 120 / 0.42);
+      }
+      aside.anno::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      aside.anno.pin {
+        position: absolute;
+        top: -11px;
+        left: 14px;
+        z-index: 3;
+      }
+
+      .callout {
+        border: 1px dashed rgb(107 63 94 / 0.4);
+        background: rgb(212 165 168 / 0.12);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 11.5px;
+        line-height: 1.55;
+      }
+      .callout strong {
+        color: var(--primary);
+        font-weight: 500;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 240px;
+        background: var(--background);
+        border-right: 1px solid rgb(140 126 120 / 0.18);
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .sb-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+      }
+      .sb-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-tint)
+        );
+        display: grid;
+        place-items: center;
+        color: var(--primary-foreground);
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+      }
+      .sb-name {
+        font-family: 'Fraunces', serif;
+        font-size: 16px;
+      }
+      .sb-name em {
+        color: var(--primary);
+        font-style: italic;
+      }
+      .sb-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .sb-nav a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--foreground);
+        font-size: 14px;
+        text-decoration: none;
+        min-height: 44px;
+        position: relative;
+      }
+      .sb-nav a .ico {
+        width: 18px;
+        height: 18px;
+        color: var(--muted-foreground);
+      }
+      .sb-nav a:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+      .sb-nav a.active {
+        background: rgba(107, 63, 94, 0.12);
+        color: var(--primary);
+        font-weight: 500;
+      }
+      .sb-nav a.active .ico {
+        color: var(--primary);
+      }
+      .sb-nav a.active::before {
+        content: '';
+        position: absolute;
+        left: -14px;
+        top: 8px;
+        bottom: 8px;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--primary);
+      }
+
+      /* Wizard chrome */
+      .wiz-shell {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        min-height: 800px;
+      }
+      .wiz-main {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-width: 0;
+      }
+      .wiz-progress {
+        padding: 22px 32px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 1px solid rgb(140 126 120 / 0.16);
+        background: var(--background);
+        position: relative;
+      }
+      .step-pill {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+        background: transparent;
+        border: 1px solid transparent;
+        min-height: 36px;
+        cursor: pointer;
+      }
+      .step-pill .num {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(140, 126, 120, 0.18);
+        color: var(--muted-foreground);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .step-pill.done .num {
+        background: rgb(201 169 110 / 0.6);
+        color: var(--foreground);
+      }
+      .step-pill.done {
+        color: var(--foreground);
+      }
+      .step-pill.active {
+        background: rgba(107, 63, 94, 0.1);
+        color: var(--primary);
+        border-color: rgb(107 63 94 / 0.25);
+      }
+      .step-pill.active .num {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+      .step-pill .lbl em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+      }
+      .step-rail-arrow {
+        color: rgb(140 126 120 / 0.5);
+        font-size: 14px;
+      }
+
+      .wiz-body {
+        padding: 36px 32px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .wiz-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 32px;
+        background: var(--card);
+        border-top: 1px solid rgb(140 126 120 / 0.16);
+      }
+      .wiz-footer .reason {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        min-height: 44px;
+        cursor: pointer;
+        transition: background 160ms;
+        text-decoration: none;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 6px 16px rgba(107, 63, 94, 0.25);
+      }
+      .btn-primary:hover {
+        background: #58324d;
+      }
+      .btn-primary:disabled,
+      .btn-primary[aria-disabled='true'] {
+        background: rgb(140 126 120 / 0.25);
+        color: var(--muted-foreground);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--foreground);
+        border: 1px solid rgb(140 126 120 / 0.32);
+      }
+      .btn-ghost:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+      .btn-destructive {
+        background: var(--destructive);
+        color: var(--primary-foreground);
+        box-shadow: 0 6px 16px rgba(168, 68, 58, 0.22);
+      }
+      .btn-destructive:hover {
+        background: #8e3830;
+      }
+
+      /* Cover thumbs */
+      .cover {
+        position: relative;
+        background: linear-gradient(
+          135deg,
+          rgb(107 63 94 / 0.08),
+          rgb(212 165 168 / 0.22) 60%,
+          rgb(201 169 110 / 0.12)
+        );
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            110% 65% at 30% 25%,
+            rgba(255, 255, 255, 0.55),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            45deg,
+            transparent 0 22px,
+            rgba(61, 53, 48, 0.035) 22px 23px
+          );
+        pointer-events: none;
+      }
+      .cover-photo {
+        background: linear-gradient(
+          135deg,
+          rgb(201 169 110 / 0.25),
+          rgb(212 165 168 / 0.18) 70%,
+          rgb(107 63 94 / 0.15)
+        );
+      }
+      .cover-photo::after {
+        background:
+          radial-gradient(
+            120% 80% at 70% 25%,
+            rgba(255, 255, 255, 0.55),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            135deg,
+            transparent 0 18px,
+            rgba(61, 53, 48, 0.04) 18px 19px
+          );
+      }
+
+      /* Reference summary */
+      .ref-summary {
+        width: 100%;
+        max-width: 720px;
+        background: var(--card);
+        border-radius: 18px;
+        padding: 16px 18px;
+        border: 1px solid rgb(140 126 120 / 0.2);
+      }
+      .ref-summary .row {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 16px;
+        align-items: center;
+      }
+      .ref-summary .thumbs {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .ref-summary .thumb {
+        width: 56px;
+        height: 56px;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+        border: 1px solid rgb(140 126 120 / 0.18);
+      }
+      .ref-summary .thumb.is-primary {
+        border: 2px solid var(--primary);
+      }
+      .ref-summary .thumb .pin-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 14px;
+        height: 14px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        border: 2px solid var(--background);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+      }
+      .ref-summary .meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+      }
+      .ref-summary .meta .head {
+        color: var(--foreground);
+        font-weight: 500;
+      }
+      .ref-summary .pills {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .ref-summary .pill {
+        background: var(--secondary);
+        border: 1px solid rgb(140 126 120 / 0.2);
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        color: var(--foreground);
+      }
+      .ref-summary .pill em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        color: var(--primary);
+      }
+
+      /* PENDING animation card */
+      .pending-stage {
+        width: 100%;
+        max-width: 540px;
+        margin-top: 20px;
+        background: var(--card);
+        border-radius: 22px;
+        padding: 36px 28px 30px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+        position: relative;
+        overflow: hidden;
+      }
+      /* Treatment (a): nail outline filling */
+      .nail-fill {
+        width: 140px;
+        height: 200px;
+        position: relative;
+      }
+      .nail-fill svg {
+        display: block;
+      }
+      .nail-fill .outline {
+        stroke: var(--primary);
+        stroke-width: 1.5;
+        fill: none;
+      }
+      .nail-fill .fill {
+        fill: url(#nailGrad);
+        transform-origin: bottom center;
+        animation: nail-rise 4s ease-in-out infinite;
+      }
+      @keyframes nail-rise {
+        0% {
+          transform: scaleY(0);
+        }
+        50% {
+          transform: scaleY(1);
+        }
+        60% {
+          transform: scaleY(1);
+        }
+        100% {
+          transform: scaleY(0);
+        }
+      }
+      .nail-fill .glimmer {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          120deg,
+          transparent 30%,
+          rgba(255, 255, 255, 0.55) 50%,
+          transparent 70%
+        );
+        transform: translateX(-100%);
+        animation: glimmer-sweep 3.6s ease-in-out infinite;
+        mix-blend-mode: overlay;
+        pointer-events: none;
+      }
+      @keyframes glimmer-sweep {
+        0% {
+          transform: translateX(-100%);
+        }
+        65% {
+          transform: translateX(100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+      .pending-text {
+        font-family: 'Fraunces', serif;
+        font-size: 22px;
+        font-weight: 300;
+        letter-spacing: -0.01em;
+      }
+      .pending-text em {
+        font-style: italic;
+        color: var(--primary);
+      }
+      .pending-sub {
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+      }
+
+      /* Indeterminate bar (reduced-motion fallback) */
+      .indet-bar {
+        width: 100%;
+        height: 4px;
+        background: rgb(140 126 120 / 0.18);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+      .indet-bar::after {
+        content: '';
+        position: absolute;
+        width: 40%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--primary),
+          transparent
+        );
+        animation: indet-slide 1.6s ease-in-out infinite;
+      }
+      @keyframes indet-slide {
+        0% {
+          left: -45%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nail-fill .fill,
+        .nail-fill .glimmer,
+        .indet-bar::after {
+          animation: none;
+        }
+      }
+
+      /* Success card */
+      .result-frame {
+        width: 100%;
+        max-width: 720px;
+        background: var(--card);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 16px 48px rgba(61, 53, 48, 0.12);
+      }
+      .result-image {
+        aspect-ratio: 1/1;
+        border-radius: 16px;
+        background:
+          radial-gradient(
+            80% 70% at 30% 30%,
+            rgba(255, 255, 255, 0.55),
+            transparent 60%
+          ),
+          linear-gradient(
+            135deg,
+            #d4a5a8 0%,
+            #c9a96e 35%,
+            #b78db1 70%,
+            #6b3f5e 100%
+          );
+        position: relative;
+        overflow: hidden;
+      }
+      .result-image::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: repeating-radial-gradient(
+          circle at 60% 40%,
+          rgba(255, 255, 255, 0.08) 0 4px,
+          transparent 4px 16px
+        );
+        pointer-events: none;
+        mix-blend-mode: soft-light;
+      }
+      .result-image .placeholder-tag {
+        position: absolute;
+        left: 14px;
+        top: 14px;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        background: rgba(61, 53, 48, 0.55);
+        color: var(--background);
+        padding: 4px 10px;
+        border-radius: 999px;
+      }
+      /* Stylized nail outlines layered on top of the result image */
+      .result-image .hand-shape {
+        position: absolute;
+        bottom: -6%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70%;
+        opacity: 0.95;
+      }
+
+      /* Error card */
+      .err-card {
+        width: 100%;
+        max-width: 600px;
+        background: var(--card);
+        border-radius: 22px;
+        padding: 40px 36px 32px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 12px 32px rgba(61, 53, 48, 0.08);
+      }
+      .err-glyph {
+        width: 132px;
+        height: 132px;
+        margin-bottom: 4px;
+      }
+      .err-headline {
+        font-family: 'Fraunces', serif;
+        font-size: 28px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        text-wrap: pretty;
+        max-width: 480px;
+      }
+      .err-headline em {
+        font-style: italic;
+        color: var(--primary);
+      }
+      .err-body {
+        color: var(--muted-foreground);
+        font-size: 14.5px;
+        line-height: 1.55;
+        max-width: 460px;
+        text-wrap: pretty;
+      }
+      .err-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 8px;
+      }
+
+      .legend-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+      }
+      .legend-card dt {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        color: var(--primary);
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      .legend-card dd {
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+
+      .toast {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--foreground);
+        color: var(--background);
+        border-radius: 999px;
+        font-size: 13px;
+        box-shadow: 0 12px 32px rgba(61, 53, 48, 0.25);
+      }
+      .toast .check {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: grid;
+        place-items: center;
+        color: var(--foreground);
+      }
+
+      /* Inline confirm (Discard) */
+      .inline-confirm {
+        margin-top: 14px;
+        background: rgb(168 68 58 / 0.06);
+        border: 1px solid rgb(168 68 58 / 0.32);
+        border-radius: 14px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--foreground);
+        font-size: 13px;
+      }
+      .inline-confirm .label {
+        color: var(--destructive);
+        font-weight: 500;
+      }
+      .inline-confirm .actions {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="mx-auto max-w-[1280px] px-4 pt-10 pb-4">
+      <p
+        class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+      >
+        Wireframe · c17 · /design/new · Step 3
+      </p>
+      <h1
+        class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+      >
+        Step 3 · <span class="italic text-primary">Confirm.</span>
+      </h1>
+      <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-2xl">
+        Seven frames: <em>pending → success</em>, plus five distinct error
+        states (refusal · rate-limit · network · storage-fail · low-quality).
+        Same wizard chrome as c11 (sidebar + progress strip). Calm, recoverable
+        language. No alarming red, no shake.
+      </p>
+    </header>
+
+    <section class="mx-auto max-w-[1280px] px-4 mb-10">
+      <div class="legend-card grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+        <dl>
+          <dt>Tokens (locked)</dt>
+          <dd>
+            Fraunces heading · Inter body · semantic Tailwind tokens. Error
+            glyphs use primary-tint + accent + muted strokes — no flat red, no
+            exclamation triangles.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Card geometry</dt>
+          <dd>
+            All errors share the same 600px card shape: glyph (132×132) →
+            headline → body → actions. Pending uses a 540px stage. Success
+            breaks the card to give the image a 720px hero frame.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Progress strip</dt>
+          <dd>
+            "1 ✓ Inspiration · 2 ✓ Direction · 3 Confirm" — Step 3 active. Steps
+            1 and 2 remain clickable, return there with full state preserved.
+          </dd>
+        </dl>
+        <dl class="md:col-span-3">
+          <dt>Recovery routes</dt>
+          <dd>
+            "← Back to adjust" → Step 2 with primary/supporting/prompt/shape
+            preserved. "Use different references" (refusal only) → Step 1, picks
+            preserved but designations cleared. "Try again" → re-fires Generate
+            with the same inputs and returns to Pending. "Save & Confirm" →
+            toast + nav to <code>/design/[id]</code> (or
+            <code>/library</code> per team).
+          </dd>
+        </dl>
+        <dl class="md:col-span-3">
+          <dt>Motion</dt>
+          <dd>
+            Pending: 4s nail-fill loop with a 3.6s glimmer sweep over a soft
+            warm gradient. Pending → Success: 250ms cross-fade · result image
+            scales 0.96 → 1.0 in 200ms. Pending → Error: 200ms gentle settle on
+            glyph (NOT shake). <em>prefers-reduced-motion</em> → all loops +
+            transitions become instant; pending falls back to static
+            "Generating…" text + indeterminate bar.
+          </dd>
+        </dl>
+        <dl class="md:col-span-3">
+          <dt>A11y</dt>
+          <dd>
+            <code>aria-busy="true"</code> on the result region while pending.
+            Each transition fires an
+            <code>aria-live="polite"</code> announcement ("Generation complete.
+            Result ready." / "Generation paused. Rate limit."). Glyphs are
+            <code>aria-hidden</code>; semantics live in the H2 headline + body.
+            No color-only signaling — every error has glyph + heading + body +
+            ≥1 CTA.
+          </dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════ FRAME 1 — Pending ═══════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">01.</span>
+      <h2 class="frame-title">
+        Pending · <span class="italic text-primary">painting your design.</span>
+      </h2>
+      <span class="frame-sub"
+        >Reference summary up top, animated nail-fill stage below.
+        ~10–15s.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · pending</span
+        ><span class="tag">frame 01</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar relative">
+          <aside class="anno pin">AppShell · sidebar (matches c11)</aside>
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <aside class="anno pin">
+              component: WizardProgress · 1 ✓ · 2 ✓ · 3 active
+            </aside>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Generating · ~10s</span
+            >
+          </div>
+
+          <div
+            class="wiz-body"
+            role="region"
+            aria-label="Result"
+            aria-busy="true"
+          >
+            <p
+              class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+            >
+              Step 3 of 3
+            </p>
+            <h3
+              class="font-fraunces text-3xl font-light tracking-[-0.02em] mb-5"
+            >
+              Painting your <em class="italic text-primary">design.</em>
+            </h3>
+
+            <!-- Reference summary -->
+            <section class="ref-summary relative">
+              <aside class="anno pin">
+                component: ReferenceSummary · primary + supporting + prompt +
+                shape
+              </aside>
+              <div class="row">
+                <div class="thumbs">
+                  <div class="thumb is-primary">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                    <span class="pin-dot"
+                      ><svg
+                        width="7"
+                        height="7"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        /></svg
+                    ></span>
+                  </div>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div class="thumb">
+                    <div
+                      class="cover cover-photo"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div class="thumb">
+                    <div
+                      class="cover cover-photo"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                </div>
+                <div class="meta">
+                  <span class="head"
+                    >4 references · 1 primary, 3 supporting</span
+                  >
+                  <span
+                    >Pinterest #5 leading · soft mauve french with one chrome
+                    accent</span
+                  >
+                  <div class="pills">
+                    <span class="pill"><em>Shape</em> · Almond</span>
+                    <span class="pill"
+                      ><em>Prompt</em> · "soft mauve french with one chrome
+                      accent finger, summer wedding"</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Pending stage -->
+            <section class="pending-stage relative" aria-live="polite">
+              <aside class="anno pin">
+                component: PendingStage · treatment (a) nail-fill + glimmer · 4s
+                loop
+              </aside>
+
+              <div class="nail-fill" aria-hidden="true">
+                <svg viewBox="0 0 70 100" width="140" height="200">
+                  <defs>
+                    <linearGradient id="nailGrad" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stop-color="#d4a5a8" />
+                      <stop
+                        offset="55%"
+                        stop-color="#c9a96e"
+                        stop-opacity="0.85"
+                      />
+                      <stop
+                        offset="100%"
+                        stop-color="#6b3f5e"
+                        stop-opacity="0.7"
+                      />
+                    </linearGradient>
+                    <clipPath id="nailClip">
+                      <path d="M15 96 Q14 24 35 8 Q56 24 55 96 Z" />
+                    </clipPath>
+                  </defs>
+                  <!-- outline -->
+                  <path class="outline" d="M15 96 Q14 24 35 8 Q56 24 55 96 Z" />
+                  <!-- fill (animated) -->
+                  <g clip-path="url(#nailClip)">
+                    <rect class="fill" x="0" y="0" width="70" height="100" />
+                  </g>
+                  <!-- cuticle line -->
+                  <path
+                    d="M16 96 Q35 88 54 96"
+                    stroke="#8c7e78"
+                    stroke-width="0.8"
+                    fill="none"
+                    opacity="0.5"
+                  />
+                </svg>
+                <div class="glimmer"></div>
+              </div>
+
+              <div>
+                <div class="pending-text">Painting your <em>design</em>…</div>
+                <div class="pending-sub">
+                  ~10 seconds · we'll show it as soon as it's ready
+                </div>
+              </div>
+
+              <div class="indet-bar" aria-hidden="true"></div>
+            </section>
+
+            <p class="text-xs text-muted-foreground mt-4">
+              Optional:
+              <button class="underline underline-offset-4 text-foreground">
+                Cancel
+              </button>
+              — annotated quiet cancel; team to decide whether to ship.
+            </p>
+          </div>
+
+          <div class="wiz-footer">
+            <span
+              class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              >No actions while generating</span
+            >
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Motion treatment chosen: (a) nail-fill.</strong> Vertical SVG
+          nail outline; warm gradient fill rises from cuticle to tip in 4s,
+          holds briefly, then resets — paired with a 3.6s diagonal glimmer
+          sweep. Soft, on-brand, doesn't feel like a generic loader.
+        </div>
+        <div class="callout">
+          <strong>Reduced motion fallback.</strong> Static SVG nail (filled at
+          ~60%, no animation) + indeterminate progress bar (which itself becomes
+          a static striped bar under reduced motion). Headline becomes
+          "Generating…" — no "Painting" verb to hint at fake progress.
+        </div>
+        <div class="callout">
+          <strong>Reference summary above.</strong> Reassures the user her input
+          was received before the result arrives. Primary thumbnail carries a
+          small ★ pin-dot and 2px primary border; supporting thumbs sit beside
+          it. Prompt + shape are pills below the meta.
+        </div>
+        <div class="callout">
+          <strong>No buttons during pending.</strong> Footer reads "No actions
+          while generating." Optional quiet "Cancel" link sits inline above the
+          footer if the team chooses to ship it; flagged for review.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════ FRAME 2 — Success ═══════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">02.</span>
+      <h2 class="frame-title">
+        Success · <span class="italic text-primary">result ready.</span>
+      </h2>
+      <span class="frame-sub"
+        >Hero image · caption · 3 actions · quiet Discard at bottom.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · success</span
+        ><span class="tag">frame 02</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Result ready</span
+            >
+          </div>
+
+          <div
+            class="wiz-body"
+            role="region"
+            aria-label="Result"
+            aria-busy="false"
+          >
+            <p
+              class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-1"
+            >
+              Step 3 of 3
+            </p>
+            <h3
+              class="font-fraunces text-4xl font-light tracking-[-0.02em] mb-2"
+            >
+              Here's your <em class="italic text-primary">design.</em>
+            </h3>
+            <p
+              class="text-sm text-muted-foreground mb-5 max-w-prose text-center"
+            >
+              Save it to your Library, try another version, or step back and
+              adjust.
+            </p>
+
+            <!-- Result hero -->
+            <section class="result-frame relative">
+              <aside class="anno pin">
+                component: ResultHero · 1024² placeholder · soft frame
+              </aside>
+              <div
+                class="result-image"
+                role="img"
+                aria-label="Generated nail design — almond shape, soft mauve french with chrome accent"
+              >
+                <span class="placeholder-tag">Generated · 1024 × 1024</span>
+                <!-- Stylized nail row to suggest a result -->
+                <svg class="hand-shape" viewBox="0 0 360 200" fill="none">
+                  <defs>
+                    <linearGradient id="rs" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stop-color="#f0ebe3" />
+                      <stop
+                        offset="60%"
+                        stop-color="#d4a5a8"
+                        stop-opacity="0.95"
+                      />
+                      <stop offset="100%" stop-color="#6b3f5e" />
+                    </linearGradient>
+                    <linearGradient id="rs2" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stop-color="#c9a96e" />
+                      <stop offset="100%" stop-color="#f0ebe3" />
+                    </linearGradient>
+                  </defs>
+                  <g stroke="rgba(61,53,48,0.45)" stroke-width="1.2">
+                    <path
+                      d="M30 200 Q28 80 50 50 Q72 80 70 200 Z"
+                      fill="url(#rs)"
+                    />
+                    <path
+                      d="M100 200 Q98 60 120 30 Q142 60 140 200 Z"
+                      fill="url(#rs)"
+                    />
+                    <path
+                      d="M170 200 Q168 50 190 20 Q212 50 210 200 Z"
+                      fill="url(#rs2)"
+                    />
+                    <path
+                      d="M240 200 Q238 60 260 30 Q282 60 280 200 Z"
+                      fill="url(#rs)"
+                    />
+                    <path
+                      d="M310 200 Q308 80 330 50 Q352 80 350 200 Z"
+                      fill="url(#rs)"
+                    />
+                  </g>
+                  <!-- French tips -->
+                  <g fill="rgba(250,247,242,0.85)">
+                    <path
+                      d="M30 200 Q28 80 50 50 Q72 80 70 200 Q70 174 50 170 Q30 174 30 200 Z"
+                      opacity="0.5"
+                    />
+                  </g>
+                </svg>
+              </div>
+
+              <figcaption
+                class="text-center mt-4 text-[13px] text-muted-foreground"
+              >
+                <span class="text-foreground font-medium">Almond shape</span>
+                <span class="mx-2 opacity-50">·</span>
+                4 references
+                <span class="mx-2 opacity-50">·</span>
+                prompt:
+                <em class="font-fraunces italic text-primary"
+                  >"soft pastel marble"</em
+                >
+              </figcaption>
+            </section>
+
+            <!-- Actions row -->
+            <section
+              class="mt-6 flex flex-wrap gap-3 justify-center items-center relative"
+            >
+              <aside class="anno pin">
+                component: ResultActions · primary · secondary · tertiary
+              </aside>
+              <button class="btn btn-primary">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                >
+                  <path d="M2 6.5l2.6 2.6L13 1" />
+                </svg>
+                Save & Confirm
+              </button>
+              <button class="btn btn-ghost">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path
+                    d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3M12 3v3h-3M4 13v-3h3"
+                  />
+                </svg>
+                Try another version
+              </button>
+              <a href="#" class="btn btn-ghost">← Back to adjust</a>
+            </section>
+
+            <!-- Quiet discard -->
+            <section class="mt-8 text-center">
+              <button
+                class="text-xs text-muted-foreground underline underline-offset-4 hover:text-destructive"
+              >
+                Discard this design
+              </button>
+              <!-- Inline confirm preview -->
+              <div
+                class="inline-confirm mt-3"
+                role="alertdialog"
+                aria-labelledby="discard-label"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  style="color: var(--destructive); flex-shrink: 0"
+                >
+                  <path
+                    d="M3 5h10M6 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2M5 5l1 9h4l1-9"
+                  />
+                </svg>
+                <span id="discard-label"
+                  ><span class="label">Discard this design?</span> It won't be
+                  saved.</span
+                >
+                <div class="actions">
+                  <button
+                    class="btn btn-ghost"
+                    style="padding: 8px 14px; min-height: 36px; font-size: 13px"
+                  >
+                    Keep
+                  </button>
+                  <button
+                    class="btn btn-destructive"
+                    style="padding: 8px 14px; min-height: 36px; font-size: 13px"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- Toast preview -->
+            <div class="mt-5 flex justify-center">
+              <div class="toast" role="status">
+                <span class="check"
+                  ><svg
+                    width="9"
+                    height="9"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M2 6.5l2.5 2.5L10 3.5" /></svg
+                ></span>
+                Saved to your Library
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <a href="#" class="btn btn-ghost">← Back</a>
+            <span class="reason"
+              >Saved → /library · Or stay here to try another version.</span
+            >
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Save & Confirm.</strong> Saves to <code>/library</code>, fires
+          success toast ("Saved to your Library"), then navigates to
+          <code>/design/[id]</code> (team to confirm exact target — toast
+          survives the route change for ~3s).
+        </div>
+        <div class="callout">
+          <strong>Try another version.</strong> Re-fires Generate with the exact
+          same primary/supporting/prompt/shape. Returns to the Pending frame
+          with the same reference summary — no loss of context.
+        </div>
+        <div class="callout">
+          <strong>Discard requires confirm.</strong> The text link expands an
+          inline confirm row (not a modal) — primary destructive "Discard" +
+          ghost "Keep". Esc keeps. The image is dropped; the wizard returns to
+          Step 1 with picks preserved (so nothing creative is lost).
+        </div>
+        <div class="callout">
+          <strong>Pending → Success.</strong> 250ms cross-fade on the wiz-body.
+          Result image scales 0.96 → 1.0 in 200ms ease-out. Aria-live announces
+          "Generation complete. Result ready."
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ FRAME 3 — Error: refusal ════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">03.</span>
+      <h2 class="frame-title">
+        Error · <span class="italic text-primary">refusal.</span>
+      </h2>
+      <span class="frame-sub"
+        >Provider declined (NSFW filter / policy). Calm, recoverable. Two routes
+        back.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · error · refusal</span
+        ><span class="tag">frame 03</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Couldn't generate</span
+            >
+          </div>
+
+          <div class="wiz-body">
+            <div class="err-card relative">
+              <aside class="anno pin">
+                component: ErrorCard · refusal · same shape across all 5 errors
+              </aside>
+
+              <svg class="err-glyph" viewBox="0 0 132 132" aria-hidden="true">
+                <!-- soft background circle -->
+                <circle
+                  cx="66"
+                  cy="66"
+                  r="54"
+                  fill="#efe8de"
+                  stroke="#d4a5a8"
+                  stroke-width="1.2"
+                  stroke-dasharray="3 4"
+                />
+                <!-- nail with a "—" through it -->
+                <path
+                  d="M52 100 Q50 50 66 36 Q82 50 80 100 Z"
+                  fill="#f0ebe3"
+                  stroke="#8c7e78"
+                  stroke-width="1.4"
+                />
+                <line
+                  x1="44"
+                  y1="68"
+                  x2="88"
+                  y2="68"
+                  stroke="#6b3f5e"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                />
+                <!-- petal -->
+                <path
+                  d="M30 30 Q40 22 48 28 Q42 38 30 36 Z"
+                  fill="#d4a5a8"
+                  opacity="0.7"
+                />
+                <path
+                  d="M104 96 Q98 88 92 92 Q96 100 104 102 Z"
+                  fill="#c9a96e"
+                  opacity="0.6"
+                />
+              </svg>
+
+              <h2 class="err-headline">
+                We couldn't <em>generate</em> this design.
+              </h2>
+              <p class="err-body">
+                The image model declined the request. This sometimes happens
+                with certain prompts or references. Try adjusting.
+              </p>
+
+              <div class="err-actions">
+                <a href="#" class="btn btn-primary">← Back to adjust</a>
+                <a href="#" class="btn btn-ghost">Use different references</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <a href="#" class="btn btn-ghost">← Back</a>
+            <span class="reason"
+              >Step 2 selections are preserved. Step 1 picks are
+              preserved.</span
+            >
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Why two routes.</strong> "Back to adjust" is a small change
+          (tweak prompt/order). "Use different references" goes deeper — back to
+          Step 1 where the source set itself can be edited. Picks remain
+          selected; primary/supporting designations are cleared.
+        </div>
+        <div class="callout">
+          <strong>Calm copy.</strong> "We couldn't generate this design" —
+          first-person plural, no blame. Body explains the cause briefly, points
+          to action. No "Error 422" technicalism.
+        </div>
+        <div class="callout">
+          <strong>Glyph language.</strong> Soft dashed circle + nail-with-line +
+          petals. Same construction across all 5 errors — only the inner element
+          changes (line / clock / wifi / save / sparkle-fade).
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ FRAME 4 — Error: rate-limit-after-retry ════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">04.</span>
+      <h2 class="frame-title">
+        Error · <span class="italic text-primary">rate limited.</span>
+      </h2>
+      <span class="frame-sub"
+        >Auto-retried once and still throttled. Try-again primary.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · error · rate limit</span
+        ><span class="tag">frame 04</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Generation paused</span
+            >
+          </div>
+
+          <div class="wiz-body">
+            <div class="err-card">
+              <svg class="err-glyph" viewBox="0 0 132 132" aria-hidden="true">
+                <circle
+                  cx="66"
+                  cy="66"
+                  r="54"
+                  fill="#efe8de"
+                  stroke="#d4a5a8"
+                  stroke-width="1.2"
+                  stroke-dasharray="3 4"
+                />
+                <!-- clock face -->
+                <circle
+                  cx="66"
+                  cy="66"
+                  r="28"
+                  fill="#f0ebe3"
+                  stroke="#6b3f5e"
+                  stroke-width="1.6"
+                />
+                <line
+                  x1="66"
+                  y1="66"
+                  x2="66"
+                  y2="46"
+                  stroke="#6b3f5e"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                />
+                <line
+                  x1="66"
+                  y1="66"
+                  x2="80"
+                  y2="74"
+                  stroke="#6b3f5e"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                />
+                <circle cx="66" cy="66" r="2" fill="#6b3f5e" />
+                <!-- ticks -->
+                <g stroke="#8c7e78" stroke-width="1.2">
+                  <line x1="66" y1="40" x2="66" y2="44" />
+                  <line x1="66" y1="88" x2="66" y2="92" />
+                  <line x1="40" y1="66" x2="44" y2="66" />
+                  <line x1="88" y1="66" x2="92" y2="66" />
+                </g>
+                <!-- petal flourish -->
+                <path
+                  d="M28 36 Q38 28 46 34 Q40 44 28 42 Z"
+                  fill="#c9a96e"
+                  opacity="0.55"
+                />
+              </svg>
+
+              <h2 class="err-headline">
+                Generation <em>paused</em> — too many requests.
+              </h2>
+              <p class="err-body">
+                We hit the model's rate limit and the auto-retry didn't recover.
+                Try again in a moment.
+              </p>
+
+              <div class="err-actions">
+                <button class="btn btn-primary">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  >
+                    <path
+                      d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3M12 3v3h-3M4 13v-3h3"
+                    />
+                  </svg>
+                  Try again
+                </button>
+                <a href="#" class="btn btn-ghost">← Back to adjust</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <a href="#" class="btn btn-ghost">← Back</a>
+            <span class="reason"
+              >Auto-retried once · all inputs preserved.</span
+            >
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Try again.</strong> Re-fires Generate with identical inputs
+          (same primary/supporting/prompt/shape) and returns to the Pending
+          frame. The reference summary above the pending stage is unchanged.
+        </div>
+        <div class="callout">
+          <strong>Calm.</strong> "Generation paused" is gentler than "Failed".
+          Clock glyph signals time-based, not catastrophic.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ FRAME 5 — Error: post-retry-network ════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">05.</span>
+      <h2 class="frame-title">
+        Error · <span class="italic text-primary">network.</span>
+      </h2>
+      <span class="frame-sub"
+        >Transient network failed twice after auto-retry. Same shape, different
+        glyph + copy.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · error · network</span
+        ><span class="tag">frame 05</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Couldn't reach the model</span
+            >
+          </div>
+
+          <div class="wiz-body">
+            <div class="err-card">
+              <svg class="err-glyph" viewBox="0 0 132 132" aria-hidden="true">
+                <circle
+                  cx="66"
+                  cy="66"
+                  r="54"
+                  fill="#efe8de"
+                  stroke="#d4a5a8"
+                  stroke-width="1.2"
+                  stroke-dasharray="3 4"
+                />
+                <!-- wifi arcs (ghosted top, solid bottom) -->
+                <g
+                  fill="none"
+                  stroke="#6b3f5e"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                >
+                  <path d="M40 70 Q66 48 92 70" opacity="0.25" />
+                  <path d="M48 78 Q66 62 84 78" opacity="0.5" />
+                  <path d="M55 86 Q66 76 77 86" />
+                </g>
+                <circle cx="66" cy="92" r="3" fill="#6b3f5e" />
+                <!-- diagonal slash, soft -->
+                <line
+                  x1="38"
+                  y1="40"
+                  x2="98"
+                  y2="98"
+                  stroke="#a8443a"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  opacity="0.7"
+                />
+                <!-- petals -->
+                <path
+                  d="M28 96 Q38 88 46 94 Q40 104 28 102 Z"
+                  fill="#c9a96e"
+                  opacity="0.55"
+                />
+              </svg>
+
+              <h2 class="err-headline">
+                Couldn't reach the <em>image model.</em>
+              </h2>
+              <p class="err-body">
+                Network hiccup. The auto-retry didn't recover. Check your
+                connection and try again.
+              </p>
+
+              <div class="err-actions">
+                <button class="btn btn-primary">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  >
+                    <path
+                      d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3M12 3v3h-3M4 13v-3h3"
+                    />
+                  </svg>
+                  Try again
+                </button>
+                <a href="#" class="btn btn-ghost">← Back to adjust</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <a href="#" class="btn btn-ghost">← Back</a>
+            <span class="reason">Auto-retried twice · inputs preserved.</span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Network glyph.</strong> Wifi arcs with the top ghost-faded +
+          soft destructive slash — signals "no signal" without alarming
+          icon-language. Slash uses destructive token at 70% opacity, paired
+          with neutral primary strokes — never standalone red.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ FRAME 6 — Error: storage-fail ════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">06.</span>
+      <h2 class="frame-title">
+        Error · <span class="italic text-primary">couldn't save.</span>
+      </h2>
+      <span class="frame-sub"
+        >Generated, but storage write failed. Image is gone — do not show
+        it.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · error · storage</span
+        ><span class="tag">frame 06</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Couldn't save</span
+            >
+          </div>
+
+          <div class="wiz-body">
+            <div class="err-card">
+              <svg class="err-glyph" viewBox="0 0 132 132" aria-hidden="true">
+                <circle
+                  cx="66"
+                  cy="66"
+                  r="54"
+                  fill="#efe8de"
+                  stroke="#d4a5a8"
+                  stroke-width="1.2"
+                  stroke-dasharray="3 4"
+                />
+                <!-- folder/save shape with arrow falling -->
+                <rect
+                  x="42"
+                  y="48"
+                  width="48"
+                  height="40"
+                  rx="4"
+                  fill="#f0ebe3"
+                  stroke="#6b3f5e"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="M42 56 L52 56 L56 50 L74 50"
+                  fill="none"
+                  stroke="#6b3f5e"
+                  stroke-width="1.4"
+                />
+                <!-- down arrow -->
+                <path
+                  d="M66 64 L66 78 M60 73 L66 79 L72 73"
+                  stroke="#a8443a"
+                  stroke-width="2"
+                  fill="none"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M50 86 L82 86"
+                  stroke="#8c7e78"
+                  stroke-width="1.2"
+                  stroke-dasharray="3 3"
+                />
+                <!-- petals -->
+                <path
+                  d="M30 36 Q40 28 48 34 Q42 44 30 42 Z"
+                  fill="#d4a5a8"
+                  opacity="0.6"
+                />
+              </svg>
+
+              <h2 class="err-headline">
+                Generated, but couldn't <em>save.</em>
+              </h2>
+              <p class="err-body">
+                The image was created but we couldn't store it. Try again — your
+                reference set is preserved.
+              </p>
+
+              <div class="err-actions">
+                <button class="btn btn-primary">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                  >
+                    <path
+                      d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3M12 3v3h-3M4 13v-3h3"
+                    />
+                  </svg>
+                  Try again
+                </button>
+                <a href="#" class="btn btn-ghost">← Back to adjust</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <a href="#" class="btn btn-ghost">← Back</a>
+            <span class="reason"
+              >Image lost · references preserved · try again costs another
+              generation.</span
+            >
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Do not show the unsaved image.</strong> The image is gone —
+          caching it client-side and presenting it would imply recovery is
+          possible. Glyph is a save-icon with a small destructive down-arrow,
+          never a corrupted-image preview.
+        </div>
+        <div class="callout">
+          <strong>Cost transparency.</strong> Footer reason flags that "Try
+          again" re-runs generation (incurs another model call) — useful if
+          usage is metered. Optional, but recommended.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ FRAME 7 — Error: low-quality ════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">07.</span>
+      <h2 class="frame-title">
+        Error · <span class="italic text-primary">low quality.</span>
+      </h2>
+      <span class="frame-sub"
+        >Result failed quality heuristics. Adjust is primary. "Try anyway" is
+        escape hatch.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · step 3 · error · low quality</span
+        ><span class="tag">frame 07</span>
+      </div>
+
+      <div class="wiz-shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="/dashboard"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="/design/new" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="/library"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="wiz-main">
+          <div class="wiz-progress">
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Inspiration</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill done">
+              <span class="num">✓</span><span class="lbl">Direction</span>
+            </button>
+            <span class="step-rail-arrow">›</span>
+            <button class="step-pill active" aria-current="step">
+              <span class="num">3</span
+              ><span class="lbl"><em>Confirm</em></span>
+            </button>
+            <span
+              class="ml-auto text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+              aria-live="polite"
+              >Result wasn't great</span
+            >
+          </div>
+
+          <div class="wiz-body">
+            <div class="err-card">
+              <svg class="err-glyph" viewBox="0 0 132 132" aria-hidden="true">
+                <circle
+                  cx="66"
+                  cy="66"
+                  r="54"
+                  fill="#efe8de"
+                  stroke="#d4a5a8"
+                  stroke-width="1.2"
+                  stroke-dasharray="3 4"
+                />
+                <!-- two sparkles, one fading -->
+                <path
+                  d="M66 38 L70 54 L86 58 L70 62 L66 78 L62 62 L46 58 L62 54 Z"
+                  fill="#c9a96e"
+                  opacity="0.85"
+                />
+                <path
+                  d="M40 86 L42 92 L48 94 L42 96 L40 102 L38 96 L32 94 L38 92 Z"
+                  fill="#d4a5a8"
+                  opacity="0.45"
+                />
+                <path
+                  d="M94 80 L96 86 L102 88 L96 90 L94 96 L92 90 L86 88 L92 86 Z"
+                  fill="#d4a5a8"
+                  opacity="0.35"
+                  stroke="#8c7e78"
+                  stroke-width="0.8"
+                  stroke-dasharray="2 2"
+                />
+                <!-- subtle dashed outline around faded sparkle -->
+                <circle
+                  cx="94"
+                  cy="88"
+                  r="14"
+                  fill="none"
+                  stroke="#8c7e78"
+                  stroke-width="0.8"
+                  stroke-dasharray="2 3"
+                  opacity="0.5"
+                />
+              </svg>
+
+              <h2 class="err-headline">The result <em>wasn't great.</em></h2>
+              <p class="err-body">
+                The model returned something that didn't match your references
+                well. Adjusting your prompt or reference set usually helps.
+              </p>
+
+              <div class="err-actions">
+                <a href="#" class="btn btn-primary">← Back to adjust</a>
+                <button class="btn btn-ghost">Try again anyway</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-footer">
+            <a href="#" class="btn btn-ghost">← Back</a>
+            <span class="reason"
+              >Quality flag triggered · we recommend adjusting before
+              retry.</span
+            >
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding: 14px;
+          display: grid;
+          gap: 8px;
+        "
+      >
+        <div class="callout">
+          <strong>Primary flips.</strong> Unique to this error: "← Back to
+          adjust" is primary because the heuristic is telling us the inputs
+          likely need work. "Try again anyway" stays as a ghost button — it's an
+          escape hatch, not the recommended path.
+        </div>
+        <div class="callout">
+          <strong>Glyph.</strong> Two sparkles — one solid, one fading inside a
+          dashed circle. Visual metaphor for "almost, not quite." No
+          broken-image / sad-face tropes.
+        </div>
+      </div>
+    </div>
+
+    <footer
+      class="mx-auto max-w-[1280px] px-4 py-10 text-[11px] tracking-[0.22em] uppercase text-muted-foreground"
+    >
+      c17 · Step 3 · Components: AppShell · WizardProgress · ReferenceSummary ·
+      PendingStage · ResultHero · ResultActions · ErrorCard · DiscardConfirm
+    </footer>
+  </body>
+</html>

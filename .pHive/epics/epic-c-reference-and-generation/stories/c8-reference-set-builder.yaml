@@ -1,0 +1,337 @@
+id: c8-reference-set-builder
+epic: epic-c-reference-and-generation
+title: 'lib/references/reference-set.ts — pure one-primary + ordered-secondary builder with exhaustive invariant tests (no I/O)'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: [c3-data-model-types-converters]
+
+escalations_addressed:
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Builder enforces the c3-locked Design.secondaryReferenceIds: string[]
+      ordered-array shape. Validates: exactly one primaryReferenceId,
+      no duplicate IDs across primary+secondary, secondary ORDER
+      preserved as input. Pure (no I/O), exhaustively unit-tested so c10
+      createDesign action and c11 UI can rely on the contract without
+      re-validating.
+
+description: |
+  Pure builder. Takes user-selected reference IDs + optional prompt + nail
+  shape, validates the assembly invariants, and returns a typed
+  ReferenceSet record ready to feed into c10 createDesign. No Firestore,
+  no Storage, no fetch. Every error case returns a discriminated typed
+  failure rather than throwing — call sites (c11 UI, c10 action) decide
+  surfacing.
+
+  Invariants enforced:
+
+  1. Exactly one primary reference ID (locked per FR-C-2 + design-discussion
+     §My Proposed Approach + research-brief Open Q3).
+  2. Secondary reference IDs preserved in input order (ARRAY shape from c3
+     lock).
+  3. No reference ID appears more than once across primary + secondary
+     (a primary cannot also be secondary; no duplicate secondaries).
+  4. Prompt text length ≤ 1000 chars (locked here as a sane default;
+     overridable in Open Q tracker if Don wants different).
+  5. Nail shape ∈ NailShape union from lib/types.ts.
+
+  This is the kind of pure logic story that gives every downstream
+  consumer (c9, c10, c11, c13) a stable contract to test against.
+  Pure-function discipline means c11's e2e tests can use the SAME builder
+  without spinning up Firestore.
+
+  Out of scope: persistence (c10 owns the Firestore write), UI (c11 owns
+  the panel), Pinterest pin selection state (c12 owns the pin grid
+  selection affordances).
+
+acceptance_criteria:
+  - 'Given valid input `{ primaryReferenceId: "r1", secondaryReferenceIds: ["r2", "r3"], promptText: "rose gold matte", nailShape: "almond" }`, when `buildReferenceSet(input)` is called, then it returns `{ ok: true; set: { primaryReferenceId: "r1", secondaryReferenceIds: ["r2", "r3"], promptText: "rose gold matte", nailShape: "almond" } }`.'
+  - 'Given input with `secondaryReferenceIds: []`, when builder runs, then `{ ok: true; set: { ..., secondaryReferenceIds: [] } }` — empty secondary array is valid.'
+  - 'Given input without `promptText` (or with `promptText: undefined`), when builder runs, then output `set.promptText === null` (normalized; c3 Design uses `string | null`).'
+  - 'Given input with `promptText: ""` (empty string), when builder runs, then output `set.promptText === null` (empty string treated as no prompt).'
+  - 'Given input with `primaryReferenceId: ""` (empty), when builder runs, then `{ ok: false; reason: "primary_required"; message }`.'
+  - 'Given input with `secondaryReferenceIds: ["r1", "r1"]` (duplicate secondary), when builder runs, then `{ ok: false; reason: "duplicate_reference_id"; message }` naming `"r1"`.'
+  - 'Given input with `primaryReferenceId: "r1", secondaryReferenceIds: ["r1"]`, when builder runs, then `{ ok: false; reason: "primary_in_secondary"; message }`.'
+  - 'Given input with `secondaryReferenceIds: ["r3", "r2", "r4"]` (not sorted), when builder runs, then output `set.secondaryReferenceIds === ["r3", "r2", "r4"]` (input order preserved EXACTLY, not re-sorted).'
+  - 'Given input with `promptText` of length 1001, when builder runs, then `{ ok: false; reason: "prompt_too_long"; message }` naming the cap.'
+  - 'Given input with `nailShape: "stiletto"` (NOT in NailShape union — currently `"almond" | "coffin" | "square" | "round" | "oval"`), when builder runs, then `{ ok: false; reason: "invalid_nail_shape"; message }`.'
+  - 'Given an extreme input with `secondaryReferenceIds` of length 50, when builder runs, then `{ ok: true; set }` (no upper cap on secondary count; UX in c11 may restrict but contract does not).'
+  - "Given the builder is imported, when its file is inspected, then it does NOT import `firebase-admin/*`, `'server-only'`, or any Firestore/Storage modules — pure logic only."
+
+steps:
+  - id: research
+    description: |
+      Max 1 focused question:
+      (1) NailShape canonical union — re-confirm `lib/types.ts` exports
+      `NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval'`
+      (per c3 batch-1 raw findings). Outline Slice 3 lists `'stiletto'` as
+      a member; lib/types.ts currently does not. c3 design_decisions
+      DEFERRED to lib/types.ts as source of truth. This story validates
+      against the existing union — if Don wants `stiletto` later, that's a
+      separate atomic change to lib/types.ts.
+
+      Read .pHive/planning/structured-outline.md:222-271 (Slice 3 spec) for
+      the buildReferenceSet interface signature already named.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Pure function = pure
+      tests, no mocks needed.
+
+      - tests/unit/references/reference-set-happy-path.test.ts —
+        (1) Valid input with prompt + 2 secondaries → `{ ok: true; set }`
+        (2) Valid input with no secondaries → `{ ok: true; set }`
+        (3) Valid input without prompt → `set.promptText === null`
+        (4) Valid input with empty-string prompt → `set.promptText === null`
+        (5) All 5 NailShape values (`almond`, `coffin`, `square`, `round`,
+            `oval`) → all valid
+
+      - tests/unit/references/reference-set-invariants.test.ts —
+        (6) Empty primaryReferenceId → `primary_required`
+        (7) Whitespace-only primaryReferenceId (e.g., `"   "`) →
+            `primary_required` (trim then check)
+        (8) Duplicate secondary `["r1", "r1"]` → `duplicate_reference_id`
+        (9) Primary in secondary → `primary_in_secondary`
+        (10) Secondary order preserved exactly:
+             input `["c", "a", "b"]` → output `["c", "a", "b"]`
+
+      - tests/unit/references/reference-set-bounds.test.ts —
+        (11) `promptText` length exactly 1000 → valid
+        (12) `promptText` length 1001 → `prompt_too_long`
+        (13) `secondaryReferenceIds` length 50 → valid
+        (14) `secondaryReferenceIds` containing empty-string ID → `invalid_reference_id`
+        (15) `nailShape: "stiletto"` → `invalid_nail_shape`
+        (16) `nailShape: "ALMOND"` (case mismatch) → `invalid_nail_shape`
+             (case-sensitive enum)
+
+      - tests/unit/references/reference-set-purity.test.ts —
+        (17) Module file does NOT contain `''server-only''`, `firebase`,
+             `firestore`, `storage` (grep test reading the source file)
+
+      Tests run in the unit lane (jsdom or node, doesn't matter — pure
+      logic). No MSW needed. No emulator. No mocks.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. One small file.
+
+      ```ts
+      // lib/references/reference-set.ts
+      // PURE. No imports from ''server-only'', firebase, firestore, storage.
+      import type { NailShape } from '@/lib/types';
+
+      const NAIL_SHAPES = ['almond', 'coffin', 'square', 'round', 'oval'] as const;
+      const MAX_PROMPT_LENGTH = 1000;
+
+      function isNailShape(x: unknown): x is NailShape {
+        return typeof x === 'string'
+          && (NAIL_SHAPES as readonly string[]).includes(x);
+      }
+
+      export interface ReferenceSet {
+        primaryReferenceId: string;
+        secondaryReferenceIds: string[];
+        promptText: string | null;
+        nailShape: NailShape;
+      }
+
+      export type BuildReferenceSetResult =
+        | { ok: true; set: ReferenceSet }
+        | { ok: false;
+            reason:
+              | 'primary_required'
+              | 'invalid_reference_id'
+              | 'duplicate_reference_id'
+              | 'primary_in_secondary'
+              | 'prompt_too_long'
+              | 'invalid_nail_shape';
+            message: string };
+
+      export function buildReferenceSet(input: {
+        primaryReferenceId: string;
+        secondaryReferenceIds: string[];
+        promptText?: string | null;
+        nailShape: string;
+      }): BuildReferenceSetResult {
+        const primary = (input.primaryReferenceId ?? '').trim();
+        if (!primary) {
+          return { ok: false, reason: 'primary_required',
+                   message: 'primary reference is required' };
+        }
+
+        const secondary = input.secondaryReferenceIds ?? [];
+        for (const id of secondary) {
+          if (typeof id !== 'string' || id.trim() === '') {
+            return { ok: false, reason: 'invalid_reference_id',
+                     message: 'secondary reference IDs must be non-empty strings' };
+          }
+        }
+
+        const seen = new Set<string>();
+        for (const id of secondary) {
+          if (seen.has(id)) {
+            return { ok: false, reason: 'duplicate_reference_id',
+                     message: `duplicate secondary reference: ${id}` };
+          }
+          seen.add(id);
+        }
+
+        if (secondary.includes(primary)) {
+          return { ok: false, reason: 'primary_in_secondary',
+                   message: `primary reference ${primary} appears in secondary list` };
+        }
+
+        const normalizedPrompt =
+          input.promptText && input.promptText.trim().length > 0
+            ? input.promptText
+            : null;
+        if (normalizedPrompt !== null && normalizedPrompt.length > MAX_PROMPT_LENGTH) {
+          return { ok: false, reason: 'prompt_too_long',
+                   message: `prompt exceeds ${MAX_PROMPT_LENGTH} chars` };
+        }
+
+        if (!isNailShape(input.nailShape)) {
+          return { ok: false, reason: 'invalid_nail_shape',
+                   message: `nailShape "${input.nailShape}" not in NailShape union` };
+        }
+
+        return {
+          ok: true,
+          set: {
+            primaryReferenceId: primary,
+            secondaryReferenceIds: secondary,
+            promptText: normalizedPrompt,
+            nailShape: input.nailShape,
+          },
+        };
+      }
+      ```
+
+      DO NOT: persist anything. DO NOT: validate that the IDs actually
+      exist as docs in Firestore — that's c10 createDesign's job (and
+      Firestore rules' job indirectly). DO NOT: mutate the input.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify purity + invariant coverage.
+
+      - `lib/references/reference-set.ts` imports ONLY types
+        (`NailShape`). No SDK imports. No `''server-only''`. Reviewer grep.
+      - All 17 tests pass.
+      - Builder does NOT mutate input — tested by passing a frozen object
+        in test (10) variant.
+      - `MAX_PROMPT_LENGTH = 1000` is a named constant, not a magic
+        number.
+      - Empty + whitespace-only primary IDs both rejected (test 6 + 7).
+      - Empty-string secondary IDs rejected (test 14).
+      - NailShape validation is case-sensitive (test 16).
+      - Secondary order preserved verbatim (test 10).
+      - Returns discriminated union — no thrown errors escape the
+        function.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c8-reference-set-builder`.
+      Commit: `feat(c8): pure reference-set builder + invariant tests`.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Pure TypeScript module — no Next.js or Firebase dependencies'
+    runtime: 'Node 20+ for tests; works in any JS runtime since no I/O'
+    testing: 'Vitest unit lane only; no mocks; no MSW; no emulator'
+  key_files:
+    - path: lib/types.ts
+      purpose: 'Consumed (c3) — NailShape union for validation'
+    - path: lib/references/reference-set.ts
+      purpose: 'CREATE; pure builder'
+    - path: lib/references/ingest.ts
+      purpose: 'Sibling (c6/c7); reference-set.ts is independent — no cross-import'
+
+files_to_modify:
+  - file: lib/references/reference-set.ts
+    change: 'CREATE; pure buildReferenceSet function + ReferenceSet type + BuildReferenceSetResult discriminated union'
+  - file: tests/unit/references/reference-set-happy-path.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/references/reference-set-invariants.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/references/reference-set-bounds.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/references/reference-set-purity.test.ts
+    change: 'CREATE in test-spec — grep guard against SDK imports'
+
+design_decisions:
+  - decision: 'Ordered ARRAY for `secondaryReferenceIds` (locked from c3 design_decisions + design-discussion §3 + research-brief Open Q3)'
+    rationale: 'v1 single-user, bounded list, single-doc read/write. Subcollection deferred to a future epic if 100+ refs per design becomes real.'
+  - decision: 'Pure function — no Firestore, Storage, or `server-only` imports'
+    rationale: 'Lets c11 e2e tests build reference sets without spinning up emulators. Lets c10 createDesign call this synchronously inside its server action without awaits. Lets c13 buildGeminiRequest use this output as a stable input shape.'
+  - decision: 'Returns discriminated `{ ok: true; set } | { ok: false; reason; message }` — no thrown errors'
+    rationale: 'Matches the c5/c6/c7 envelope pattern. Call sites (c10 action, c11 UI) prefer pattern-matching over try/catch.'
+  - decision: 'Empty-string and whitespace-only `promptText` normalize to `null`'
+    rationale: 'c3 Design.promptText is `string | null`. UI form inputs often produce empty strings when the user clears them; treating empty as null keeps Firestore docs clean (no ambiguous `""`).'
+  - decision: 'MAX_PROMPT_LENGTH = 1000 chars'
+    rationale: "Conservative cap. Gemini 2.5 Flash Image accepts much longer prompts but UX rarely needs more than 200-300 chars for nail-design intent. Easy to revisit if Don's wife hits the cap."
+  - decision: 'No upper bound on secondary count enforced by builder; UX may restrict in c11'
+    rationale: 'Contract-vs-UX separation: builder enforces invariants that downstream code (c10 storage, c13 request) requires. UI cap is a product decision (5? 10? unlimited?) that lives in c11. Builder being permissive lets the same function serve any UX policy.'
+  - decision: 'Validate against `NailShape` union from lib/types.ts (no `stiletto`)'
+    rationale: 'lib/types.ts is source of truth. If product needs `stiletto`, separate atomic change. c3 surfaced the divergence; this story honors it.'
+  - decision: 'Builder does NOT validate Reference docs exist in Firestore'
+    rationale: "Existence is c10 createDesign's problem (and indirectly c4 firestore.rules — primary/secondary refs the user does not own would be denied at write time on the design doc). Builder is pure; cross-doc validation requires I/O, which would break purity."
+
+cross_cutting:
+  - concern: 'data-model'
+    notes: 'Builder is the canonical place to validate the 6 invariants of an assembled reference set. Adding a new invariant (e.g., "no more than 10 secondaries" if product decides) is a one-line addition + test. Removing or weakening an invariant requires updating callers (c10, c11) in the same change.'
+
+risks:
+  - severity: low
+    description: 'Builder permissive bound on secondary count creates UX confusion if c11 cap diverges from server'
+    mitigation: "c11 enforces UX cap (decided at c11 design); builder remains permissive. If they diverge, c11's cap simply triggers the disabled-Generate UI path with a clear message — server never rejects what UI accepted."
+  - severity: low
+    description: 'NailShape `stiletto` request from product team forces lib/types.ts change → cascades through c3 + c8 + c9 + c10 + c11 + c13 + c17'
+    mitigation: "Atomic single-PR change to lib/types.ts; this story's validation auto-picks up the new union member. Tests that hardcode the 5-member list (test 5) need updating."
+  - severity: low
+    description: 'MAX_PROMPT_LENGTH = 1000 turns out to be too low for some prompts'
+    mitigation: 'Single constant change; test (11) (length=1000) and test (12) (length=1001) update with the new cap.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 3 Changes #8 (line 237): lib/references/reference-set.ts —
+      build one-primary, many-secondary ordered reference sets.
+      Slice 3 Interfaces (line 250): buildReferenceSet(input: {
+        primaryReferenceId: string;
+        secondaryReferenceIds: string[];
+        promptText?: string }):
+        { primaryReferenceId; secondaryReferenceIds; promptText? }
+      Slice 3 Validation: Verify the UI never allows zero or multiple
+      primary references. Verify secondary references preserve explicit
+      user order. Verify the prompt is optional.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > Domain: Epic C introduces the first durable `designs`
+      record that stores one primary reference, ordered secondary
+      references, optional prompt text, and nail shape before or at
+      generation time, satisfying FR-C-2 through FR-C-4.
+      Open Question §4 (locked): Ordered secondary-reference persistence
+      is canonical as an ordered array on the `designs` document.
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §My Proposed Approach: For ordered secondary references: my opinion
+      is an ordered array on the `designs` document, not a subcollection.
+      The list is bounded (UX limits secondary count to a small number),
+      and an array keeps reads to one document.
+  - path: lib/types.ts
+    relevant_excerpt: |
+      export type NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval';
+      Source of truth for valid shapes; builder validates against this.
+
+ui_indicators: 'NO new UI surface — pure module; no wireframes; no ui-design step required'

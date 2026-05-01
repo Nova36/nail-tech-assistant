@@ -1,0 +1,2505 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>c11 — /design/new · Studio New Design workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --background: #faf7f2;
+        --foreground: #3d3530;
+        --card: #f0ebe3;
+        --primary: #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint: #d4a5a8;
+        --accent: #c9a96e;
+        --secondary: #efe8de;
+        --muted: #f0ebe3;
+        --muted-foreground: #8c7e78;
+        --border: #8c7e78;
+        --destructive: #a8443a;
+        --touch-target-min: 44px;
+      }
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+      html,
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        min-height: 100vh;
+      }
+      .font-fraunces {
+        font-family: 'Fraunces', Georgia, serif;
+      }
+      .text-primary {
+        color: var(--primary);
+      }
+      .text-muted-foreground {
+        color: var(--muted-foreground);
+      }
+      .text-destructive {
+        color: var(--destructive);
+      }
+      .bg-card {
+        background-color: var(--card);
+      }
+      .bg-secondary {
+        background-color: var(--secondary);
+      }
+      .bg-primary {
+        background-color: var(--primary);
+      }
+      .bg-muted {
+        background-color: var(--muted);
+      }
+      .border-border {
+        border-color: rgb(140 126 120 / 0.32);
+      }
+
+      /* Frame container */
+      .frame {
+        margin: 28px auto;
+        background: var(--background);
+        background-image: radial-gradient(
+          circle at top,
+          rgb(212 165 168 / 0.18),
+          transparent 35%
+        );
+        border: 1px solid rgb(140 126 120 / 0.22);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61, 53, 48, 0.12);
+        width: 1280px;
+        max-width: calc(100vw - 32px);
+      }
+      .frame-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid rgb(140 126 120 / 0.2);
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .frame-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary-tint);
+      }
+      .frame-bar .dot.b {
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .frame-bar .dot.c {
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      .frame-bar .tag {
+        margin-left: auto;
+        border: 1px solid rgb(140 126 120 / 0.3);
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+      }
+
+      .frame-label {
+        margin: 24px auto 0;
+        max-width: 1280px;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        padding: 0 4px;
+      }
+      .frame-num {
+        font-family: 'Fraunces', serif;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+        color: var(--primary);
+        font-style: italic;
+      }
+      .frame-title {
+        font-family: 'Fraunces', serif;
+        font-size: 28px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+      }
+      .frame-sub {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        letter-spacing: 0.04em;
+      }
+
+      /* Annotation callouts */
+      aside.anno {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(250, 247, 242, 0.7);
+        border: 1px dashed rgb(140 126 120 / 0.42);
+      }
+      aside.anno::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--primary);
+        opacity: 0.55;
+      }
+      aside.anno.pin {
+        position: absolute;
+        top: -11px;
+        left: 14px;
+        background: var(--background);
+        z-index: 3;
+      }
+      aside.anno.pin.r {
+        left: auto;
+        right: 14px;
+      }
+
+      .callout {
+        border: 1px dashed rgb(107 63 94 / 0.4);
+        background: rgb(212 165 168 / 0.12);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 11.5px;
+        line-height: 1.55;
+        color: var(--foreground);
+      }
+      .callout strong {
+        color: var(--primary);
+        font-weight: 500;
+      }
+      .callout-rail {
+        display: grid;
+        gap: 8px;
+        margin: 14px;
+      }
+
+      /* Pin/board placeholder cover */
+      .cover {
+        position: relative;
+        background: linear-gradient(
+          135deg,
+          rgb(107 63 94 / 0.08),
+          rgb(212 165 168 / 0.22) 60%,
+          rgb(201 169 110 / 0.12)
+        );
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            110% 65% at 30% 25%,
+            rgba(255, 255, 255, 0.55),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            45deg,
+            transparent 0 22px,
+            rgba(61, 53, 48, 0.035) 22px 23px
+          );
+        pointer-events: none;
+      }
+      .cover-photo {
+        background: linear-gradient(
+          135deg,
+          rgb(201 169 110 / 0.25),
+          rgb(212 165 168 / 0.18) 70%,
+          rgb(107 63 94 / 0.15)
+        );
+      }
+      .cover-photo::after {
+        background:
+          radial-gradient(
+            120% 80% at 70% 25%,
+            rgba(255, 255, 255, 0.55),
+            transparent 55%
+          ),
+          repeating-linear-gradient(
+            135deg,
+            transparent 0 18px,
+            rgba(61, 53, 48, 0.04) 18px 19px
+          );
+      }
+
+      /* Pin card */
+      .pin {
+        position: relative;
+        border-radius: 18px;
+        background: var(--card);
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 6px 18px rgba(61, 53, 48, 0.06);
+        transition:
+          transform 180ms ease-out,
+          box-shadow 180ms ease-out;
+        min-height: 44px;
+      }
+      .pin:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px rgba(61, 53, 48, 0.12);
+      }
+      .pin .add-overlay {
+        position: absolute;
+        inset: auto 0 0 0;
+        padding: 10px;
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(61, 53, 48, 0.55)
+        );
+        color: var(--primary-foreground);
+        font-size: 12px;
+        opacity: 0;
+        transition: opacity 160ms;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+      }
+      .pin:hover .add-overlay,
+      .pin:focus-visible .add-overlay {
+        opacity: 1;
+      }
+      .pin .badge-on {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        padding: 3px 7px;
+        border-radius: 999px;
+      }
+      .pin .badge-on.sec {
+        background: var(--accent);
+        color: var(--foreground);
+      }
+
+      /* Reference panel slot */
+      .slot {
+        position: relative;
+        display: grid;
+        grid-template-columns: 28px 88px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 10px;
+        border-radius: 14px;
+        background: var(--background);
+        border: 1px solid rgb(140 126 120 / 0.2);
+      }
+      .slot.primary {
+        background: rgb(212 165 168 / 0.14);
+        border-color: rgb(107 63 94 / 0.35);
+      }
+      .slot .grip {
+        width: 24px;
+        height: 36px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        color: var(--muted-foreground);
+        cursor: grab;
+        background: rgba(140, 126, 120, 0.06);
+      }
+      .slot .grip:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+      .slot .thumb {
+        width: 88px;
+        height: 88px;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+      }
+      .slot .meta {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        line-height: 1.4;
+      }
+      .slot .meta .src {
+        color: var(--foreground);
+        font-weight: 500;
+      }
+      .slot .pos {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--foreground);
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+      .slot.primary .pos {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+      .slot .ctrls {
+        display: flex;
+        gap: 4px;
+      }
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--muted-foreground);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .icon-btn:hover {
+        background: rgba(140, 126, 120, 0.08);
+        color: var(--foreground);
+      }
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        min-height: 44px;
+        transition:
+          background 160ms,
+          transform 120ms,
+          box-shadow 180ms;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 6px 16px rgba(107, 63, 94, 0.25);
+      }
+      .btn-primary:hover {
+        background: #58324d;
+      }
+      .btn-primary:active {
+        transform: translateY(1px);
+      }
+      .btn-primary:disabled,
+      .btn-primary[aria-disabled='true'] {
+        background: rgb(140 126 120 / 0.25);
+        color: var(--muted-foreground);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--foreground);
+        border: 1px solid rgb(140 126 120 / 0.32);
+      }
+      .btn-ghost:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 240px;
+        background: var(--background);
+        border-right: 1px solid rgb(140 126 120 / 0.18);
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .sb-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+      }
+      .sb-mark {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-tint)
+        );
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--primary-foreground);
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+      }
+      .sb-name {
+        font-family: 'Fraunces', serif;
+        font-size: 16px;
+        letter-spacing: -0.01em;
+      }
+      .sb-name em {
+        color: var(--primary);
+        font-style: italic;
+      }
+      .sb-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 6px;
+      }
+      .sb-nav a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: var(--foreground);
+        font-size: 14px;
+        text-decoration: none;
+        min-height: 44px;
+      }
+      .sb-nav a .ico {
+        width: 18px;
+        height: 18px;
+        color: var(--muted-foreground);
+      }
+      .sb-nav a:hover {
+        background: rgba(140, 126, 120, 0.08);
+      }
+      .sb-nav a.active {
+        background: rgba(107, 63, 94, 0.12);
+        color: var(--primary);
+      }
+      .sb-nav a.active .ico {
+        color: var(--primary);
+      }
+      .sb-section-label {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 0 12px;
+        margin-top: 8px;
+      }
+
+      /* Layout */
+      .shell {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        min-height: 760px;
+      }
+      .ws {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 20px;
+        padding: 24px;
+      }
+      .ws-main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .ws-side {
+        min-width: 0;
+      }
+
+      .panel {
+        position: relative;
+        background: var(--card);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+      }
+
+      .browse-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .browse-grid.tiny {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      /* Upload tile */
+      .upload-tile {
+        border: 1.5px dashed rgb(107 63 94 / 0.35);
+        border-radius: 18px;
+        background: rgb(212 165 168 / 0.08);
+        min-height: 200px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        color: var(--muted-foreground);
+        padding: 18px;
+        cursor: pointer;
+        transition:
+          background 160ms,
+          border-color 160ms;
+      }
+      .upload-tile:hover {
+        background: rgb(212 165 168 / 0.16);
+        border-color: rgb(107 63 94 / 0.55);
+      }
+      .upload-tile h4 {
+        font-family: 'Fraunces', serif;
+        font-size: 18px;
+        font-weight: 400;
+        color: var(--foreground);
+        letter-spacing: -0.01em;
+        margin-bottom: 4px;
+      }
+
+      /* Prompt textarea */
+      .prompt-wrap {
+        background: var(--card);
+        border-radius: 18px;
+        padding: 14px;
+        border: 1px solid rgb(140 126 120 / 0.22);
+      }
+      textarea.prompt {
+        width: 100%;
+        min-height: 88px;
+        background: transparent;
+        border: 0;
+        outline: 0;
+        resize: vertical;
+        color: var(--foreground);
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      textarea.prompt::placeholder {
+        color: var(--muted-foreground);
+      }
+
+      .ref-empty {
+        padding: 22px 16px;
+        border: 1.5px dashed rgb(140 126 120 / 0.4);
+        border-radius: 14px;
+        text-align: center;
+        color: var(--muted-foreground);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .ref-empty .h {
+        font-family: 'Fraunces', serif;
+        font-size: 17px;
+        color: var(--foreground);
+        font-weight: 400;
+        margin-bottom: 4px;
+      }
+
+      .gen-bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 14px 16px;
+        background: var(--card);
+        border-radius: 16px;
+        border: 1px solid rgb(140 126 120 / 0.18);
+      }
+      .gen-bar .reason {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .gen-bar .reason svg {
+        color: var(--accent);
+      }
+
+      .err-banner {
+        display: flex;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgb(168 68 58 / 0.08);
+        border: 1px solid rgb(168 68 58 / 0.32);
+        color: var(--destructive);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .err-banner .icon {
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .toast {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--foreground);
+        color: var(--background);
+        border-radius: 999px;
+        font-size: 13px;
+        box-shadow: 0 12px 32px rgba(61, 53, 48, 0.25);
+      }
+      .toast .check {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: grid;
+        place-items: center;
+        color: var(--foreground);
+      }
+
+      .kbd {
+        font-family: 'Inter', monospace;
+        font-size: 11px;
+        padding: 2px 6px;
+        border: 1px solid rgb(140 126 120 / 0.4);
+        border-radius: 4px;
+        background: var(--background);
+        color: var(--foreground);
+      }
+
+      .legend-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 8px 24px rgba(61, 53, 48, 0.06);
+      }
+      .legend-card dt {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        color: var(--primary);
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      .legend-card dd {
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: var(--foreground);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ════════════════════════ DOC HEADER + LEGEND ════════════════════════ -->
+    <header class="mx-auto max-w-[1280px] px-4 pt-10 pb-4">
+      <p
+        class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground mb-3"
+      >
+        Wireframe · c11 · /design/new
+      </p>
+      <h1
+        class="font-fraunces text-4xl md:text-5xl font-light tracking-[-0.03em] leading-[1.02]"
+      >
+        Studio New <span class="italic text-primary">Design</span> workspace.
+      </h1>
+      <p class="text-sm leading-6 text-muted-foreground mt-3 max-w-2xl">
+        Five state frames stacked top → bottom. Each uses the authenticated
+        shell (sidebar + main) and the same component primitives:
+        <em>Browse Pinterest</em>, <em>Reference panel</em>,
+        <em>Upload tile</em>, <em>Prompt</em>, <em>Generate bar</em>.
+      </p>
+    </header>
+
+    <section class="mx-auto max-w-[1280px] px-4 mb-10">
+      <div class="legend-card grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-1">
+        <dl>
+          <dt>Tokens</dt>
+          <dd>
+            <code>bg-background</code>, <code>bg-card</code>,
+            <code>text-foreground</code>, <code>text-muted-foreground</code>,
+            <code>bg-primary</code>, <code>bg-secondary</code>,
+            <code>bg-accent</code>, <code>destructive</code>. Heading: Fraunces.
+            Body: Inter.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Frame conventions</dt>
+          <dd>
+            Frames are 1280×variable. Window-bar shows route + frame label.
+            Dashed pin-labels mark named regions / components.
+            <span class="callout inline-block mt-2">Callouts</span> are
+            interaction / a11y / motion notes.
+          </dd>
+        </dl>
+        <dl>
+          <dt>Reference rules</dt>
+          <dd>
+            1 primary required to enable Generate. 0–N secondaries optional
+            (display order = generation weight). Exactly one primary at any
+            time. Empty primary + ≥1 secondary = invalid (frame 4).
+          </dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════ FRAME 1 ════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">01.</span>
+      <h2 class="frame-title">
+        Empty <span class="italic text-primary">workspace.</span>
+      </h2>
+      <span class="frame-sub"
+        >No references picked. Generate disabled with reason.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span><span class="ml-2">/design/new · empty</span
+        ><span class="tag">frame 01 · empty</span>
+      </div>
+
+      <div class="shell">
+        <!-- ─── Sidebar ─── -->
+        <aside class="sidebar relative">
+          <aside class="anno pin">
+            region: AppShell · Sidebar (~240px) · matches dashboard chrome
+          </aside>
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+          <div class="sb-section-label mt-auto">v0.4 · Mother's Day '26</div>
+        </aside>
+
+        <!-- ─── Workspace ─── -->
+        <div class="ws">
+          <!-- Main column -->
+          <div class="ws-main">
+            <div class="flex items-baseline gap-3">
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground"
+              >
+                New design
+              </p>
+              <span class="text-xs text-muted-foreground"
+                >· Untitled draft</span
+              >
+            </div>
+            <h3
+              class="font-fraunces text-3xl font-light tracking-[-0.02em] leading-[1.05] -mt-2"
+            >
+              Pull a few <span class="italic text-primary">references.</span>
+            </h3>
+
+            <!-- Browse Pinterest panel -->
+            <section class="panel" aria-labelledby="f1-browse-h">
+              <aside class="anno pin">
+                component: BrowsePinterestPanel · embedded · scrollable
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 id="f1-browse-h" class="font-fraunces text-xl font-light">
+                  Browse Pinterest
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >Board · Soft Mauve · 47 pins</span
+                >
+              </div>
+              <div class="browse-grid tiny">
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <div class="add-overlay">
+                    + Set as primary · Add as secondary
+                  </div>
+                </article>
+              </div>
+              <div class="callout mt-4">
+                <strong>Click mechanic.</strong> Pin click =
+                <em>add as secondary</em> (least destructive). The hover overlay
+                also exposes a "Set as primary" affordance. Choosing primary
+                while one already exists swaps with confirmation.
+                <strong>SR:</strong> announce "Added pin 3 as secondary,
+                position 2" via aria-live=polite.
+              </div>
+            </section>
+
+            <!-- Upload tile -->
+            <section class="panel">
+              <aside class="anno pin">
+                component: UploadTile · drag-drop + file-picker (parity)
+              </aside>
+              <div
+                class="upload-tile"
+                role="button"
+                tabindex="0"
+                aria-label="Upload reference photo. Drag and drop or click to choose a file."
+              >
+                <div>
+                  <h4>Drop a reference photo</h4>
+                  <div class="text-sm">
+                    or
+                    <span class="text-primary underline underline-offset-4"
+                      >click to choose</span
+                    >
+                    a file (JPG, PNG · up to 12 MB)
+                  </div>
+                </div>
+              </div>
+              <div class="callout mt-3">
+                <strong>A11y parity.</strong> Drag-drop AND keyboard activation
+                (<span class="kbd">Enter</span> /
+                <span class="kbd">Space</span>) both open the file picker. Drop
+                area has <code>role=button</code> + clear focus ring.
+              </div>
+            </section>
+          </div>
+
+          <!-- Side column: Reference panel + prompt + generate -->
+          <aside
+            class="ws-side flex flex-col gap-4"
+            aria-label="Reference set and prompt"
+          >
+            <section class="panel" aria-labelledby="f1-ref-h" role="region">
+              <aside class="anno pin r">
+                component: ReferencePanel · sticky · role=region
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 id="f1-ref-h" class="font-fraunces text-xl font-light">
+                  Reference set
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >0 / ∞</span
+                >
+              </div>
+
+              <div class="ref-empty">
+                <div class="h">No references yet.</div>
+                Pick one pin or upload a photo to set as your <em>primary</em>.
+                Add more for nuance.
+              </div>
+
+              <div class="callout mt-4">
+                <strong>Reference rules.</strong> 1 primary required · 0–N
+                secondaries optional · order = weight.
+              </div>
+            </section>
+
+            <section class="prompt-wrap">
+              <aside
+                class="anno pin r"
+                style="position: relative; left: 0; top: 0; margin-bottom: 8px"
+              >
+                component: PromptInput · optional
+              </aside>
+              <label for="f1-prompt" class="sr-only">Prompt</label>
+              <textarea
+                id="f1-prompt"
+                class="prompt"
+                placeholder="Optional. A short brief in plain words — e.g. 'soft mauve French with a single chrome accent'."
+              ></textarea>
+              <p class="text-[11px] text-muted-foreground mt-1">
+                Optional. If provided, the prompt overrides reference cues on
+                conflict.
+              </p>
+            </section>
+
+            <div class="gen-bar">
+              <button class="btn btn-primary" disabled aria-disabled="true">
+                Generate
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </button>
+              <span class="reason" aria-live="polite">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M8 5v3.5M8 11v.01" />
+                </svg>
+                Select at least one primary reference.
+              </span>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- Annotation rail -->
+      <div
+        class="callout-rail border-t border-border"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding-top: 14px;
+        "
+      >
+        <div class="callout">
+          <strong>Motion · empty.</strong> Page paint is instant. Only the
+          upload-tile hover-tint and pin hover-lift animate.
+          <em>prefers-reduced-motion</em> → no transitions.
+        </div>
+        <div class="callout">
+          <strong>A11y · focus order.</strong> Tab flow: Sidebar → page H1 →
+          Browse grid (each pin focusable) → Upload tile → Reference panel
+          heading → Prompt textarea → Generate. Skip-link at top of doc.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════ FRAME 2 ════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">02.</span>
+      <h2 class="frame-title">
+        Primary <span class="italic text-primary">picked.</span>
+      </h2>
+      <span class="frame-sub"
+        >One pin set as primary, no secondaries. Generate enabled.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · primary only</span
+        ><span class="tag">frame 02</span>
+      </div>
+
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="ws">
+          <div class="ws-main">
+            <div class="flex items-baseline gap-3">
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground"
+              >
+                New design
+              </p>
+              <span class="text-xs text-muted-foreground"
+                >· Untitled draft · saved 2s ago</span
+              >
+            </div>
+            <h3
+              class="font-fraunces text-3xl font-light tracking-[-0.02em] leading-[1.05] -mt-2"
+            >
+              Add nuance with
+              <span class="italic text-primary">secondaries.</span>
+            </h3>
+
+            <section class="panel">
+              <aside class="anno pin">
+                component: BrowsePinterestPanel · pin #2 marked PRIMARY
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 class="font-fraunces text-xl font-light">
+                  Browse Pinterest
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >Board · Soft Mauve · 47 pins</span
+                >
+              </div>
+              <div class="browse-grid tiny">
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="badge-on">★ Primary</span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+              </div>
+              <div class="callout mt-4">
+                <strong>Toast on add.</strong> 200ms slide+fade in panel + a
+                brief inline toast: "Set pin 2 as primary." Toast auto-dismisses
+                3s. <strong>Aria-live</strong>: "Reference set updated. Primary:
+                pin 2 of board Soft Mauve."
+              </div>
+            </section>
+          </div>
+
+          <aside class="ws-side flex flex-col gap-4">
+            <section class="panel" aria-labelledby="f2-ref-h" role="region">
+              <aside class="anno pin r">
+                ReferencePanel · primary slot filled
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 id="f2-ref-h" class="font-fraunces text-xl font-light">
+                  Reference set
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >1 / ∞</span
+                >
+              </div>
+
+              <ul role="list" class="flex flex-col gap-3">
+                <li
+                  class="slot primary"
+                  aria-label="Primary reference, position 1"
+                >
+                  <span class="grip" tabindex="-1" aria-hidden="true">
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </span>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Pinterest pin · Soft Mauve · #2</span>
+                    </div>
+                    <div
+                      class="text-[11px] tracking-[0.18em] uppercase text-primary mt-1 inline-flex items-center gap-1.5"
+                    >
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                      >
+                        <path
+                          d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                        />
+                      </svg>
+                      Primary
+                    </div>
+                  </div>
+                  <div class="ctrls">
+                    <button class="icon-btn" aria-label="Demote to secondary">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 8h8M8 4v8" />
+                      </svg>
+                    </button>
+                    <button class="icon-btn" aria-label="Remove primary">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+                <li class="ref-empty" style="padding: 14px">
+                  <div class="text-xs">
+                    + Add secondary references
+                    <span class="text-muted-foreground">(optional)</span>
+                  </div>
+                </li>
+              </ul>
+
+              <div class="callout mt-4">
+                <strong>Add-secondary affordance.</strong> The dashed slot below
+                the primary is a real drop-target AND a clickable button — opens
+                an inline picker drawer focused on the same Pinterest grid.
+              </div>
+            </section>
+
+            <section class="prompt-wrap">
+              <textarea
+                class="prompt"
+                placeholder="Optional. A short brief — e.g. 'soft mauve French with a single chrome accent'."
+              ></textarea>
+              <p class="text-[11px] text-muted-foreground mt-1">
+                Optional. If provided, the prompt overrides reference cues on
+                conflict.
+              </p>
+            </section>
+
+            <div class="gen-bar">
+              <button class="btn btn-primary" type="button">
+                Generate
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </button>
+              <span class="reason">Ready · 1 primary, 0 secondaries</span>
+            </div>
+
+            <!-- Toast preview -->
+            <div class="flex justify-end">
+              <div class="toast" role="status" aria-live="polite">
+                <span class="check"
+                  ><svg
+                    width="9"
+                    height="9"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M2 6.5l2.5 2.5L10 3.5" /></svg
+                ></span>
+                Set pin 2 as primary
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding-top: 14px;
+        "
+      >
+        <div class="callout">
+          <strong>Motion · add.</strong> Slot slides + fades in 200ms. Browse
+          pin badge fades in 150ms with a subtle scale 0.96 → 1.
+        </div>
+        <div class="callout">
+          <strong>Generate states.</strong> idle = primary tone · pressed =
+          saving + redirect to <code>/design/[id]</code> (the Generate-pending
+          state lives in c17 and is out of scope here).
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════ FRAME 3 ════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">03.</span>
+      <h2 class="frame-title">
+        Primary + 3 <span class="italic text-primary">secondaries.</span>
+      </h2>
+      <span class="frame-sub"
+        >Mixed sources · explicit ordering · prompt half-typed.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · 1 primary + 3 secondaries</span
+        ><span class="tag">frame 03</span>
+      </div>
+
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="ws">
+          <div class="ws-main">
+            <div class="flex items-baseline gap-3">
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground"
+              >
+                New design
+              </p>
+              <span class="text-xs text-muted-foreground"
+                >· Untitled draft · saved 12s ago</span
+              >
+            </div>
+            <h3
+              class="font-fraunces text-3xl font-light tracking-[-0.02em] leading-[1.05] -mt-2"
+            >
+              Almost <span class="italic text-primary">there.</span>
+            </h3>
+
+            <section class="panel">
+              <aside class="anno pin">
+                BrowsePinterestPanel · 4 pins marked (1 primary + 3 secondary)
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 class="font-fraunces text-xl font-light">
+                  Browse Pinterest
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >Board · Soft Mauve · 47 pins</span
+                >
+              </div>
+              <div class="browse-grid tiny">
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="badge-on sec">2 · Secondary</span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="badge-on">★ Primary</span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="badge-on sec">3 · Secondary</span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+              </div>
+            </section>
+          </div>
+
+          <aside class="ws-side flex flex-col gap-4">
+            <section class="panel" aria-labelledby="f3-ref-h" role="region">
+              <aside class="anno pin r">
+                ReferencePanel · 4 slots · ordered
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 id="f3-ref-h" class="font-fraunces text-xl font-light">
+                  Reference set
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >1 + 3</span
+                >
+              </div>
+
+              <ul
+                role="list"
+                class="flex flex-col gap-2.5"
+                aria-describedby="f3-ref-help"
+              >
+                <li class="slot primary">
+                  <span
+                    class="grip"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    title="Primary cannot be reordered"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                      />
+                    </svg>
+                  </span>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Pinterest · Soft Mauve · #2</span>
+                    </div>
+                    <div
+                      class="text-[11px] tracking-[0.18em] uppercase text-primary mt-1"
+                    >
+                      Primary
+                    </div>
+                  </div>
+                  <div class="ctrls">
+                    <button class="icon-btn" aria-label="Replace primary">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path
+                          d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3M12 3v3h-3M4 13v-3h3"
+                        />
+                      </svg>
+                    </button>
+                    <button class="icon-btn" aria-label="Remove primary">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+
+                <li class="slot" aria-label="Secondary 1">
+                  <button
+                    class="grip"
+                    aria-label="Reorder, Pinterest pin Soft Mauve, position 1 of 3 secondaries. Use up and down arrows to move."
+                    aria-keyshortcuts="ArrowUp ArrowDown"
+                  >
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Pinterest · Soft Mauve · #1</span>
+                    </div>
+                    <div class="text-[11px] text-muted-foreground mt-1">
+                      added 1m ago
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="pos" aria-hidden="true">1</span>
+                    <button class="icon-btn" aria-label="Remove secondary 1">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+
+                <li class="slot" aria-label="Secondary 2">
+                  <button
+                    class="grip"
+                    aria-label="Reorder, uploaded photo, position 2 of 3 secondaries."
+                    aria-keyshortcuts="ArrowUp ArrowDown"
+                  >
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  <div class="thumb">
+                    <div
+                      class="cover cover-photo"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Upload · client_amara_001.jpg</span>
+                    </div>
+                    <div class="text-[11px] text-muted-foreground mt-1">
+                      added 32s ago · 2.4 MB
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="pos">2</span>
+                    <button class="icon-btn" aria-label="Remove secondary 2">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+
+                <li class="slot" aria-label="Secondary 3">
+                  <button
+                    class="grip"
+                    aria-label="Reorder, Pinterest pin Soft Mauve, position 3 of 3 secondaries."
+                    aria-keyshortcuts="ArrowUp ArrowDown"
+                  >
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Pinterest · Soft Mauve · #4</span>
+                    </div>
+                    <div class="text-[11px] text-muted-foreground mt-1">
+                      added 18s ago
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="pos">3</span>
+                    <button class="icon-btn" aria-label="Remove secondary 3">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              </ul>
+
+              <p
+                id="f3-ref-help"
+                class="text-[11px] text-muted-foreground mt-3"
+              >
+                Order = generation weight. Drag the grip — or focus it and use
+                ↑/↓ to reorder.
+              </p>
+            </section>
+
+            <!-- Frame 5 (optional): keyboard hint floating from focused grip -->
+            <div class="callout">
+              <strong>Frame 5 · grip focus.</strong> When a grip receives focus,
+              an inline tooltip appears beside it: "<span class="kbd">↑</span>
+              <span class="kbd">↓</span> to reorder ·
+              <span class="kbd">Esc</span> to cancel ·
+              <span class="kbd">Enter</span> to confirm". Live region announces
+              "Moved upload secondary from position 2 to position 1" after each
+              press.
+            </div>
+
+            <section class="prompt-wrap">
+              <aside
+                class="anno pin r"
+                style="position: relative; left: 0; top: 0; margin-bottom: 8px"
+              >
+                PromptInput · 6 words typed
+              </aside>
+              <textarea class="prompt">
+soft mauve french, single chrome</textarea
+              >
+              <p class="text-[11px] text-muted-foreground mt-1">
+                Optional. If provided, the prompt overrides reference cues on
+                conflict.
+              </p>
+            </section>
+
+            <div class="gen-bar">
+              <button class="btn btn-primary" type="button">
+                Generate
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </button>
+              <span class="reason"
+                >Ready · 1 primary, 3 secondaries · text overrides on
+                conflict</span
+              >
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding-top: 14px;
+        "
+      >
+        <div class="callout">
+          <strong>Focus determinism.</strong> After remove → focus moves to the
+          next slot's grip (or the previous one if last). After add → focus
+          stays on the picker, never the panel. After reorder → focus stays on
+          the grip whose item just moved.
+        </div>
+        <div class="callout">
+          <strong>Motion · reorder.</strong> Live tracking during drag, 150ms
+          ease on drop. Position pills (1/2/3) crossfade their numbers 100ms.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════ FRAME 4 ════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">04.</span>
+      <h2 class="frame-title">
+        Invalid <span class="italic text-primary">state.</span>
+      </h2>
+      <span class="frame-sub"
+        >No primary + 2 secondaries. Inline error · Generate disabled with
+        reason. <strong>Not</strong> a modal.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · invalid · missing primary</span
+        ><span class="tag">frame 04 · invalid</span>
+      </div>
+
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="ws">
+          <div class="ws-main">
+            <div class="flex items-baseline gap-3">
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground"
+              >
+                New design
+              </p>
+              <span class="text-xs text-muted-foreground"
+                >· Untitled draft</span
+              >
+            </div>
+            <h3
+              class="font-fraunces text-3xl font-light tracking-[-0.02em] leading-[1.05] -mt-2"
+            >
+              Set one as <span class="italic text-primary">primary.</span>
+            </h3>
+
+            <section class="panel">
+              <aside class="anno pin">
+                BrowsePinterestPanel · two pins marked secondary, no primary
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 class="font-fraunces text-xl font-light">
+                  Browse Pinterest
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-muted-foreground"
+                  >Board · Soft Mauve · 47 pins</span
+                >
+              </div>
+              <div class="browse-grid tiny">
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="badge-on sec">1 · Secondary</span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                  <span class="badge-on sec">2 · Secondary</span>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+                <article class="pin">
+                  <div class="cover aspect-[4/5]"></div>
+                </article>
+              </div>
+              <div class="callout mt-4">
+                <strong>How it happened.</strong> User removed the primary while
+                two secondaries were already in the set. Removing a primary
+                doesn't auto-promote — it surfaces this state instead.
+              </div>
+            </section>
+          </div>
+
+          <aside class="ws-side flex flex-col gap-4">
+            <section class="panel" aria-labelledby="f4-ref-h" role="region">
+              <aside class="anno pin r">
+                ReferencePanel · invalid (no primary)
+              </aside>
+              <div class="flex items-baseline justify-between mb-3">
+                <h4 id="f4-ref-h" class="font-fraunces text-xl font-light">
+                  Reference set
+                </h4>
+                <span
+                  class="text-[11px] tracking-[0.18em] uppercase text-destructive"
+                  >0 + 2 · invalid</span
+                >
+              </div>
+
+              <div class="err-banner mb-3" role="alert">
+                <svg
+                  class="icon"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <circle cx="8" cy="8" r="6.5" />
+                  <path d="M8 5v3.5M8 11v.01" />
+                </svg>
+                <div>
+                  <strong style="color: var(--destructive); font-weight: 500"
+                    >Pick exactly one primary.</strong
+                  >
+                  You have 2 secondaries but no primary reference. Promote one
+                  of them, or add a new primary from the browse panel.
+                </div>
+              </div>
+
+              <ul role="list" class="flex flex-col gap-2.5">
+                <!-- Empty primary slot -->
+                <li
+                  class="slot"
+                  style="
+                    border-style: dashed;
+                    border-color: rgb(168 68 58 / 0.45);
+                    background: rgb(168 68 58 / 0.05);
+                  "
+                >
+                  <span
+                    class="grip"
+                    aria-hidden="true"
+                    style="background: transparent"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                    >
+                      <path
+                        d="M8 1l2.2 4.5 5 .7-3.6 3.5.85 5L8 12l-4.45 2.7.85-5L.8 6.2l5-.7z"
+                      />
+                    </svg>
+                  </span>
+                  <div
+                    class="thumb"
+                    style="
+                      background: rgba(168, 68, 58, 0.06);
+                      display: grid;
+                      place-items: center;
+                      color: var(--destructive);
+                    "
+                  >
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                    >
+                      <path d="M12 4v16M4 12h16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="meta" style="color: var(--destructive)">
+                      Primary required
+                    </div>
+                    <div
+                      class="text-[11px] mt-1"
+                      style="color: var(--destructive)"
+                    >
+                      Promote a secondary or pick from Browse.
+                    </div>
+                  </div>
+                  <div class="ctrls">
+                    <button
+                      class="btn btn-ghost"
+                      style="
+                        padding: 6px 10px;
+                        min-height: 32px;
+                        font-size: 12px;
+                      "
+                    >
+                      Promote ↓1
+                    </button>
+                  </div>
+                </li>
+
+                <li class="slot">
+                  <button
+                    class="grip"
+                    aria-label="Reorder secondary 1 (Pinterest pin)"
+                  >
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Pinterest · Soft Mauve · #1</span>
+                    </div>
+                    <button
+                      class="text-[11px] text-primary mt-1 underline underline-offset-4"
+                    >
+                      Make primary
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="pos">1</span>
+                    <button class="icon-btn" aria-label="Remove">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+
+                <li class="slot">
+                  <button
+                    class="grip"
+                    aria-label="Reorder secondary 2 (Pinterest pin)"
+                  >
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  <div class="thumb">
+                    <div
+                      class="cover"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Pinterest · Soft Mauve · #3</span>
+                    </div>
+                    <button
+                      class="text-[11px] text-primary mt-1 underline underline-offset-4"
+                    >
+                      Make primary
+                    </button>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="pos">2</span>
+                    <button class="icon-btn" aria-label="Remove">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              </ul>
+
+              <div class="callout mt-4">
+                <strong>Inline · not modal.</strong> No destructive
+                interruption. The error is announced via <code>role=alert</code>
+                (assertive once), then sits in-flow until resolved. Each
+                secondary surfaces a one-tap "Make primary" recovery.
+              </div>
+            </section>
+
+            <section class="prompt-wrap">
+              <textarea class="prompt"></textarea>
+              <p class="text-[11px] text-muted-foreground mt-1">
+                Optional. If provided, the prompt overrides reference cues on
+                conflict.
+              </p>
+            </section>
+
+            <div class="gen-bar">
+              <button class="btn btn-primary" disabled aria-disabled="true">
+                Generate
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </button>
+              <span
+                class="reason"
+                aria-live="polite"
+                style="color: var(--destructive)"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M8 5v3.5M8 11v.01" />
+                </svg>
+                Pick exactly one primary.
+              </span>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div
+        class="callout-rail"
+        style="
+          border-top: 1px dashed rgb(140 126 120 / 0.32);
+          padding-top: 14px;
+        "
+      >
+        <div class="callout">
+          <strong>Sister case · 2 primaries.</strong> If a user attempts a
+          second primary while one exists, the system shows a confirm-swap
+          inline near the badge ("Replace current primary with this pin?
+          <span class="text-primary">Replace</span> ·
+          <span class="text-muted-foreground">Cancel</span>") rather than
+          silently overwriting. Generate-disabled reason in that case: "Pick
+          exactly one primary."
+        </div>
+        <div class="callout">
+          <strong>A11y · error visibility.</strong> Reason text is also surfaced
+          on the disabled Generate button via <code>aria-describedby</code>, so
+          screen reader users hear it when focusing the button.
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════ FRAME 5 ════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">05.</span>
+      <h2 class="frame-title">
+        Reorder <span class="italic text-primary">grip — focus.</span>
+      </h2>
+      <span class="frame-sub"
+        >Keyboard hint surfaces when a grip is focused. Inline · not a global
+        tooltip.</span
+      >
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span
+        ><span class="dot c"></span
+        ><span class="ml-2">/design/new · grip:focus-visible</span
+        ><span class="tag">frame 05 · a11y</span>
+      </div>
+
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail Tech <em>Assistant.</em></div>
+          </div>
+          <nav class="sb-nav" aria-label="Primary">
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M3 10l7-6 7 6v8a1 1 0 0 1-1 1h-4v-6h-4v6H4a1 1 0 0 1-1-1z"
+                />
+              </svg>
+              Dashboard</a
+            >
+            <a href="#" class="active" aria-current="page"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M10 3v14M3 10h14" />
+              </svg>
+              New Design</a
+            >
+            <a href="#"
+              ><svg
+                class="ico"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <rect x="3" y="4" width="14" height="13" rx="2" />
+                <path d="M7 4v13M13 4v13" />
+              </svg>
+              Library</a
+            >
+          </nav>
+        </aside>
+
+        <div class="ws">
+          <div class="ws-main">
+            <div class="flex items-baseline gap-3">
+              <p
+                class="text-[11px] tracking-[0.28em] uppercase text-muted-foreground"
+              >
+                New design
+              </p>
+            </div>
+            <h3
+              class="font-fraunces text-3xl font-light tracking-[-0.02em] leading-[1.05] -mt-2"
+            >
+              Keyboard <span class="italic text-primary">reorder.</span>
+            </h3>
+
+            <section class="panel">
+              <aside class="anno pin">
+                Detail · ReferenceSlot · grip:focus-visible
+              </aside>
+              <p class="text-sm text-muted-foreground max-w-prose mb-4">
+                When a reorder grip receives keyboard focus (e.g. via
+                <span class="kbd">Tab</span>), an inline keyboard-hint chip
+                surfaces immediately to the right. Pressing
+                <span class="kbd">↑</span>/<span class="kbd">↓</span> moves the
+                secondary up/down within the secondaries list (primary cannot be
+                reordered). Each move fires an aria-live announcement.
+              </p>
+
+              <ul role="list" class="flex flex-col gap-3 max-w-xl">
+                <li class="slot">
+                  <button
+                    class="grip"
+                    style="
+                      outline: 2px solid var(--primary);
+                      outline-offset: 2px;
+                    "
+                    aria-label="Reorder secondary 2 (uploaded photo), position 2 of 3"
+                  >
+                    <svg
+                      width="10"
+                      height="14"
+                      viewBox="0 0 10 14"
+                      fill="currentColor"
+                    >
+                      <circle cx="2" cy="2" r="1" />
+                      <circle cx="2" cy="7" r="1" />
+                      <circle cx="2" cy="12" r="1" />
+                      <circle cx="8" cy="2" r="1" />
+                      <circle cx="8" cy="7" r="1" />
+                      <circle cx="8" cy="12" r="1" />
+                    </svg>
+                  </button>
+                  <div class="thumb">
+                    <div
+                      class="cover cover-photo"
+                      style="position: absolute; inset: 0"
+                    ></div>
+                  </div>
+                  <div>
+                    <div class="meta">
+                      <span class="src">Upload · client_amara_001.jpg</span>
+                    </div>
+                    <div class="text-[11px] text-muted-foreground mt-1">
+                      2.4 MB
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="pos">2</span>
+                    <button class="icon-btn" aria-label="Remove">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      >
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                  <!-- Floating keyboard hint -->
+                  <div
+                    style="
+                      position: absolute;
+                      left: 48px;
+                      bottom: -30px;
+                      display: inline-flex;
+                      align-items: center;
+                      gap: 6px;
+                      background: var(--foreground);
+                      color: var(--background);
+                      padding: 6px 10px;
+                      border-radius: 8px;
+                      font-size: 11.5px;
+                      box-shadow: 0 8px 18px rgba(61, 53, 48, 0.25);
+                      white-space: nowrap;
+                    "
+                  >
+                    <span
+                      class="kbd"
+                      style="
+                        background: rgba(255, 255, 255, 0.12);
+                        color: var(--background);
+                        border-color: transparent;
+                      "
+                      >↑</span
+                    >
+                    <span
+                      class="kbd"
+                      style="
+                        background: rgba(255, 255, 255, 0.12);
+                        color: var(--background);
+                        border-color: transparent;
+                      "
+                      >↓</span
+                    >
+                    to reorder
+                    <span style="opacity: 0.55">·</span>
+                    <span
+                      class="kbd"
+                      style="
+                        background: rgba(255, 255, 255, 0.12);
+                        color: var(--background);
+                        border-color: transparent;
+                      "
+                      >Esc</span
+                    >
+                    cancel
+                  </div>
+                </li>
+              </ul>
+
+              <div class="callout mt-12 max-w-xl">
+                <strong>WCAG 2.1.1.</strong> Reorder is fully keyboard-operable
+                without dragging. After each ↑/↓: "Moved upload secondary from
+                position 2 to position 1" via <code>aria-live=polite</code>.
+                <strong>Reduced motion:</strong> reorder is instant; no slide
+                animation.
+              </div>
+            </section>
+          </div>
+
+          <aside class="ws-side flex flex-col gap-4">
+            <section class="panel">
+              <aside class="anno pin r">Spec · interactions catalogue</aside>
+              <h4 class="font-fraunces text-xl font-light mb-3">
+                Interactions
+              </h4>
+              <ul class="text-[12.5px] leading-[1.7] space-y-2">
+                <li>
+                  <strong class="text-primary">Pin click</strong> → adds as
+                  secondary · 200ms slide-in · toast 3s · aria-live polite.
+                </li>
+                <li>
+                  <strong class="text-primary">Hover overlay</strong> → "Set as
+                  primary" affordance · 160ms fade.
+                </li>
+                <li>
+                  <strong class="text-primary">Upload</strong> → drag-drop OR
+                  keyboard-activate the tile.
+                </li>
+                <li>
+                  <strong class="text-primary">Reorder</strong> → drag (mouse)
+                  OR ↑/↓ (keyboard) · live during drag · 150ms ease drop.
+                </li>
+                <li>
+                  <strong class="text-primary">Remove</strong> → 150ms fade-out
+                  · neighbors reflow 200ms · focus moves to next slot.
+                </li>
+                <li>
+                  <strong class="text-primary">Generate disabled</strong> →
+                  reasons: "Select at least one primary reference." · "Pick
+                  exactly one primary."
+                </li>
+                <li>
+                  <strong class="text-primary">Generate pressed</strong> →
+                  saving state · redirects to <code>/design/[id]</code> (out of
+                  scope here · see c17).
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <footer
+      class="mx-auto max-w-[1280px] px-4 py-10 text-[11px] tracking-[0.22em] uppercase text-muted-foreground"
+    >
+      c11 · Components: AppShell · BrowsePinterestPanel · UploadTile ·
+      ReferencePanel · ReferenceSlot · PromptInput · GenerateBar · Frames: empty
+      · primary-only · primary+3 · invalid · grip-focus
+    </footer>
+  </body>
+</html>

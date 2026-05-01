@@ -1,0 +1,488 @@
+id: c16-generate-design-surface
+epic: epic-c-reference-and-generation
+title: 'generateDesign mutation surface — orchestrates persistGenerationStart → c14.generate → persistGenerationResult; surface choice (action vs route) locked by c1 spike P95'
+status: shipped
+complexity: medium
+methodology: tdd
+depends_on: [c15-generation-lifecycle-state-machine, c14-gemini-request-retry]
+
+escalations_addressed:
+  - trigger: api:surface-boundary
+    severity: moderate
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Surface choice (server action vs route handler) READ from c1 spike
+      artifact at research step. P95 < 30s → server action; P95 ≥ 30s →
+      route handler at app/api/designs/generate/route.ts with streaming.
+      Decision documented in design_decisions; same loginAction-style
+      discriminated envelope returned regardless of transport.
+  - trigger: persistence:consistency
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Orchestrates the c15 two-write lifecycle precisely: start →
+      provider → result. If start fails, provider not called. If
+      provider returns failure, persistGenerationResult writes the
+      failure row. If provider success, persistGenerationResult does
+      Storage + transactional Firestore update. c16 does NOT bypass
+      c15 — every state transition flows through lifecycle module.
+  - trigger: data-model:contract-stability
+    severity: major
+    placement: pre-exec
+    raised_by: tpm
+    addressed_by: |
+      Returns the c17-consumed envelope shape (locked here):
+      `{ status: "success"; generationId; imageUrl } |
+       { status: "failure"; errorCode: 'refusal'|'rate_limit'|'network'|'low_quality'|'storage_fail'|'unknown'; cta: 'adjust_inputs'; message }`.
+      c17 UI maps each errorCode to a copy variant. errorCode taxonomy
+      EXTENDS c3 GenerationErrorCode union by adding `low_quality` +
+      `storage_fail` for UI purposes — c16 is the surface that
+      reconciles the lifecycle (c3 union) and the UI (c17 5-state) views.
+
+description: |
+  Slice 4 mutation surface. The single function the UI calls to trigger
+  generation. Composes everything below:
+
+  1. **`generateDesign({ designId }): Promise<GenerateDesignResult>`** —
+     reads session uid; reads the Design doc to fetch the assembled
+     ReferenceSet (primary + secondaries + prompt + shape); reads each
+     Reference doc; calls `persistGenerationStart` (c15); calls
+     c14's `generate` (which builds the request via c5 storage reads
+     and runs the retry policy); calls `persistGenerationResult` (c15);
+     translates the lifecycle result into the c17 envelope.
+
+  2. **Surface choice** — server action OR route handler. LOCKED by c1
+     spike output. If P95 < 30s → server action (simpler, idiomatic);
+     if P95 ≥ 30s → route handler at `app/api/designs/generate/route.ts`
+     with streaming progress (Vercel function timeout requires it).
+     Story-time decision based on the artifact at
+     `.pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md`.
+     Both transports return the same envelope.
+
+  3. **Image URL resolution** — on success, `imageUrl` field in the
+     envelope is a Firebase Storage download URL (or signed URL,
+     depending on c5 surface) that c17 `<GenerationPreview>` `<Image>`
+     can render. c18 will add the Firebase Storage host to
+     `next.config.ts` `images.remotePatterns` to enable optimization.
+
+  Returns the discriminated envelope. UI in c17 pattern-matches on
+  `result.status === "success"` vs `"failure"` and on `errorCode`.
+
+  Out of scope: UI components (c17 owns). next.config.ts host allowance
+  (c18 owns). Library queries (Epic D).
+
+acceptance_criteria:
+  # US-C-4 (generate a nail-design image) — c16 is the mutation surface the UI calls; orchestrates c15 + c14
+  - 'Given an authenticated session for `alice` and an existing design `d1` owned by alice with valid references, when `generateDesign({ designId: "d1" })` is called and provider returns success, then it returns `{ status: "success"; generationId; imageUrl: <storage URL or signed URL> }`.'
+  - 'Given no session, when `generateDesign(...)` is called, then it returns `{ status: "failure"; errorCode: "unauthorized"; cta: "adjust_inputs" (or omitted for unauthorized); message }` (or rejects with 401 if route-handler form). Provider NOT called; no rows written.'
+  - 'Given the design does not exist, when persistGenerationStart fails with `design_not_found`, then `generateDesign` returns `{ status: "failure"; errorCode: "design_not_found"; cta: "adjust_inputs"; message }` and provider NOT called.'
+  - 'Given persistGenerationStart succeeds and c14 returns `{ ok: false; reason: "refusal" }`, when persistGenerationResult writes the failure row, then `generateDesign` returns `{ status: "failure"; errorCode: "refusal"; cta: "adjust_inputs"; message }`. The generation row exists with `status: "failure"; errorCode: "refusal"`.'
+  - 'Given c14 returns success and persistGenerationResult succeeds, when generateDesign returns, then `imageUrl` resolves the bytes at `users/{uid}/generations/{generationId}.png` (Storage download URL OR signed URL — c5 surface decides; c16 just propagates the URL string).'
+  - 'Given c15 persistGenerationResult returns `{ ok: false; reason: "storage_fail" }`, when generateDesign returns, then envelope is `{ status: "failure"; errorCode: "storage_fail"; cta: "adjust_inputs"; message }` with the c17-friendly errorCode.'
+  - 'Given c14 returns `{ ok: false; reason: "missing_reference_bytes" }`, when generateDesign returns, then errorCode maps to `unknown` (or a more specific code if added; locked here as `unknown` to match c3 GenerationErrorCode constraint at the lifecycle layer).'
+  - 'Given the c1 spike artifact lock = server action AND `generateDesign` is the action exported from `app/(authenticated)/design/actions.ts`, when grepped, then the file is the SAME module as c9/c10 (single design-flow actions file).'
+  - 'Given the c1 spike artifact lock = route handler AND `app/api/designs/generate/route.ts` exists, when POST is hit with `{ designId }` body, then it returns the envelope as JSON. `runtime: "nodejs"`.'
+  - 'Given grep across `generateDesign` (action or route), when checked, then it imports ONLY `lib/firebase/session`, `lib/designs/lifecycle`, `lib/ai/generate`, and supporting types. NO direct firebase-admin imports; NO direct provider SDK imports.'
+  - "Given a complete generation flow that succeeds, when telemetry is checked, then `metadata.retryCount` and `metadata.durationMs` are persisted on the generation row's `providerResponseMetadata` (via c15)."
+
+steps:
+  - id: research
+    description: |
+      Max 2 focused questions:
+      (1) READ c1 spike artifact `.pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md`.
+      Confirm: P95 latency < 30s OR ≥ 30s → drives action vs route choice.
+      Lock the surface for this story.
+      (2) Image URL strategy — should c17 `<GenerationPreview>` use:
+      (a) Firebase Storage public download URL (requires storage rules
+      to allow public read OR the user is authenticated and uses Firebase
+      web SDK), OR
+      (b) Server-generated signed URL (15-minute expiry typical), OR
+      (c) Server-proxied byte stream from a route?
+      Recommendation: (a) — c4 storage.rules allow read for the owner;
+      Firebase Web SDK on the client side authenticates via the same
+      session and reads the bytes. c11 EmbeddedPinterestPanel already
+      uses `next/image` with `i.pinimg.com`; c18 adds the Storage host.
+      If complications, fallback to (b) signed URL minted by this
+      action via c5 helper extension.
+
+      Read .pHive/planning/structured-outline.md:284 (Slice 4 Changes #4
+      app/api/designs/generate/route.ts) — outline names the route, but
+      api:surface-boundary lock makes action canonical. Resolution per
+      c1 spike P95.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests BEFORE implementation. Heavy mocking of c14
+      generate + c15 persistGeneration*; integration test against
+      emulator for the end-to-end flow.
+
+      - tests/unit/actions/generate-design-happy-path.test.ts —
+        (1) Mock getSession → `{ uid: "alice-uid" }`
+        (2) Mock Firestore reads to return design `d1` (alice-owned) +
+            primary ref + 2 secondary refs
+        (3) Mock c15 persistGenerationStart → `{ ok: true; generationId: "g1" }`
+        (4) Mock c14 generate → `{ ok: true; imageBytes; mimeType: "image/png";
+            metadata: { retryCount: 0; durationMs: 8000 } }`
+        (5) Mock c15 persistGenerationResult → `{ ok: true }`
+        (6) Mock c5 helper to resolve a Storage URL for the saved bytes
+        (7) Call generateDesign({ designId: "d1" })
+        (8) Assert envelope `{ status: "success"; generationId: "g1";
+            imageUrl: "<URL>" }`
+
+      - tests/unit/actions/generate-design-auth-context.test.ts —
+        (9) No session → unauthorized envelope; persistGenerationStart NOT called
+        (10) Empty designId → invalid_input envelope
+
+      - tests/unit/actions/generate-design-error-paths.test.ts —
+        (11) persistGenerationStart returns `design_not_found` → envelope
+             `{ status: "failure"; errorCode: "design_not_found"; ... }`;
+             c14 generate NOT called
+        (12) persistGenerationStart returns `design_unauthorized` →
+             envelope errorCode `design_unauthorized`; c14 NOT called
+        (13) c14 returns `refusal` → envelope errorCode `refusal`;
+             persistGenerationResult called with failure outcome
+        (14) c14 returns `rate_limit` (after retry exhausted) → errorCode
+             `rate_limit`
+        (15) c14 returns `network` (after retry exhausted) → errorCode
+             `network`
+        (16) c14 returns `missing_reference_bytes` → errorCode `unknown`
+             (lifecycle limitation; c17 may show generic)
+        (17) c14 returns `low_quality` → errorCode `low_quality`
+        (18) c15 persistGenerationResult returns `storage_fail` →
+             envelope errorCode `storage_fail`
+        (19) c15 persistGenerationResult returns `firestore_failure` →
+             errorCode `unknown` (lifecycle: row was either updated or
+             not; surface as unknown to UI; details in row)
+
+      - tests/integration/api/generate-design-route.test.ts (if route handler
+        path is locked):
+        (20) POST `/api/designs/generate` with valid body + session →
+             200 with success envelope
+        (21) POST without session → 401 with unauthorized envelope
+        (22) POST with invalid JSON body → 400
+
+      - tests/integration/designs/generate-design-end-to-end.test.ts —
+        (Firestore + Storage emulators; mocked c14):
+        (23) Real design + references; mocked c14 returns success bytes;
+             generateDesign runs end-to-end → assert generation row at
+             `success`, design.latestGenerationId set, output bytes at
+             `users/alice/generations/{genId}.png` readable
+
+      Tests use vi.mock for c14 and c15 in unit lane; emulator-backed
+      integration uses real lifecycle.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Make failing tests pass. Either action or route handler per c1
+      lock.
+
+      ### Path A: server action (P95 < 30s)
+
+      Extend `app/(authenticated)/design/actions.ts` (file from c9 + c10):
+      ```ts
+      import {
+        persistGenerationStart, persistGenerationResult,
+      } from '@/lib/designs/lifecycle';
+      import { generate } from '@/lib/ai/generate';
+      import { getServerFirebaseStorage } from '@/lib/firebase/storage';
+      import { getFirestore } from 'firebase-admin/firestore';
+      import { createServerFirebaseAdmin } from '@/lib/firebase/server';
+      import {
+        designConverter, referenceConverter,
+      } from '@/lib/firestore/converters';
+
+      type GenerateDesignErrorCode =
+        | 'unauthorized' | 'invalid_input'
+        | 'design_not_found' | 'design_unauthorized'
+        | 'refusal' | 'rate_limit' | 'network' | 'low_quality'
+        | 'storage_fail' | 'unknown';
+
+      export type GenerateDesignResult =
+        | { status: 'success'; generationId: string; imageUrl: string }
+        | { status: 'failure';
+            errorCode: GenerateDesignErrorCode;
+            cta: 'adjust_inputs';
+            message: string };
+
+      function reasonToCode(reason: string): GenerateDesignErrorCode {
+        if (reason === 'refusal') return 'refusal';
+        if (reason === 'rate_limit') return 'rate_limit';
+        if (reason === 'network') return 'network';
+        if (reason === 'low_quality') return 'low_quality';
+        if (reason === 'storage_fail') return 'storage_fail';
+        if (reason === 'design_not_found') return 'design_not_found';
+        if (reason === 'design_unauthorized') return 'design_unauthorized';
+        return 'unknown';
+      }
+
+      export async function generateDesign(input: {
+        designId: string;
+      }): Promise<GenerateDesignResult> {
+        const session = await getSession();
+        if (!session?.uid) {
+          return { status: 'failure', errorCode: 'unauthorized',
+                   cta: 'adjust_inputs', message: 'sign in required' };
+        }
+        const designId = (input.designId ?? '').trim();
+        if (!designId) {
+          return { status: 'failure', errorCode: 'invalid_input',
+                   cta: 'adjust_inputs', message: 'designId required' };
+        }
+
+        // 1. Load design + references for c14.generate input
+        const db = getFirestore(createServerFirebaseAdmin());
+        const designSnap = await db.collection('designs').doc(designId)
+          .withConverter(designConverter).get();
+        if (!designSnap.exists) {
+          return { status: 'failure', errorCode: 'design_not_found',
+                   cta: 'adjust_inputs', message: 'design not found' };
+        }
+        const design = designSnap.data()!;
+        if (design.userId !== session.uid) {
+          return { status: 'failure', errorCode: 'design_unauthorized',
+                   cta: 'adjust_inputs', message: 'design owned by another user' };
+        }
+
+        const refIds = [design.primaryReferenceId, ...design.secondaryReferenceIds];
+        const refSnaps = await Promise.all(
+          refIds.map((rid) => db.collection('references').doc(rid)
+            .withConverter(referenceConverter).get()),
+        );
+        const refs = refSnaps.map((s) => s.data()!).filter(Boolean);
+        if (refs.length !== refIds.length) {
+          return { status: 'failure', errorCode: 'unknown',
+                   cta: 'adjust_inputs', message: 'one or more references missing' };
+        }
+        const [primaryRef, ...secondaryRefs] = refs;
+
+        // 2. Persist pending row (c15)
+        const requestSummary = {
+          primaryReferenceId: design.primaryReferenceId,
+          secondaryReferenceIds: design.secondaryReferenceIds,
+          promptText: design.promptText, nailShape: design.nailShape,
+        };
+        const start = await persistGenerationStart({
+          userId: session.uid, designId, requestJson: requestSummary,
+        });
+        if (!start.ok) {
+          return { status: 'failure', errorCode: reasonToCode(start.reason),
+                   cta: 'adjust_inputs', message: start.message };
+        }
+        const generationId = start.generationId;
+
+        // 3. Call c14 generate (request build + retry)
+        const outcome = await generate({
+          primaryReference: primaryRef,
+          secondaryReferences: secondaryRefs,
+          promptText: design.promptText,
+          nailShape: design.nailShape,
+        });
+
+        // 4. Persist result (c15)
+        const persisted = await persistGenerationResult({
+          generationId, userId: session.uid, designId, outcome,
+        });
+
+        if (!persisted.ok) {
+          return { status: 'failure', errorCode: reasonToCode(persisted.reason),
+                   cta: 'adjust_inputs', message: persisted.message };
+        }
+        if (!outcome.ok) {
+          return { status: 'failure', errorCode: reasonToCode(outcome.reason),
+                   cta: 'adjust_inputs', message: outcome.message };
+        }
+
+        // 5. Build image URL for UI
+        const bucket = getServerFirebaseStorage();
+        const filePath = `users/${session.uid}/generations/${generationId}.${
+          outcome.mimeType === 'image/jpeg' ? 'jpg' : 'png'}`;
+        const file = bucket.file(filePath);
+        const [signedUrl] = await file.getSignedUrl({
+          action: 'read',
+          expires: Date.now() + 15 * 60 * 1000, // 15 min
+        });
+        return { status: 'success', generationId, imageUrl: signedUrl };
+      }
+      ```
+
+      ### Path B: route handler (P95 ≥ 30s)
+
+      Create `app/api/designs/generate/route.ts` with the same body
+      logic wrapped in `POST(req)`, runtime: 'nodejs', dynamic:
+      'force-dynamic'. Streaming progress (e.g., Server-Sent Events or
+      Response with body stream) per c1 spike recommendation.
+
+      DO NOT: implement BOTH transports. ONE per c1 spike lock.
+      DO NOT: skip the design-load + reference-load steps (c14 needs
+      them). DO NOT: bypass c15 lifecycle.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Verify the surface is correctly chosen and orchestrates lifecycle
+      cleanly.
+
+      - Surface choice (action or route) matches c1 spike P95 lock.
+        Reviewer reads the artifact and confirms the choice.
+      - generateDesign reads uid from session ONLY.
+      - Design + reference loading happens BEFORE persistGenerationStart.
+        If loading fails, no `pending` row is written.
+      - c15 persistGenerationStart called before c14 generate.
+      - c14 generate called once.
+      - c15 persistGenerationResult called once with c14's outcome.
+      - Envelope returned matches the locked shape.
+      - Image URL strategy matches research lock (signed URL OR public
+        download URL).
+      - errorCode taxonomy: `refusal | rate_limit | network | low_quality |
+        storage_fail | unknown` for provider/lifecycle failures, plus
+        `unauthorized | invalid_input | design_not_found |
+        design_unauthorized` for auth/input failures.
+      - Reviewer grep across the action / route file: NO firebase-admin
+        SDK direct imports for Firestore (lifecycle owns); imports of
+        `lib/firebase/server` + `getFirestore` for the design load are
+        OK because we need the design BEFORE calling lifecycle.
+      - Returned envelope's `cta` field is always `"adjust_inputs"` on
+        failure (UI in c17 has the same CTA across all 5 branches).
+      - All vitest unit + integration tests pass.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: |
+      Branch: `epic-c/c16-generate-design-surface`.
+      Commit: `feat(c16): generateDesign mutation surface (action OR route per c1 spike)`.
+      Pre-commit: `pnpm test`, `pnpm test:rules` (or :storage) must pass.
+    agent: integrator
+    depends_on: [review]
+
+context:
+  codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+  tech_stack:
+    framework: 'Next.js 15 server action OR route handler — choice locked by c1 spike'
+    runtime: 'Node 20+; firebase-admin v13.8.0; provider SDK via c13'
+    testing: 'Vitest unit (mocked c14 + c15); vitest+emulator integration; (route handler test if route path locked)'
+  key_files:
+    - path: .pHive/epics/epic-c-reference-and-generation/docs/spike-gemini-sdk.md
+      purpose: 'Consumed (c1) — P95 latency drives surface choice'
+    - path: app/(authenticated)/design/actions.ts
+      purpose: 'EXTENDED (c9 + c10 + c16 in same file) IF action path locked'
+    - path: app/api/designs/generate/route.ts
+      purpose: 'CREATE IF route path locked'
+    - path: lib/designs/lifecycle.ts
+      purpose: 'Consumed (c10 + c15) — persistGenerationStart, persistGenerationResult'
+    - path: lib/ai/generate.ts
+      purpose: 'Consumed (c14) — generate'
+    - path: lib/firebase/storage.ts
+      purpose: 'Consumed (c5) — getServerFirebaseStorage, signed URL minting'
+    - path: lib/firestore/converters/index.ts
+      purpose: 'Consumed (c3) — designConverter, referenceConverter'
+    - path: lib/firebase/session.ts
+      purpose: 'Consumed — getSession'
+    - path: app/(auth)/login/actions.ts
+      purpose: 'Pattern reference — discriminated envelope shape'
+
+files_to_modify:
+  - file: app/(authenticated)/design/actions.ts
+    change: 'EXTEND with generateDesign action (Path A) OR no change (Path B)'
+  - file: app/api/designs/generate/route.ts
+    change: 'CREATE if Path B (route handler with streaming) per c1 lock'
+  - file: tests/unit/actions/generate-design-happy-path.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/actions/generate-design-auth-context.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/unit/actions/generate-design-error-paths.test.ts
+    change: 'CREATE in test-spec'
+  - file: tests/integration/api/generate-design-route.test.ts
+    change: 'CREATE if Path B'
+  - file: tests/integration/designs/generate-design-end-to-end.test.ts
+    change: 'CREATE in test-spec — full lifecycle integration'
+
+design_decisions:
+  - decision: 'Surface choice (action vs route handler) READ from c1 spike P95 latency'
+    rationale: 'api:surface-boundary lock with conditional resolution. Sub-30s P95 → action (idiomatic, simpler client integration); ≥30s P95 → route handler (Vercel timeout requires streaming). c1 spike measures explicitly; c16 honors.'
+  - decision: 'Design + reference loading happens in c16, NOT inside c15 persistGenerationStart'
+    rationale: 'persistGenerationStart already does an ownership check (defensive read). Loading the full reference docs there would couple lifecycle to ReferenceSet shape. c16 reads what c14 needs; c15 stays minimal.'
+  - decision: 'Image URL = 15-minute signed URL via Storage Admin SDK'
+    rationale: 'Per research lock. Public download URLs require c4 storage.rules to be permissive (loosen security); signed URLs preserve owner-only rules and have a controlled expiry. 15 min is enough for the user to view + interact; if they navigate away and come back later, c17 / Epic D can re-mint.'
+  - decision: 'errorCode taxonomy in envelope EXTENDS c3 GenerationErrorCode (adds `low_quality`, `storage_fail`, `design_not_found`, `design_unauthorized`, `unauthorized`, `invalid_input`)'
+    rationale: 'data-model:contract-stability. c3 GenerationErrorCode is the row-level type (only 4 members); c16 envelope is the UI-level type (10 members) reflecting auth + input + lifecycle states. Two vocabularies on purpose; reviewer documents the mapping.'
+  - decision: 'cta = "adjust_inputs" on every failure (consistent across 5 branches)'
+    rationale: 'kickoff #8 + FR-C-7. The user''s recovery path is always "go back and adjust inputs" — change the prompt, swap a reference, try a different shape. UI in c17 maps the cta to a single CTA button across all error states.'
+  - decision: 'c14 generate is called BETWEEN persistGenerationStart and persistGenerationResult, NEVER concurrently'
+    rationale: 'Sequential flow is the contract c15 expects. Concurrent calls would race the two writes and could leave orphans. Sequential is also simpler and matches user expectations.'
+  - decision: 'metadata.retryCount and metadata.durationMs persisted via c15.providerResponseMetadata (already in c15 spec)'
+    rationale: 'c14 GenerateResult.metadata propagates through c15 and lands on the row. Future Epic D library queries can show "this generation took 12s, retried once".'
+
+cross_cutting:
+  - concern: 'security-rules'
+    notes: 'Session uid + design ownership check + c4 firestore.rules + c4 storage.rules. Four defense layers.'
+  - concern: 'error-handling'
+    notes: 'Discriminated envelope. errorCode taxonomy fixed; c17 UI exhaustively maps. cta consistent.'
+  - concern: 'persistence:consistency'
+    notes: 'Sequential start → provider → result. No bypass. c15 owns FR-C-9 invariant.'
+  - concern: 'api:surface-boundary'
+    notes: 'Surface choice locked by c1 spike P95. Documented in design_decisions.'
+
+risks:
+  - severity: high
+    description: 'Surface lock changes mid-development (e.g., c1 spike says action but real-world Vercel cold start adds 5s pushing P95 over 30s)'
+    mitigation: "If detected, re-cut to route handler in a follow-up story. Same envelope shape; UI in c17 unaffected. Adds rework but doesn't break contracts."
+  - severity: medium
+    description: 'Signed URL expires before user finishes viewing (e.g., user generates, walks away for 30 min, comes back to broken `<img>`)'
+    mitigation: '15 min is the v1 default; can extend to 1 hour or generate fresh URLs on Library page load (Epic D). Acceptable v1 residual.'
+  - severity: medium
+    description: 'Multiple references missing → returned errorCode `unknown` is not user-friendly'
+    mitigation: 'A future hardening story could add a `references_missing` errorCode + UI branch. v1 falls through to generic adjust_inputs CTA. Acceptable for the rare case.'
+  - severity: medium
+    description: 'Route-handler streaming progress is hard to test reliably in vitest jsdom'
+    mitigation: 'If Path B is locked, integration test (20-22) uses a non-streaming test pattern (single response.json()) or moves to Playwright. Stream verification is a real-browser concern.'
+  - severity: low
+    description: 'Concurrent generateDesign calls from same user create two pending rows (c15 already accepts this)'
+    mitigation: 'c17 UI disables Generate button while pending. If a user manages to call twice via API, c15 still produces two valid rows with two valid generation IDs — no corruption.'
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 4 Changes #4 (line 284): app/api/designs/generate/route.ts —
+      trigger the first generation for a draft design or draft input
+      set.
+      [Resolved: per c1 spike P95 + api:surface-boundary lock — action
+      OR route based on latency.]
+      Slice 4 Interfaces (line 296):
+        generateDesign(input: { designId: string }): Promise<
+          | { status: 'success'; generationId; resultStoragePath }
+          | { status: 'failure'; generationId;
+              errorCode: 'refusal' | 'rate_limit' | 'network' |
+                'unknown'; message: string }>
+      [c16 envelope EXTENDS errorCode union for UI mapping.]
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      US-C-4: Generate a nail-design image. Acceptance: Given a valid
+      stored design with one primary reference and optional secondary
+      references, when the app generates...
+      US-C-5: See a raw result or guided failure.
+      FR-C-5, FR-C-6, FR-C-7, FR-C-9: covered by orchestration of
+      c14 (request + retry) + c15 (lifecycle persistence) + c16
+      (mutation surface).
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/research-brief.md
+    relevant_excerpt: |
+      §New Surfaces > Server Actions: generateDesign(input) is the
+      generation-triggering surface for a stored design. The outline
+      defines a typed success/failure contract, but also names POST
+      /api/designs/generate; final naming and transport remain open.
+      [Resolved by c1 spike + this story.]
+  - path: .pHive/epics/epic-c-reference-and-generation/docs/design-discussion.md
+    relevant_excerpt: |
+      §Open Question §1, §2: spike resolves provider gate + SDK choice +
+      sync-vs-route recommendation.
+      §My Proposed Approach: server actions are primary, route handlers
+      are unused. [Caveat: c7 multipart and c16-if-P95-≥30s are
+      documented exceptions.]
+  - path: app/(auth)/login/actions.ts
+    relevant_excerpt: |
+      loginAction discriminated state envelope — pattern reference for
+      c16 GenerateDesignResult shape.
+
+ui_indicators: 'NO new UI surface — server action OR route handler only; c17 owns the UI; no wireframes; no ui-design step required'
