@@ -35,13 +35,12 @@ export function GenerationPreview({
 
       <section className="overflow-hidden rounded-[32px] border border-border/70 bg-card/70 p-3 shadow-[0_20px_50px_rgba(61,53,48,0.08)] md:p-5">
         <div className="relative aspect-square overflow-hidden rounded-[24px] bg-[radial-gradient(circle_at_top,_rgb(250_247_242),_rgb(240_235_227)_55%,_rgb(214_196_188))]">
-          {/* TODO c18: drop unoptimized once next.config remotePatterns covers Storage host */}
           <Image
             src={imageUrl}
+            overrideSrc={imageUrl}
             alt={alt}
             fill
             sizes="(min-width: 1024px) 720px, 100vw"
-            unoptimized
             className="object-cover motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-[0.96] motion-safe:duration-200"
           />
         </div>
@@ -51,7 +50,7 @@ export function GenerationPreview({
         <button
           type="button"
           onClick={onAdjust}
-          className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+          className="min-h-[44px] text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
         >
           ← Back to adjust
         </button>

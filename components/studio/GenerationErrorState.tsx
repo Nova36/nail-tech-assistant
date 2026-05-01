@@ -1,12 +1,14 @@
 'use client';
 
 import type { GenerateDesignErrorCode } from '@/app/(authenticated)/design/actions';
+import type { Ref } from 'react';
 
 type GenerationErrorStateProps = {
   errorCode: GenerateDesignErrorCode;
   message: string;
   onAdjust: () => void;
   onRetry?: () => void;
+  headingRef?: Ref<HTMLHeadingElement>;
 };
 
 const ERROR_COPY: Record<
@@ -80,6 +82,7 @@ export function GenerationErrorState({
   message,
   onAdjust,
   onRetry,
+  headingRef,
 }: GenerationErrorStateProps) {
   const copy = ERROR_COPY[errorCode];
   const primaryAction = copy.primaryCta.toLowerCase().includes('try again')
@@ -92,14 +95,18 @@ export function GenerationErrorState({
   return (
     <section
       role="alert"
-      className="space-y-5 rounded-[28px] border border-[color:var(--primary)]/20 bg-card/80 p-6 shadow-[0_20px_50px_rgba(61,53,48,0.08)]"
+      className="space-y-5 rounded-[28px] border border-[color:var(--primary)]/20 bg-card/80 p-6 shadow-[0_20px_50px_rgba(61,53,48,0.08)] motion-safe:[animation:view-settle_200ms_ease-out_both]"
       data-message={message}
     >
       <div className="space-y-2">
         <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
           Step 3 of 3
         </p>
-        <h2 className="font-heading-display text-3xl font-light tracking-[-0.03em] text-foreground md:text-4xl">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="font-heading-display text-3xl font-light tracking-[-0.03em] text-foreground md:text-4xl"
+        >
           {copy.heading}
         </h2>
         <p className="max-w-prose text-sm text-muted-foreground">{copy.body}</p>
@@ -109,7 +116,7 @@ export function GenerationErrorState({
         <button
           type="button"
           onClick={primaryAction}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[color:var(--primary)] px-4 py-3 text-sm font-medium text-[color:var(--primary-foreground)] shadow-[0_6px_16px_rgba(107,63,94,0.25)]"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[color:var(--primary)] px-4 py-3 text-sm font-medium text-[color:var(--primary-foreground)] shadow-[0_6px_16px_rgba(107,63,94,0.25)] focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
         >
           {copy.primaryCta}
         </button>
@@ -117,7 +124,7 @@ export function GenerationErrorState({
           <button
             type="button"
             onClick={secondaryAction}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
           >
             {copy.secondaryCta}
           </button>
