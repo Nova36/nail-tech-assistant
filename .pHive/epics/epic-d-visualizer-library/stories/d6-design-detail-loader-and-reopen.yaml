@@ -1,0 +1,140 @@
+id: d6-design-detail-loader-and-reopen
+epic: epic-d-visualizer-library
+title: GET /api/designs/[id] DesignDetail loader + reopen page hydration
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [d5-design-page-visualizer-integration]
+
+description: |
+  Add the design loader so /design/[id] can hydrate a previously-saved design
+  with the full DesignDetail payload: design row + references (resolved) +
+  prompt + nail shape + latest generation row (image + status).
+
+  Slice 6 starts here. Without this, /library cards cannot reopen a design,
+  and regenerate (d8) has nothing to load from.
+
+  Source: structured-outline.md Slice 6 manifest #6, interfaces `loadDesign`,
+  `GET /api/designs/[id]`. PRD US-D-3, US-D-4 partial, FR-D-4, FR-D-8.
+
+  Security: rule must allow authenticated owner read + deny cross-user access.
+  No mutations in this route.
+
+acceptance_criteria:
+  - 'Given an authenticated owner of a design, when GET /api/designs/[id], then 200 with DesignDetail { design, references, latestGeneration } | maps to US-D-4 AC #1, FR-D-8'
+  - 'Given an authenticated user who does not own the design, when GET /api/designs/[id], then 404 (not 403 — do not leak existence) or rules-denied per project convention | maps to US-D-3 AC #3'
+  - 'Given a design row exists but its references have been deleted, when loaded, then DesignDetail.references contains only resolvable rows + a controlled `staleReferenceCount` field | maps to US-D-4 AC #3 silent-break risk'
+  - 'Given a saved design is reopened, when /design/[id] hydrates, then visualizer + ShapeSelector + prompt + reference summaries restore | maps to US-D-4 AC #1, FR-D-8'
+
+steps:
+  - id: research
+    description: Read research-brief Q2 (latest_generation_id lineage already exists in lifecycle.ts:300-316). Read Slice 6 interface block. Confirm Firestore reference resolution pattern from epic C.
+    agent: researcher
+  - id: test-spec
+    description: |
+      tests/integration/designs-detail-route.test.ts (`@vitest-environment node`): authenticated owner happy path returns full DesignDetail; cross-user denied; missing design 404; design with missing references returns staleReferenceCount > 0.
+
+      tests/integration/rules/designs-detail-rule.test.ts (rules-lane): authenticated owner read allowed; cross-user read denied; references collection read allowed only via parent design ownership.
+
+      tests/unit/design-page/page.reopen.test.tsx (jsdom): given mocked DesignDetail prop, /design/[id] page renders visualizer + restored shape + restored prompt + reference summaries.
+
+      No implementation reads. Test from spec only.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Add app/api/designs/[id]/route.ts GET handler. Load design via Firestore Admin SDK with converter (per feedback_converter_strips_id.md, use `.withConverter()` to retain id). Resolve referenced documents (primary + secondary references). Resolve latest generation by latestGenerationId.
+
+      Add lib/designs/load.ts: pure DesignDetail builder + reference resolution helper that surfaces stale-reference count.
+
+      Update firestore.rules to allow authenticated owner read on /designs/{id} (already present from c10? — verify in research and only update if needed).
+
+      Update app/(authenticated)/design/[designId]/page.tsx server component to fetch DesignDetail (or use existing fetch pattern). Hydrate Confirm.tsx with restored state.
+
+      Catch blocks log code+message.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Tests pass. Reviewer reopens a seeded design via Vercel preview / local prod build and verifies workspace restores fully.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d6): GET /api/designs/[id] + reopen page hydration`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    persistence: Firestore Admin SDK (server-only)
+    testing: Vitest node + jsdom + rules
+  key_files:
+    - path: lib/designs/lifecycle.ts
+      purpose: latestGenerationId already wired (research Q2)
+    - path: lib/firestore/converters/designs.ts
+      purpose: Use `.withConverter()` per feedback_converter_strips_id.md
+    - path: app/(authenticated)/design/[designId]/page.tsx
+      purpose: Existing hydration site — extend, do not replace
+
+files_to_modify:
+  - file: app/api/designs/[id]/route.ts
+    change: GET handler — DesignDetail loader
+  - file: lib/designs/load.ts
+    change: net-new — DesignDetail builder + reference resolution
+  - file: firestore.rules
+    change: verify owner-read on /designs/{id} + /references; update only if missing
+  - file: app/(authenticated)/design/[designId]/page.tsx
+    change: hydrate from DesignDetail
+  - file: app/(authenticated)/design/[designId]/Confirm.tsx
+    change: accept restored state shape (prompt, references, shape)
+  - file: tests/integration/designs-detail-route.test.ts
+    change: net-new
+  - file: tests/integration/rules/designs-detail-rule.test.ts
+    change: net-new
+  - file: tests/unit/design-page/page.reopen.test.tsx
+    change: net-new
+
+code_examples:
+  - title: DesignDetail shape
+    snippet: |
+      type DesignDetail = {
+        design: Design;
+        references: { primary: Reference; secondary: Reference[]; staleReferenceCount: number };
+        latestGeneration: Generation | null;
+      };
+  - title: Converter usage (per memory)
+    snippet: |
+      import { designConverter } from '@/lib/firestore/converters/designs';
+      const snap = await db.collection('designs').doc(id).withConverter(designConverter).get();
+
+design_decisions:
+  - decision: 404 for cross-user (not 403)
+    rationale: Do not leak design existence across users
+  - decision: staleReferenceCount surfaced rather than silent skip
+    rationale: regenerate (d8) needs to fail visibly when stored references are missing — see PRD US-D-4 AC #3 silent-break risk
+
+cross_cutting:
+  - concern: security-rules
+    action: rules-lane integration test for design + references read
+  - concern: jsdom-vs-node
+    action: route handler test uses node env
+  - concern: error-logging
+    action: catches log code+message
+
+risks:
+  - severity: medium
+    description: Reference resolution N+1 query under high reference count
+    mitigation: batch read primary + secondary in one Firestore getAll call
+  - severity: low
+    description: Confirm.tsx hydration state shape drift
+    mitigation: page.reopen.test.tsx asserts restored state matches expected
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 6 manifest #6: app/api/designs/[id]/route.ts — load a persisted design.
+      Interface: GET /api/designs/[id] → { design: DesignDetail }
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/feedback_converter_strips_id.md
+    relevant_excerpt: |
+      designConverter strips id on toFirestore; tests reading raw doc().get() must use .withConverter().

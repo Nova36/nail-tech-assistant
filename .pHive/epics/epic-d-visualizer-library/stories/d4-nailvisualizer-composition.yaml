@@ -1,0 +1,190 @@
+id: d4-nailvisualizer-composition
+epic: epic-d-visualizer-library
+title: NailVisualizer + VisualizerFrame composition with theme scaffold (nails-focal v1)
+status: pending
+complexity: high
+methodology: tdd
+depends_on: [d1-nailshape-union-migration, d3-nail-tip-mask-svg-assets]
+
+description: |
+  Compose the visualizer that renders one generated design across five LARGE
+  nail-shaped cutouts arranged in a fan layout. **Reframed 2026-05-01: nails
+  are the focal point, not a hand.** No painted/illustrated hand silhouette.
+  Stage = 5 fan-arranged nail anchors + outlines, no finger stubs. Each nail
+  ~200×280 user units in the 1280×540 stage viewBox.
+
+  Ship with theme="flat" active (uses approved
+  `.pHive/wireframes/NailVisualizer/stage.svg`) and the architectural
+  scaffold for future theme="line-art" pivot (uses
+  `.pHive/wireframes/NailVisualizer/stage-line-art.svg`).
+
+  Component contract:
+  ```
+  <NailVisualizer
+    theme="flat" | "line-art"  // v1 ships flat only; line-art reserved
+    imageUrl={...}
+    nailShape={...}
+  />
+  ```
+
+  Stage SVG = swappable asset import (`stage.svg` active for v1, `stage-
+  line-art.svg` reserved). Nail outline color + stroke = CSS vars
+  (`--nail-outline-color`, `--nail-stroke-style`). Optional SVG displacement
+  filter = no-op for flat, hint reserved for line-art.
+
+  VisualizerFrame: tablet-landscape framing wrapper; ergonomic without
+  separate presentation mode (kickoff #10).
+
+  No /design/[id] integration in this story — d5 wires it.
+
+acceptance_criteria:
+  - 'Given a NailVisualizer with theme=flat, imageUrl, nailShape=almond, when rendered, then 5 large nail anchors display the imageUrl masked with the almond clipPath | maps to US-D-1 AC #1, FR-D-1'
+  - 'Given the same component with nailShape changed to coffin, when re-rendered, then all 5 nails update without an additional generation network call | maps to US-D-2 AC #1, NFR perf'
+  - 'Given imageUrl is missing or fails to load, when the visualizer renders, then a controlled fallback state is shown (no broken layout) | maps to US-D-1 AC #2'
+  - 'Given theme=flat, when CSS vars --nail-outline-color or --nail-stroke-style are overridden, then the rendering reflects them | enables A→C pivot'
+  - 'Given snapshot tests per shape under theme=flat, when run, then a stable baseline is captured for visual regression | maps to FR-D-1 silent-break mitigation'
+  - 'Given the rendered visualizer, when inspected, then no full hand silhouette / palm / knuckles are drawn — only nails + minimal anchor geometry | enforces nails-as-focal reframe'
+
+steps:
+  - id: research
+    description: Read research-brief Q1 + Slice 5 manifest items 1, 2, 9. Confirm SVG asset import patterns work with Next.js (import .svg as URL or React component — pick one and document).
+    agent: researcher
+  - id: ui-design
+    description: |
+      Confirm `.pHive/wireframes/NailVisualizer/manifest.yaml` shows
+      wireframe_approval status=approved. Open
+      `.pHive/wireframes/NailVisualizer/preview.html` in browser to confirm
+      the 1280×540 fan-arranged stage with 5 anchors renders cleanly under
+      all 6 shapes. Verify the theme scaffold contract (`<NailVisualizer
+      theme=... imageUrl=... nailShape=...>`) is implementable against
+      the stage.svg + stage-line-art.svg pair.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/unit/visualizer/NailVisualizer.test.tsx (jsdom):
+        - renders 5 masked elements (one per nail anchor in stage.svg) when imageUrl + nailShape provided
+        - each masked element references clipPath id `nail-tip-{nailShape}`
+        - applying theme=flat mounts the flat class hook + reads stage.svg as the active stage asset
+        - applying theme=line-art reads stage-line-art.svg (presence of asset path; rendering may be a placeholder if line-art SVG hasn't shipped)
+        - missing imageUrl renders the fallback marker (no broken layout)
+        - changing nailShape prop updates each clip's clipPath ref correctly
+        - no full hand / palm path in the rendered DOM (negative assertion enforcing nails-focal reframe)
+      tests/unit/visualizer/VisualizerFrame.test.tsx: tablet-landscape min-width hint + child render.
+      Snapshot test scaffold: tests/unit/visualizer/__snapshots__/NailVisualizer.{shape}.snap — one snapshot per shape under theme=flat.
+      Tests written against component contract spec only — do not read implementation.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Add components/NailVisualizer/{NailVisualizer.tsx, VisualizerFrame.tsx, index.ts}.
+      Copy stage assets from `.pHive/wireframes/NailVisualizer/` into
+      `components/NailVisualizer/`:
+        - stage.svg              (active for theme="flat")
+        - stage-line-art.svg     (reserved for theme="line-art")
+      Add CSS vars + theme class hook in styles/visualizer.css (or
+      component-scoped Tailwind v4 @theme inline). CSS vars:
+      `--nail-outline-color`, `--nail-stroke-style`.
+      theme="flat" is fully renderable. theme="line-art" path renders the
+      stage-line-art.svg + reserved displacement filter (filter is a no-op
+      until styled in a post-v1 pivot story).
+      Integrate the 6 mask SVGs (copied in d3) via inline `<defs>` or
+      `<use href=...>` referencing the per-shape clipPath id.
+      Catch image-load failure on the masked `<image>`; render fallback.
+      Log code+message per feedback_silent_catches_cost_time.md.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + lint + tests + snapshots pass. Reviewer opens each shape snapshot in browser and confirms visual sanity. Confirms theme prop contract matches wireframe.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d4): NailVisualizer + VisualizerFrame (theme-scaffolded, flat v1)`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    rendering: SVG + masked <image>
+    styling: Tailwind v4 + CSS vars
+    testing: Vitest jsdom + snapshot
+  key_files:
+    - path: .pHive/wireframes/epic-d-visualizer-library/visualizer-view.html
+      purpose: Wireframe canonical for theme=flat layout
+    - path: components/NailVisualizer/shapes/*.svg
+      purpose: clipPath assets from d3
+    - path: .pHive/brand/brand-system.yaml
+      purpose: Pearl Fog stroke + Warm Parchment fill — locked palette
+
+files_to_modify:
+  - file: components/NailVisualizer/NailVisualizer.tsx
+    change: net-new
+  - file: components/NailVisualizer/VisualizerFrame.tsx
+    change: net-new
+  - file: components/NailVisualizer/stage.svg
+    change: copy from .pHive/wireframes/NailVisualizer/stage.svg (no edits)
+  - file: components/NailVisualizer/stage-line-art.svg
+    change: copy from .pHive/wireframes/NailVisualizer/stage-line-art.svg (no edits)
+  - file: components/NailVisualizer/index.ts
+    change: net-new (barrel export)
+  - file: styles/visualizer.css
+    change: net-new (CSS vars + theme class hooks); OR component-scoped CSS-in-Tailwind
+  - file: tests/unit/visualizer/NailVisualizer.test.tsx
+    change: net-new
+  - file: tests/unit/visualizer/VisualizerFrame.test.tsx
+    change: net-new
+
+code_examples:
+  - title: Component contract (target shape)
+    snippet: |
+      type Theme = 'flat' | 'line-art';
+
+      export function NailVisualizer(props: {
+        theme: Theme;
+        imageUrl: string | null;
+        nailShape: NailShape;
+        onImageError?: () => void;
+      }): JSX.Element { /* ... */ }
+  - title: Theme prop scaffold contract
+    snippet: |
+      // theme="flat":     hand=handFlat,    --nail-outline-color: var(--brand-pearl-fog),
+      //                                     --nail-fill-blend: normal
+      // theme="line-art": hand=handLineArt (TODO d?), --nail-outline-color: var(--brand-champagne-gold),
+      //                                                --nail-fill-blend: multiply, plus displacement filter
+
+design_decisions:
+  - decision: theme prop scaffolded but only "flat" is renderable in v1
+    rationale: Don's pivot insurance — theme contract present from day 1; line-art path reserved without bloating v1
+  - decision: hand SVG as separate component (handFlat.tsx), not inline in NailVisualizer
+    rationale: Swappable asset boundary makes A→C pivot a single import change
+  - decision: CSS vars over inline style
+    rationale: Brand-tokens already use CSS-var pattern; consistent with existing components
+  - decision: image-load failure → visualizer-internal fallback
+    rationale: Matches US-D-1 AC #2 (controlled error or fallback state instead of broken layout); avoids requiring callers to handle every render edge
+
+cross_cutting:
+  - concern: error-logging
+    action: image-load failure in masked <image> logs code+message
+  - concern: types-coverage
+    action: theme prop union exhaustiveness via assertUnreachable
+
+risks:
+  - severity: high
+    description: 2D visualizer technically renders but feels cheap (silent-break per outline Risk #5)
+    mitigation: snapshot baseline per shape + reviewer visual sanity check + designer wireframe alignment + tablet QA in d5 e2e
+  - severity: medium
+    description: Tailwind v4 @theme inline literal-breakpoints quirk (per memory reference_app_infra_gotchas.md)
+    mitigation: prefer component-scoped CSS or CSS vars over @theme inline expansion
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 5 manifest #1 NailVisualizer.tsx, #2 ShapeSelector (kept at studio/), #9 VisualizerFrame.tsx.
+      Risk #5: 2D visualizer can technically work while feeling cheap if masks/scaling look stretched.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/reference_app_infra_gotchas.md
+    relevant_excerpt: |
+      Tailwind v4 @theme inline literal breakpoints (FIXED). Prefer CSS-var-driven theming for component-internal vars.

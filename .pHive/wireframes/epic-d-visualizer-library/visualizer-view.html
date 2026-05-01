@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Epic D — /design/[id] · Visualizer View</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+
+      /* ─── Brand tokens ─────────────────────────────────────────────── */
+      :root {
+        --background:         #faf7f2;
+        --foreground:         #3d3530;
+        --card:               #f0ebe3;
+        --primary:            #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint:       #d4a5a8;
+        --accent:             #c9a96e;
+        --muted-foreground:   #6f625c;
+        --border:             rgba(140,126,120,0.22);
+        --destructive:        #b04848;
+
+        /* ── Theme vars (flat = Option A) ──
+           Pivot to line-art: set --nail-outline-color → #C9A96E,
+           --nail-fill-blend → multiply, activate SVG filter wrapper.
+           Theme prop on <NailVisualizer> selects these at runtime. */
+        --nail-outline-color: #D4A5A8;
+        --nail-fill-blend:    normal;
+        --hand-fill:          #F0EBE3;
+        --hand-stroke:        #D4CBC5;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.15), transparent 35%);
+        min-height: 100vh;
+        padding: 28px 16px 64px;
+      }
+
+      /* ─── Frame chrome (matches c17 pattern) ───────────────────────── */
+      .frame {
+        margin: 0 auto 40px;
+        background: var(--background);
+        background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.15), transparent 35%);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61,53,48,0.12);
+        width: 1280px;
+        max-width: calc(100vw - 32px);
+      }
+      .frame-bar {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 14px;
+        background: #ede4d9;
+        border-bottom: 1px solid var(--border);
+        font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .frame-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-tint); }
+      .frame-bar .dot.b { background: var(--accent); opacity: 0.7; }
+      .frame-bar .dot.c { background: var(--primary); opacity: 0.55; }
+      .frame-bar .tag {
+        margin-left: auto; border: 1px solid rgba(140,126,120,0.3);
+        padding: 2px 8px; border-radius: 999px; font-size: 10px;
+      }
+
+      .frame-label {
+        margin: 24px auto 8px; max-width: 1280px;
+        display: flex; align-items: baseline; gap: 14px; padding: 0 4px; flex-wrap: wrap;
+      }
+      .frame-num  { font-family: 'Fraunces', serif; font-size: 14px; color: var(--primary); font-style: italic; }
+      .frame-title { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 300; letter-spacing: -0.02em; }
+      .frame-sub  { font-size: 12px; color: var(--muted-foreground); }
+
+      /* ─── Annotation callout (c17 pattern) ─────────────────────────── */
+      aside.anno {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+        color: var(--muted-foreground);
+        padding: 3px 8px; border-radius: 4px;
+        background: rgba(250,247,242,0.85);
+        border: 1px dashed rgba(140,126,120,0.42);
+      }
+      aside.anno::before {
+        content: ''; width: 5px; height: 5px; border-radius: 50%;
+        background: var(--primary); opacity: 0.55;
+      }
+      aside.anno.pin { position: absolute; top: -11px; left: 14px; z-index: 3; }
+
+      .callout {
+        border: 1px dashed rgba(107,63,94,0.4);
+        background: rgba(212,165,168,0.12);
+        border-radius: 10px; padding: 10px 12px;
+        font-size: 11.5px; line-height: 1.55;
+      }
+      .callout strong { color: var(--primary); font-weight: 500; }
+
+      /* ─── App shell ─────────────────────────────────────────────────── */
+      .app-shell {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        min-height: 820px;
+      }
+
+      /* ─── Sidebar (reuses c17 pattern exactly) ──────────────────────── */
+      .sidebar {
+        width: 240px; background: var(--background);
+        border-right: 1px solid rgba(140,126,120,0.18);
+        padding: 20px 14px;
+        display: flex; flex-direction: column; gap: 18px;
+      }
+      .sb-logo { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+      .sb-mark {
+        width: 28px; height: 28px; border-radius: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-tint));
+        display: grid; place-items: center;
+        color: var(--primary-foreground);
+        font-family: 'Fraunces', serif; font-style: italic; font-size: 14px;
+      }
+      .sb-name { font-family: 'Fraunces', serif; font-size: 16px; }
+      .sb-name em { color: var(--primary); font-style: italic; }
+      .sb-nav { display: flex; flex-direction: column; gap: 2px; }
+      .sb-nav a {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 12px; border-radius: 10px;
+        color: var(--foreground); font-size: 14px; text-decoration: none;
+        min-height: 44px; position: relative;
+      }
+      .sb-nav a .ico { width: 18px; height: 18px; color: var(--muted-foreground); }
+      .sb-nav a.active { background: rgba(107,63,94,0.12); color: var(--primary); font-weight: 500; }
+      .sb-nav a.active .ico { color: var(--primary); }
+      .sb-nav a.active::before {
+        content: ''; position: absolute; left: -14px; top: 8px; bottom: 8px;
+        width: 3px; border-radius: 0 3px 3px 0; background: var(--primary);
+      }
+
+      /* ─── Main content area ─────────────────────────────────────────── */
+      .main {
+        display: grid;
+        /* tablet landscape: visualizer left + right rail */
+        grid-template-columns: 1fr 320px;
+        grid-template-rows: auto 1fr auto;
+        min-width: 0;
+      }
+
+      /* ─── Top bar ───────────────────────────────────────────────────── */
+      .top-bar {
+        grid-column: 1 / -1;
+        display: flex; align-items: center; gap: 12px;
+        padding: 14px 24px;
+        border-bottom: 1px solid rgba(140,126,120,0.16);
+        background: var(--background);
+      }
+      .top-bar .back-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 13px; color: var(--muted-foreground);
+        padding: 6px 10px; border-radius: 8px;
+        border: 1px solid rgba(140,126,120,0.28);
+        background: transparent; cursor: pointer; text-decoration: none;
+        min-height: 36px;
+      }
+      .top-bar .design-name {
+        font-family: 'Fraunces', serif; font-size: 18px; font-weight: 400;
+        color: var(--foreground); flex: 1;
+      }
+      .top-bar .design-name .unnamed-hint {
+        font-size: 13px; color: var(--muted-foreground);
+        font-family: 'Inter', sans-serif; font-weight: 400;
+        font-style: italic;
+      }
+      .top-bar .meta { font-size: 12px; color: var(--muted-foreground); }
+
+      /* ─── Btn system (c17 exact) ────────────────────────────────────── */
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 10px 18px; border-radius: 12px;
+        font-size: 14px; font-weight: 500; min-height: 44px;
+        cursor: pointer; border: none; text-decoration: none;
+      }
+      .btn-primary { background: var(--primary); color: var(--primary-foreground); box-shadow: 0 6px 16px rgba(107,63,94,0.25); }
+      .btn-ghost { background: transparent; color: var(--foreground); border: 1px solid rgba(140,126,120,0.32); }
+      .btn-accent { background: var(--accent); color: var(--foreground); }
+
+      /* ─── Visualizer panel ──────────────────────────────────────────── */
+      .visualizer-panel {
+        grid-column: 1; grid-row: 2;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 32px 24px 16px;
+        background: var(--background);
+      }
+
+      /* ─── Nail hand SVG (theme=flat) ────────────────────────────────── */
+      /*
+        Component contract:
+          <NailVisualizer theme="flat" imageUrl={...} nailShape="almond" />
+        theme="flat"     → uses flat.svg, --nail-outline-color=#D4A5A8, no filter
+        theme="line-art" → uses line-art.svg, --nail-outline-color=#C9A96E, displacement filter
+        SVG imported as asset; JS swaps clipPath per shape selection.
+      */
+      .hand-stage {
+        position: relative;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(61,53,48,0.10), 0 2px 8px rgba(61,53,48,0.06);
+        padding: 32px 40px;
+        display: flex; flex-direction: column; align-items: center;
+      }
+
+      /* ─── Shape selector (6 pills) ──────────────────────────────────── */
+      .shape-selector {
+        grid-column: 1; grid-row: 3;
+        display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+        padding: 16px 24px 28px;
+        border-top: 1px solid rgba(140,126,120,0.12);
+        background: var(--background);
+      }
+      .shape-chip {
+        padding: 8px 18px; border-radius: 999px;
+        font-size: 13px; font-weight: 500;
+        border: 1.5px solid rgba(212,203,197,1);
+        background: var(--card); color: var(--muted-foreground);
+        cursor: pointer; min-height: 36px;
+        transition: background 140ms, border-color 140ms;
+      }
+      .shape-chip.active {
+        background: var(--primary); color: var(--primary-foreground);
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(107,63,94,0.18);
+      }
+      /*
+        6 pills: almond · coffin · square · round · oval · stiletto
+        On tablet: single row when wide enough; wraps to 2 rows on narrow.
+        No new generation triggered on shape change — client-side clipPath swap only.
+      */
+
+      /* ─── Right rail ────────────────────────────────────────────────── */
+      .right-rail {
+        grid-column: 2; grid-row: 2 / 4;
+        border-left: 1px solid rgba(140,126,120,0.16);
+        background: var(--card);
+        display: flex; flex-direction: column; gap: 0;
+        overflow-y: auto;
+      }
+      .rail-section {
+        padding: 20px 18px;
+        border-bottom: 1px solid rgba(140,126,120,0.14);
+      }
+      .rail-section:last-child { border-bottom: none; }
+      .rail-label {
+        font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+        color: var(--muted-foreground); margin-bottom: 12px;
+      }
+
+      /* Prompt display */
+      .prompt-text {
+        font-size: 14px; line-height: 1.65; color: var(--foreground);
+        background: var(--background); border-radius: 10px;
+        padding: 12px 14px;
+        border: 1px solid rgba(140,126,120,0.2);
+      }
+
+      /* Reference thumbs (3-up) */
+      .ref-thumbs {
+        display: flex; gap: 8px; flex-wrap: wrap;
+      }
+      .ref-thumb {
+        width: 72px; height: 72px; border-radius: 10px;
+        border: 1px solid rgba(140,126,120,0.2);
+        background: linear-gradient(135deg, rgba(107,63,94,0.08), rgba(212,165,168,0.22) 60%, rgba(201,169,110,0.12));
+        position: relative; overflow: hidden;
+      }
+      .ref-thumb.primary { border: 2px solid var(--primary); }
+      .ref-thumb .pin-badge {
+        position: absolute; bottom: 3px; right: 3px;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: var(--primary); border: 2px solid white;
+        display: grid; place-items: center;
+      }
+      .ref-thumb .pin-badge svg { width: 8px; height: 8px; }
+
+      /* Save / action row */
+      .action-row {
+        display: flex; flex-direction: column; gap: 10px;
+      }
+
+      /* ─── Signature Wash gradient (brand placeholder for generated image) */
+      .sig-wash { fill: url(#sigWash); }
+
+    </style>
+  </head>
+  <body>
+
+    <!-- ── Frame label ── -->
+    <div class="frame-label">
+      <span class="frame-num">D·1</span>
+      <span class="frame-title">/design/[id] — Visualizer View</span>
+      <span class="frame-sub">Tablet landscape · theme=flat · 6-shape selector · right rail: prompt + refs + save</span>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         FRAME 1 — Active visualization (named design, almond shape)
+         ════════════════════════════════════════════════════════════ -->
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span><span class="dot c"></span>
+        /design/d_abc123
+        <span class="tag">tablet · 1280×820 · theme=flat</span>
+      </div>
+
+      <div class="app-shell">
+
+        <!-- Sidebar -->
+        <nav class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail <em>Tech</em></div>
+          </div>
+          <div class="sb-nav">
+            <a href="#">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              Dashboard
+            </a>
+            <a href="#" class="active">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+              Designs
+            </a>
+            <a href="#">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Library
+            </a>
+          </div>
+        </nav>
+
+        <!-- Main grid -->
+        <div class="main">
+
+          <!-- Top bar -->
+          <div class="top-bar">
+            <a class="back-btn" href="#">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              Library
+            </a>
+            <span class="design-name">Floral French Tips</span>
+            <span class="meta">Almond · saved 4 min ago</span>
+            <button class="btn btn-ghost" style="font-size:13px; padding: 8px 14px; min-height:36px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Rename
+            </button>
+          </div>
+
+          <!-- Visualizer panel -->
+          <div class="visualizer-panel">
+            <div class="hand-stage" style="position:relative;">
+              <aside class="anno pin">theme="flat" · assets/hands/flat.svg · clipPath per shape</aside>
+              <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg" width="640" height="240" style="display:block;">
+                <defs>
+                  <linearGradient id="sigWash" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%"   stop-color="#E8D5E0"/>
+                    <stop offset="40%"  stop-color="#C9B4C9"/>
+                    <stop offset="70%"  stop-color="#D4A8B0"/>
+                    <stop offset="100%" stop-color="#E8C9A0"/>
+                  </linearGradient>
+                  <!-- Almond clip paths — landscape fan -->
+                  <clipPath id="v-pinky">   <ellipse cx="68"  cy="60"  rx="16" ry="25"/></clipPath>
+                  <clipPath id="v-ring">    <ellipse cx="180" cy="44"  rx="20" ry="31"/></clipPath>
+                  <clipPath id="v-middle">  <ellipse cx="308" cy="34"  rx="22" ry="35"/></clipPath>
+                  <clipPath id="v-index">   <ellipse cx="434" cy="44"  rx="20" ry="31"/></clipPath>
+                  <clipPath id="v-thumb">   <ellipse cx="546" cy="76"  rx="18" ry="27"/></clipPath>
+                </defs>
+                <!-- Hand silhouette — flat, Warm Parchment -->
+                <path d="M 120 238 Q 76 224 60 192 Q 44 158 52 124 L 62 76 Q 64 50 78 50 Q 92 50 94 76 L 96 94
+                          Q 98 66 102 42 Q 106 20 120 20 Q 134 20 136 44 L 138 62
+                          Q 140 36 152 22 Q 164 8 180 8 Q 196 8 198 30 L 200 52
+                          Q 204 30 220 18 Q 238 8 252 26 Q 266 44 262 68 L 258 96
+                          Q 266 76 280 66 Q 302 54 316 70 Q 330 86 322 110
+                          L 306 152 L 510 152 Q 560 168 558 202 Q 556 226 522 238 Z"
+                      fill="#F0EBE3" stroke="#D4CBC5" stroke-width="1.5"/>
+                <!-- Nail fills (almond) -->
+                <ellipse cx="68"  cy="60"  rx="16" ry="25" class="sig-wash" clip-path="url(#v-pinky)"/>
+                <ellipse cx="68"  cy="60"  rx="16" ry="25" fill="none" stroke="var(--nail-outline-color, #D4A5A8)" stroke-width="1.5"/>
+                <ellipse cx="180" cy="44"  rx="20" ry="31" class="sig-wash" clip-path="url(#v-ring)"/>
+                <ellipse cx="180" cy="44"  rx="20" ry="31" fill="none" stroke="var(--nail-outline-color, #D4A5A8)" stroke-width="1.5"/>
+                <ellipse cx="308" cy="34"  rx="22" ry="35" class="sig-wash" clip-path="url(#v-middle)"/>
+                <ellipse cx="308" cy="34"  rx="22" ry="35" fill="none" stroke="var(--nail-outline-color, #D4A5A8)" stroke-width="1.5"/>
+                <ellipse cx="434" cy="44"  rx="20" ry="31" class="sig-wash" clip-path="url(#v-index)"/>
+                <ellipse cx="434" cy="44"  rx="20" ry="31" fill="none" stroke="var(--nail-outline-color, #D4A5A8)" stroke-width="1.5"/>
+                <ellipse cx="546" cy="76"  rx="18" ry="27" class="sig-wash" clip-path="url(#v-thumb)"/>
+                <ellipse cx="546" cy="76"  rx="18" ry="27" fill="none" stroke="var(--nail-outline-color, #D4A5A8)" stroke-width="1.5"/>
+                <!-- Ground shadow -->
+                <ellipse cx="320" cy="236" rx="160" ry="7" fill="rgba(61,53,48,0.05)"/>
+              </svg>
+              <!-- Generated image label -->
+              <div style="margin-top:12px; font-size:11px; color:var(--muted-foreground); letter-spacing:0.12em; text-transform:uppercase;">
+                Generated design — Signature Wash = placeholder for imageUrl prop
+              </div>
+            </div>
+          </div>
+
+          <!-- Shape selector (6 pills) -->
+          <div class="shape-selector" style="position:relative;">
+            <aside class="anno" style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);">
+              6 shapes · clipPath swap only · no AI regen on switch
+            </aside>
+            <button class="shape-chip active">Almond</button>
+            <button class="shape-chip">Coffin</button>
+            <button class="shape-chip">Square</button>
+            <button class="shape-chip">Round</button>
+            <button class="shape-chip">Oval</button>
+            <button class="shape-chip">Stiletto</button>
+          </div>
+
+          <!-- Right rail -->
+          <aside class="right-rail">
+
+            <div class="rail-section">
+              <div class="rail-label">Design prompt</div>
+              <div class="prompt-text">
+                "Delicate white florals on a French tip base, subtle gold leaf accents near the cuticle"
+              </div>
+            </div>
+
+            <div class="rail-section">
+              <div class="rail-label">Reference images</div>
+              <div class="ref-thumbs">
+                <div class="ref-thumb primary">
+                  <!-- Pinterest pin cover placeholder -->
+                  <div class="pin-badge">
+                    <svg viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
+                  </div>
+                </div>
+                <div class="ref-thumb"></div>
+                <div class="ref-thumb"></div>
+              </div>
+            </div>
+
+            <div class="rail-section">
+              <div class="action-row">
+                <button class="btn btn-primary" style="width:100%;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Save design
+                </button>
+                <button class="btn btn-ghost" style="width:100%;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.87"/></svg>
+                  Regenerate
+                </button>
+              </div>
+            </div>
+
+            <div class="rail-section">
+              <div class="callout">
+                <strong>Right rail:</strong> prompt + refs are read-only in this state (new generation flow is /design/new). Regenerate uses stored inputs. Save persists shape + latest generation.
+              </div>
+            </div>
+
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         FRAME 2 — Unnamed design state (inline naming affordance)
+         ════════════════════════════════════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">D·1b</span>
+      <span class="frame-title">Unnamed design — inline naming affordance</span>
+      <span class="frame-sub">Design exists but has no name yet — US-D-3 unnamed-designs-first requirement</span>
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span><span class="dot c"></span>
+        /design/d_newxyz · unnamed
+        <span class="tag">inline naming</span>
+      </div>
+      <div class="app-shell">
+        <nav class="sidebar">
+          <div class="sb-logo"><div class="sb-mark">N</div><div class="sb-name">Nail <em>Tech</em></div></div>
+          <div class="sb-nav">
+            <a href="#">Dashboard</a>
+            <a href="#" class="active">Designs</a>
+            <a href="#">Library</a>
+          </div>
+        </nav>
+        <div class="main">
+          <div class="top-bar">
+            <a class="back-btn" href="#">← Library</a>
+            <!-- Inline name input — no name yet -->
+            <div style="flex:1; display:flex; align-items:center; gap:8px;">
+              <input
+                type="text"
+                placeholder="Name this design…"
+                style="font-family:'Fraunces',serif; font-size:17px; font-weight:400;
+                       background:transparent; border:none; border-bottom:1.5px dashed rgba(140,126,120,0.5);
+                       color:var(--foreground); padding:2px 4px; outline:none; width:260px;"
+              />
+              <aside class="anno">inline naming · optional · can be skipped</aside>
+            </div>
+            <span class="meta">Coffin · just generated</span>
+          </div>
+          <div class="visualizer-panel" style="padding:24px; justify-content:flex-start;">
+            <div style="font-size:13px; color:var(--muted-foreground); font-style:italic; margin-bottom:16px;">
+              [Visualizer hand — same layout as Frame D·1, coffin shape active]
+            </div>
+            <div class="callout" style="max-width:520px;">
+              <strong>Unnamed state:</strong> design card appears in library without a name. Library card shows placeholder "Untitled design". Naming is optional — user can add it now (top-bar inline input) or later (edit pencil in library card / reopened design).
+            </div>
+          </div>
+          <div class="shape-selector">
+            <button class="shape-chip">Almond</button>
+            <button class="shape-chip active">Coffin</button>
+            <button class="shape-chip">Square</button>
+            <button class="shape-chip">Round</button>
+            <button class="shape-chip">Oval</button>
+            <button class="shape-chip">Stiletto</button>
+          </div>
+          <aside class="right-rail">
+            <div class="rail-section">
+              <div class="rail-label">Design prompt</div>
+              <div class="prompt-text">"Marble swirl in dusty rose on coffin nails with matte topcoat"</div>
+            </div>
+            <div class="rail-section">
+              <div class="action-row">
+                <button class="btn btn-primary" style="width:100%;">Save design</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         FRAME 3 — Mobile fallback note (not full-fidelity)
+         ════════════════════════════════════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">D·1c</span>
+      <span class="frame-title">Mobile fallback — layout notes only</span>
+      <span class="frame-sub">Not full-fidelity · tablet is primary device · notes for implementer</span>
+    </div>
+    <div class="frame" style="max-width:480px;">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span><span class="dot c"></span>
+        /design/[id] · mobile
+        <span class="tag">notes only</span>
+      </div>
+      <div style="padding:24px; display:flex; flex-direction:column; gap:14px;">
+        <div class="callout">
+          <strong>Mobile layout contract:</strong>
+          <ul style="margin-top:8px; padding-left:16px; display:flex; flex-direction:column; gap:6px; font-size:12px; line-height:1.6;">
+            <li>Sidebar collapses to bottom nav bar (Dashboard / Designs / Library icons)</li>
+            <li>Main area: single column — visualizer hand at top (full-width, scaled down), shape pills scroll horizontally, right rail content stacks below as accordion sections</li>
+            <li>Hand stage: max-width 100%, scales proportionally — fingers still fan horizontally</li>
+            <li>Shape pills: horizontal scroll row (no wrap on mobile) with left/right fade indicators</li>
+            <li>Right rail: collapses to "Prompt", "References", "Actions" accordion rows below the visualizer</li>
+            <li>Save / Regenerate: sticky bottom action bar on mobile</li>
+          </ul>
+        </div>
+        <div class="callout">
+          <strong>Out of scope for v1 wireframe fidelity:</strong> mobile is noted for implementer guidance only. Tablet landscape is the primary review surface.
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

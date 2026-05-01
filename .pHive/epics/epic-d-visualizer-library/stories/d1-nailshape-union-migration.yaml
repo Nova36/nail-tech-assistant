@@ -1,0 +1,129 @@
+id: d1-nailshape-union-migration
+epic: epic-d-visualizer-library
+title: NailShape canonical migration to 6-shape union
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+description: |
+  Foundational migration of the `NailShape` union from the current 5-shape set to
+  the 6-shape canonical set Don picked 2026-05-01: union of PRD-spec'd shapes plus
+  retained existing scaffold shapes.
+
+  Current code (lib/types.ts:1, ShapeSelector.tsx:10): `'almond' | 'coffin' |
+  'square' | 'round' | 'oval'` (5).
+  Target: `'almond' | 'coffin' | 'square' | 'round' | 'oval' | 'stiletto'` (6).
+
+  This story does NOT introduce visualizer rendering — it widens the type union and
+  the wizard ShapeSelector pill list. Downstream stories (d3 mask assets, d4
+  visualizer, d5 integration) consume this 6-shape union. Persistence works
+  unchanged because Firestore stores shape as a string.
+
+acceptance_criteria:
+  - "Given the NailShape union, when imported by any consumer, then it accepts all 6 shapes including 'stiletto' | maps to FR-D-2 (extended union per Don's 2026-05-01 call)"
+  - 'Given the wizard ShapeSelector at /design/new, when rendered, then 6 shape pills appear (almond, coffin, square, round, oval, stiletto) | maps to FR-D-2'
+  - 'Given an exhaustiveness check (typed switch with `_: never` default), when a new shape is added or an existing one removed, then the type-checker fails until the switch is updated | hardens FR-D-2 against drift'
+
+steps:
+  - id: research
+    description: Read research-brief Q1 (NailShape mismatch). No external lookup needed; lock the union and consumer list.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing tests at tests/unit/types/nail-shape.test.ts asserting:
+      (1) NailShape accepts all 6 strings, (2) NailShape rejects an invalid
+      string at compile time (use `// @ts-expect-error` adjacent to invalid
+      assignments), (3) exhaustiveness helper `assertUnreachableShape(s: never)`
+      forces a compile error if a shape is added without handling.
+
+      Update tests/unit/components/ShapeSelector.test.tsx (or add if missing) to
+      assert SHAPES list has 6 entries and renders 6 pill buttons by accessible role/name.
+
+      Do NOT read the implementation source first — write tests from the spec.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Update lib/types.ts NailShape union to 6 shapes. Update
+      components/studio/ShapeSelector.tsx SHAPES list to match. Add
+      lib/types.ts helper `assertUnreachableShape(s: never): never`.
+
+      Verify no implicit-string-set assumption (length === 5) elsewhere by
+      grep before integrate. Codex: per feedback_codex_exec_quirks.md, do not
+      add test-shims; integrator removes stale @ts-* markers.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + lint + unit pass. Confirm no consumer assumes exactly 5 shapes.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d1): NailShape 6-shape canonical union` on epic-d/visualizer-library.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest
+  key_files:
+    - path: lib/types.ts
+      purpose: NailShape union source of truth — extend to 6
+    - path: components/studio/ShapeSelector.tsx
+      purpose: Render pill list — extend SHAPES to match union
+
+files_to_modify:
+  - file: lib/types.ts
+    change: NailShape union → 6 shapes; add assertUnreachableShape helper
+  - file: components/studio/ShapeSelector.tsx
+    change: SHAPES list → 6 entries
+  - file: tests/unit/types/nail-shape.test.ts
+    change: net-new test file
+  - file: tests/unit/components/ShapeSelector.test.tsx
+    change: assert 6 pills
+
+code_examples:
+  - title: Current NailShape union (replace)
+    file: lib/types.ts:1
+    snippet: |
+      export type NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval';
+  - title: Target NailShape union
+    snippet: |
+      export type NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval' | 'stiletto';
+
+      export function assertUnreachableShape(s: never): never {
+        throw new Error(`Unexpected NailShape: ${String(s)}`);
+      }
+  - title: Current SHAPES list (extend)
+    file: components/studio/ShapeSelector.tsx:10
+    snippet: |
+      const SHAPES: NailShape[] = ['almond', 'coffin', 'square', 'round', 'oval'];
+
+design_decisions:
+  - decision: 6-shape union (PRD canonical 4 + scaffold round/oval)
+    rationale: Don's pick 2026-05-01 — full coverage of common nail shapes, no data loss
+  - decision: Add assertUnreachableShape helper
+    rationale: Make future shape additions a compile-time fail; defends FR-D-2 invariant
+
+cross_cutting:
+  - concern: types-coverage
+    action: NailShape exhaustiveness test forces compile-fail when union changes
+
+risks:
+  - severity: low
+    description: A consumer somewhere assumes exact 5 shapes (e.g., `.length === 5` test or magic-number array)
+    mitigation: grep `'almond'\|'coffin'\|'square'\|'round'\|'oval'` before integrate
+
+references:
+  - path: .pHive/epics/epic-d-visualizer-library/docs/research-brief.md
+    relevant_excerpt: |
+      Q1 finding: NailShape mismatch — code has round|oval, PRD has stiletto.
+      Don picked union (6) to keep both groups.
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      FR-D-2: The app must support live switching among `almond`, `coffin`,
+      `square`, and `stiletto`. [Don extended to 6-shape union 2026-05-01.]

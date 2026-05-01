@@ -1,0 +1,117 @@
+epic: epic-d-visualizer-library
+status: approved
+approved_by: don
+approved_at: '2026-05-01T17:00:00Z'
+
+files:
+  page_layouts:
+    - visualizer-view.html # /design/[id] — page chrome / sidebar / right rail layout (visualizer chunk SUPERSEDED — see visualizer_canonical)
+    - library-grid.html # /library — 3-col card grid + empty state (card thumbnail visualizer chunk SUPERSEDED)
+    - reopened-design.html # /design/[id] reopened — idle / regenerating / failed / unnamed states (visualizer chunk SUPERSEDED)
+  aesthetic_history:
+    - aesthetic-option-1.html # original Option A — superseded by 2026-05-01 nails-focal reframe
+    - aesthetic-option-3.html # original Option C — line-art pivot reference
+  visualizer_canonical:
+    - ../NailVisualizer/stage.svg # CANONICAL nails-focal stage (theme=flat)
+    - ../NailVisualizer/stage-line-art.svg # CANONICAL theme=line-art reserved
+    - ../NailVisualizer/shapes/almond.svg
+    - ../NailVisualizer/shapes/coffin.svg
+    - ../NailVisualizer/shapes/square.svg
+    - ../NailVisualizer/shapes/round.svg
+    - ../NailVisualizer/shapes/oval.svg
+    - ../NailVisualizer/shapes/stiletto.svg
+    - ../NailVisualizer/preview.html # composite preview with shape selector
+
+wireframe_approval:
+  status: approved
+  approved_by: don
+  approved_at: '2026-05-01T17:00:00Z'
+  gate: exec
+  note: >
+    Approved 2026-05-01 after the nails-as-focal-point reframe. Page-level
+    layouts in this folder remain canonical for chrome / sidebar / right rail
+    / card grid. The inner-visualizer chunks within those wireframes are
+    SUPERSEDED — devs replace them with the components/NailVisualizer/
+    component built from `.pHive/wireframes/NailVisualizer/stage.svg` +
+    shapes/*.svg. d3 + d4 implement this directly.
+
+notes:
+  aesthetic_v1: "Nails-as-focal stage (no hand silhouette) — Don's reframe 2026-05-01"
+  pivot_path: "theme='line-art' via stage-line-art.svg swap — same component contract"
+  pivot_estimate_hours: '2-4 hours (cheaper after reframe — no hand asset to redraw)'
+  nail_shapes: 6 # almond, coffin, square, round, oval, stiletto
+  skin_tone: 'n/a — no skin rendered (no hand drawn)'
+  primary_device: 'tablet landscape (1280×540 stage viewBox)'
+  mobile_fallback: 'layout notes only — see Frame D·1c in visualizer-view.html'
+  reframe_2026_05_01: |
+    Original Option A/C had a flat-illustrated or line-art hand silhouette
+    with nails masked into fingertips. Don reframed: the hand is irrelevant,
+    the nails are the product. Stage is now 5 large fan-arranged nail anchors
+    (no full hand, no finger stubs). Each nail ~200×280 user units in a
+    1280×540 stage. Cheaper to pivot, cleaner focal point, more nail detail
+    visible at tablet viewing distance.
+
+design_decisions:
+  - id: dd-1
+    topic: 'Card thumbnail = mini visualizer render, not raw flat image'
+    rationale: >
+      Library cards show a scaled-down nails-focal stage with the masked
+      design, not the raw generated image. Reinforces the visualizer
+      identity throughout the app and turns library into a tile of nail-
+      design previews rather than a generic image grid. Updated 2026-05-01:
+      after the nails-focal reframe, card thumbnails render the new stage
+      layout (no hand silhouette). Fallback to raw image if visualizer
+      render is unavailable at save time.
+
+  - id: dd-2
+    topic: '6 shape pills fit single row on tablet landscape; wrap gracefully'
+    rationale: >
+      Almond, coffin, square, round, oval, stiletto — 6 chips at ~100px each
+      fit comfortably in a 960px content column at 1280px total width.
+      flex-wrap ensures they drop to 2 rows on narrower breakpoints without
+      clipping. No horizontal scroll on shape selector (would hide options).
+
+  - id: dd-3
+    topic: 'Regenerate failure preserves prior image; latest_generation_id unchanged'
+    rationale: >
+      On regen failure the visualizer shows the previous generation at reduced
+      opacity. Error surfaces as inline callout below the hand and in the right
+      rail. latest_generation_id is NOT updated. User sees 'Try again' — same
+      stored inputs re-fired. Aligns with FR-D-6 generation lineage preservation.
+
+  - id: dd-4
+    topic: 'Naming is inline in top bar (not modal or separate route)'
+    rationale: >
+      Unnamed state shows a borderless input with dashed underline in the top
+      bar. Named state shows name text + edit-pencil icon. No modal, no separate
+      route. Naming never blocks regenerate or shape switching (FR-D-7).
+
+  - id: dd-5
+    topic: 'Right rail is read-only for stored prompt + refs in reopened state'
+    rationale: >
+      The /design/[id] reopened route shows prompt and references as read-only
+      restored context, not editable fields. Editing prompt/refs starts a new
+      design via /design/new. This keeps regenerate semantics clean:
+      always uses the original design intent, not an ad-hoc edited state.
+
+  - id: dd-6
+    topic: 'Theme CSS vars scaffolded for flat→line-art pivot'
+    rationale: >
+      `--nail-outline-color`, `--nail-stroke-style` are declared as root CSS
+      vars. theme='flat' loads stage.svg with brand-default values.
+      theme='line-art' loads stage-line-art.svg with the brand line-art
+      stroke token + reserved displacement filter. Stage SVGs are imported
+      as separate asset files (no inline SVG in NailVisualizer.tsx) to keep
+      the pivot a one-import change. Pivot cost ~2-4h post-reframe.
+
+  - id: dd-7
+    topic: 'Nails-as-focal-point reframe — no hand drawn'
+    rationale: >
+      Don's call 2026-05-01 — the hand silhouette is irrelevant scaffolding;
+      the nails are the product. Stage drops the hand entirely and renders
+      5 large fan-arranged nail anchors (~200×280 user units each) in a
+      1280×540 viewBox. No finger stubs either (Claude Design's tighter
+      interpretation, accepted as-is). Effect: each nail is large enough to
+      read brushstroke detail at tablet viewing distance, library cards
+      become tiles of nail design rather than tiny hands. Pivot cost
+      drops because there's no hand asset to redraw for theme=line-art.

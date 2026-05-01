@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1180">
+<title>Option C — Line-Art Sketch</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --mulberry:   #6B3F5E;
+    --dusty-rose: #D4A5A8;
+    --champagne:  #C9A96E;
+    --ivory:      #FAF7F2;
+    --parchment:  #F0EBE3;
+    --charcoal:   #3D3530;
+    --taupe:      #6F625C;
+    --pearl:      #D4CBC5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--ivory);
+    color: var(--charcoal);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px;
+  }
+
+  .label-badge {
+    background: var(--champagne);
+    color: var(--charcoal);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+
+  .rec-tag {
+    display: inline-block;
+    background: var(--mulberry);
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 28px;
+    color: var(--charcoal);
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: var(--taupe);
+    margin-bottom: 32px;
+  }
+
+  .shape-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+
+  .shape-chip {
+    padding: 7px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    border: 1.5px solid var(--pearl);
+    background: var(--parchment);
+    color: var(--taupe);
+  }
+
+  .shape-chip.active {
+    background: var(--mulberry);
+    color: white;
+    border-color: var(--mulberry);
+    box-shadow: 0 0 0 3px rgba(107,63,94,0.18);
+  }
+
+  .visualizer-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(61,53,48,0.10), 0 2px 8px rgba(61,53,48,0.06);
+    padding: 40px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 860px;
+  }
+
+  .hand-stage {
+    position: relative;
+    width: 720px;
+    height: 300px;
+  }
+</style>
+</head>
+<body>
+
+<span class="label-badge">Option C — Line-Art Sketch <span class="rec-tag">Designer Pick</span></span>
+<h1>Five-Nail Visualizer</h1>
+<p class="subtitle">Hand-drawn style strokes · nail art floods in as fill · crafted / gift-like feeling · stiletto shape shown</p>
+
+<div class="shape-selector">
+  <div class="shape-chip">Almond</div>
+  <div class="shape-chip">Coffin</div>
+  <div class="shape-chip">Square</div>
+  <div class="shape-chip active">Stiletto</div>
+</div>
+
+<div class="visualizer-card">
+  <div class="hand-stage">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" width="720" height="300">
+      <defs>
+        <!-- Signature Wash gradient — brand placeholder for generated design -->
+        <linearGradient id="sigWash" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%"   stop-color="#E8D5E0"/>
+          <stop offset="40%"  stop-color="#C9B4C9"/>
+          <stop offset="70%"  stop-color="#D4A8B0"/>
+          <stop offset="100%" stop-color="#E8C9A0"/>
+        </linearGradient>
+
+        <!-- Stiletto nail clip paths — pointed tapered shape -->
+        <clipPath id="nail-stiletto-pinky">
+          <polygon points="78,105 94,40 110,105"/>
+        </clipPath>
+        <clipPath id="nail-stiletto-ring">
+          <polygon points="190,118 213,28 236,118"/>
+        </clipPath>
+        <clipPath id="nail-stiletto-middle">
+          <polygon points="328,124 353,16 378,124"/>
+        </clipPath>
+        <clipPath id="nail-stiletto-index">
+          <polygon points="466,118 489,28 512,118"/>
+        </clipPath>
+        <clipPath id="nail-stiletto-thumb">
+          <polygon points="592,128 614,52 636,128"/>
+        </clipPath>
+
+        <!-- Paper texture filter for sketch feel -->
+        <filter id="sketch" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+
+      <!-- ============ HAND BODY — parchment fill with sketch filter ============ -->
+      <!-- Palm base — slightly irregular path for hand-drawn feel -->
+      <path filter="url(#sketch)"
+        d="M 160 295 Q 108 278 88 240 Q 68 198 76 155
+           L 88 100 Q 90 68 108 66 Q 126 66 128 100 L 130 118
+           Q 132 86 136 58 Q 140 30 158 28 Q 176 28 178 58 L 180 80
+           Q 182 50 194 34 Q 208 16 226 16 Q 244 16 246 42 L 248 68
+           Q 254 42 272 30 Q 294 18 308 38 Q 322 58 316 88 L 312 118
+           Q 322 96 340 84 Q 368 70 382 90 Q 396 110 386 140
+           L 366 190 L 590 190 Q 648 210 646 252 Q 644 282 602 295 Z"
+        fill="#F0EBE3" stroke="none"/>
+
+      <!-- Hand outline strokes — variable weight, slightly irregular, champagne gold accents -->
+      <!-- Outer palm boundary -->
+      <path filter="url(#sketch)"
+        d="M 160 295 Q 108 278 88 240 Q 68 198 76 155
+           L 88 100 Q 90 68 108 66 Q 126 66 128 100 L 130 118"
+        fill="none" stroke="#3D3530" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Pinky finger outlines -->
+      <path filter="url(#sketch)"
+        d="M 128 118 L 128 100 Q 126 66 108 66 Q 90 68 88 100 L 88 165"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+
+      <!-- Ring finger outlines -->
+      <path filter="url(#sketch)"
+        d="M 130 80 L 132 58 Q 132 30 158 28 Q 176 28 178 58 L 180 80"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+      <path filter="url(#sketch)"
+        d="M 130 80 L 130 118"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+      <path filter="url(#sketch)"
+        d="M 180 80 L 180 118"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+
+      <!-- Middle finger outlines -->
+      <path filter="url(#sketch)"
+        d="M 180 68 L 182 50 Q 184 16 210 16 Q 236 16 236 50 L 238 68"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+      <path filter="url(#sketch)"
+        d="M 180 68 L 180 118 M 238 68 L 238 118"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+
+      <!-- Index finger outlines -->
+      <path filter="url(#sketch)"
+        d="M 238 56 L 240 38 Q 244 14 262 14 Q 280 14 282 38 L 282 60"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+      <path filter="url(#sketch)"
+        d="M 238 56 L 238 118 M 282 60 L 282 118"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+
+      <!-- Thumb outlines -->
+      <path filter="url(#sketch)"
+        d="M 282 100 L 296 82 Q 318 64 340 82 Q 358 102 350 130 L 340 160"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+      <path filter="url(#sketch)"
+        d="M 282 100 L 282 118 L 340 160"
+        fill="none" stroke="#3D3530" stroke-width="1.8" stroke-linecap="round"/>
+
+      <!-- Bottom of palm -->
+      <path filter="url(#sketch)"
+        d="M 88 200 Q 120 230 160 245 L 590 245 Q 640 230 642 260 Q 640 286 600 295 L 160 295"
+        fill="none" stroke="#3D3530" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- ============ STILETTO NAIL SHAPES — design floods in ============ -->
+      <!-- Signature Wash fills the stiletto polygon -->
+      <!-- Pinky -->
+      <polygon points="78,105 94,40 110,105" fill="url(#sigWash)" clip-path="url(#nail-stiletto-pinky)"/>
+      <polygon points="78,105 94,40 110,105" fill="none" stroke="#C9A96E" stroke-width="1.8" stroke-linejoin="round" filter="url(#sketch)"/>
+      <!-- Ring -->
+      <polygon points="190,118 213,28 236,118" fill="url(#sigWash)" clip-path="url(#nail-stiletto-ring)"/>
+      <polygon points="190,118 213,28 236,118" fill="none" stroke="#C9A96E" stroke-width="1.8" stroke-linejoin="round" filter="url(#sketch)"/>
+      <!-- Middle -->
+      <polygon points="328,124 353,16 378,124" fill="url(#sigWash)" clip-path="url(#nail-stiletto-middle)"/>
+      <polygon points="328,124 353,16 378,124" fill="none" stroke="#C9A96E" stroke-width="1.8" stroke-linejoin="round" filter="url(#sketch)"/>
+      <!-- Index -->
+      <polygon points="466,118 489,28 512,118" fill="url(#sigWash)" clip-path="url(#nail-stiletto-index)"/>
+      <polygon points="466,118 489,28 512,118" fill="none" stroke="#C9A96E" stroke-width="1.8" stroke-linejoin="round" filter="url(#sketch)"/>
+      <!-- Thumb -->
+      <polygon points="592,128 614,52 636,128" fill="url(#sigWash)" clip-path="url(#nail-stiletto-thumb)"/>
+      <polygon points="592,128 614,52 636,128" fill="none" stroke="#C9A96E" stroke-width="1.8" stroke-linejoin="round" filter="url(#sketch)"/>
+
+      <!-- Knuckle detail strokes — add depth, hand-drawn character -->
+      <path d="M 98 185 Q 108 178 118 185" fill="none" stroke="#D4CBC5" stroke-width="1.2" stroke-linecap="round" filter="url(#sketch)"/>
+      <path d="M 150 192 Q 162 185 174 192" fill="none" stroke="#D4CBC5" stroke-width="1.2" stroke-linecap="round" filter="url(#sketch)"/>
+      <path d="M 194 198 Q 208 190 222 198" fill="none" stroke="#D4CBC5" stroke-width="1.2" stroke-linecap="round" filter="url(#sketch)"/>
+      <path d="M 240 195 Q 252 188 264 195" fill="none" stroke="#D4CBC5" stroke-width="1.2" stroke-linecap="round" filter="url(#sketch)"/>
+      <path d="M 286 175 Q 296 168 306 175" fill="none" stroke="#D4CBC5" stroke-width="1.2" stroke-linecap="round" filter="url(#sketch)"/>
+
+      <!-- Soft ground shadow -->
+      <ellipse cx="364" cy="296" rx="190" ry="8" fill="rgba(61,53,48,0.05)"/>
+    </svg>
+  </div>
+
+  <!-- Design name + meta row -->
+  <div style="margin-top:28px; display:flex; align-items:center; gap:16px; width:100%; justify-content:center;">
+    <span style="font-family:'Fraunces',serif; font-size:18px; font-weight:600; color:var(--charcoal);">Floral French Tips</span>
+    <span style="font-size:12px; color:var(--taupe); font-family:'Inter',sans-serif;">Stiletto · saved 2 min ago</span>
+  </div>
+</div>
+
+<div style="margin-top:24px; background:var(--parchment); border-radius:12px; padding:16px 24px; max-width:860px; width:100%;">
+  <p style="font-size:13px; color:var(--taupe); font-family:'Inter',sans-serif; line-height:1.6;">
+    <strong style="color:var(--charcoal);">Option C — Line-Art Sketch.</strong>
+    Hand-drawn SVG strokes with slight displacement filter · Champagne Gold nail outlines ·
+    Signature Wash fills stiletto-shaped clipPath · knuckle details add depth and character.
+    Skin-tone-neutral. Each shape variant redraws stroke paths — medium SVG authoring cost.
+    <br><br>
+    <strong>Brand fit:</strong> Best alignment with "crafted, warm, and quietly indulgent — feels like a gift, not a tool."
+    Fraunces serif heading + sketch hand = coherent bespoke studio identity.
+    <br><br>
+    <strong>Tradeoff:</strong> More SVG craft than Option A. Risk: may read as "unfinished" to users expecting a polished app UI
+    rather than an atelier aesthetic.
+  </p>
+</div>
+
+</body>
+</html>
