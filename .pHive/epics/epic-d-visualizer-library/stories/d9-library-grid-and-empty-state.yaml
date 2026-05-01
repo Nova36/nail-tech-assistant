@@ -59,7 +59,7 @@ steps:
 
       Add components/DesignLibrary.tsx + components/DesignCard.tsx + components/LibraryEmptyState.tsx. DesignCard uses Confirm.tsx imageUrl resolution helper (extract to lib/designs/imageUrl.ts if not already shared). Mount DesignNameField from d7 inline.
 
-      Update firestore.rules for /designs list query (allow where ownerUid == request.auth.uid). Verify in research first; epic C may already cover this for /design/new flow.
+      **Firestore rules:** the existing `allow read` clause on `/designs/{designId}` covers BOTH `get` AND `list` queries (Firestore semantics — `allow read` is shorthand for both). Verify in research; expected outcome is no rule edit needed (Epic C baseline already covers it). Owner field is `userId` (NOT ownerUid). Rules-lane test asserts the read rule for list queries with `where userId == request.auth.uid`. Per security audit `.pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md`.
 
       No new Storage rule changes if thumbnail uses Confirm.tsx pattern.
     agent: developer
@@ -100,7 +100,7 @@ files_to_modify:
   - file: lib/designs/imageUrl.ts
     change: extract from Confirm.tsx if not shared (research step decides)
   - file: firestore.rules
-    change: confirm /designs list rule covers owner-scoped query
+    change: VERIFY existing `allow read` covers list (per Firestore semantics it does). Owner field is `userId` (NOT ownerUid). Expected no edit needed. Per security audit.
   - file: tests/unit/components/DesignLibrary.test.tsx
     change: net-new
   - file: tests/unit/components/DesignCard.test.tsx
@@ -157,3 +157,9 @@ references:
       Slice 6 — Design Library + Regenerate. WHAT WORKS: a generated design can
       be named, revisited later, reopened into the visualizer, and regenerated
       from the same stored inputs.
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      Owner field is `userId` (NOT ownerUid). Existing `allow read` on
+      `/designs/{designId}` covers both get + list per Firestore semantics —
+      Epic C baseline likely already covers d9's list rule needs. Composite
+      index for userId + createdAt already present in firestore.indexes.json.

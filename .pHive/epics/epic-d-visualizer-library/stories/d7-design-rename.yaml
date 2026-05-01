@@ -41,13 +41,21 @@ steps:
     depends_on: [ui-design]
   - id: implement
     description: |
-      Add app/api/designs/[id]/save/route.ts POST handler. Validate body { name?: string | null }, max 80 chars (or as approved at design discussion). Auth gate. Persist via Firestore Admin with field-scoped write.
+      Add app/api/designs/[id]/save/route.ts POST handler. Validate body { name?: string | null }, max 80 chars. Auth gate via `getSession(req)`. Persist via Firestore Admin SDK with field-scoped write (only `name` + `updatedAt`).
 
       Add components/DesignNameField.tsx — controlled input, optimistic update, error revert.
 
       Update designs converter if `name` field is missing from schema (research step confirms).
 
-      Update firestore.rules for /designs/{id} write to allow `name` + `updatedAt` only via this route's path pattern (or rely on field-diff hasOnly).
+      **Firestore rules:** d2 already wrote BOTH the d2 (nail_shape + updatedAt) AND d7 (name + updatedAt) field-scoped `allow update` clauses per security audit. Verify the d7 clause is present:
+      ```
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'updatedAt']);
+      ```
+      Expected outcome: no rule edit needed (d2 covered it). Defensive add only if missing. Owner field is `userId` — NOT ownerUid. Rule is defense-in-depth (Admin SDK bypasses rules in production).
 
       Catch blocks log code+message.
     agent: developer
@@ -82,7 +90,7 @@ files_to_modify:
   - file: lib/firestore/converters/designs.ts
     change: ensure `name` field round-trips (verify in research)
   - file: firestore.rules
-    change: scope `name`+`updatedAt` write via save route's diff
+    change: VERIFY d7's name+updatedAt allow-update clause is present (d2 typically wrote it). Defensive add if missing. Owner field is `userId` (NOT ownerUid). Per security audit.
   - file: tests/integration/designs-save-route.test.ts
     change: net-new
   - file: tests/unit/design-page/DesignNameField.test.tsx
@@ -130,3 +138,9 @@ references:
     relevant_excerpt: |
       Slice 6 manifest #4 save route, #8 DesignNameField. Interface saveDesign(designId, name?).
       Validation: naming optional, can be added later.
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      d7's allow-update clause is written by d2 (REPLACE pattern). d7 verifies
+      and defensively adds only if missing. Use `userId` (NOT ownerUid) +
+      `hasOnly(['name', 'updatedAt'])` diff-key constraint. Strike "via this
+      route's path pattern" wording — Firestore rules have no HTTP route context.

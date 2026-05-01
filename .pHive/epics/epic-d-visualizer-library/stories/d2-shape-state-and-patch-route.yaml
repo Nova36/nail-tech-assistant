@@ -38,9 +38,32 @@ steps:
     depends_on: [research]
   - id: implement
     description: |
-      Add lib/designs/shape-state.ts: pure `applyShape` validator + Firestore writer wrapper that updates only `nail_shape` + `updatedAt`.
-      Add app/api/designs/[id]/shape/route.ts: PATCH handler. Auth gate via getSession(req). Validate body { nailShape: NailShape } using imported union (catches drift if d1 changes). Reject any other body keys.
-      Update firestore.rules to allow owner-only PATCH where the diff is exactly { nail_shape, updatedAt }.
+      Add lib/designs/shape-state.ts: pure `applyShape` validator + Firestore Admin SDK writer wrapper that updates only `nail_shape` + `updatedAt`.
+
+      Add app/api/designs/[id]/shape/route.ts: PATCH handler. Auth gate via `getSession(req)` (route-handler session helper, NOT the server-action variant). Use Admin SDK Firestore for the write — same convention as Epic C lifecycle.ts. Validate body { nailShape: NailShape } using imported union (catches drift if d1 changes). Reject any other body keys.
+
+      **Update firestore.rules per the approved north-star composition** at `.pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md`:
+      - Canonical owner field is `userId` (NOT ownerUid). All rule clauses use `userId`.
+      - Existing baseline `/designs/{designId} allow update` clause is permissive (any field, owner-only). It MUST be REPLACED — not added alongside. Adding alongside leaves the permissive clause in effect (Firestore evaluates `allow` clauses disjunctively) and the field-scope is never enforced.
+      - The replacement is the union of d2's update clause + d7's update clause. d2 writes BOTH clauses now (so d7 has nothing to add later). d2's clause:
+        ```
+        allow update: if request.auth != null
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['nail_shape', 'updatedAt']);
+        ```
+      - d7's clause (write now, d7 verifies):
+        ```
+        allow update: if request.auth != null
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['name', 'updatedAt']);
+        ```
+
+      Firestore rule is defense-in-depth (Admin SDK bypasses rules in production); rules-lane tests assert it independently with the client SDK emulator.
+
       Catch blocks log code+message per feedback_silent_catches_cost_time.md.
     agent: developer
     depends_on: [test-spec]
@@ -75,7 +98,7 @@ files_to_modify:
   - file: app/api/designs/[id]/shape/route.ts
     change: net-new — PATCH handler
   - file: firestore.rules
-    change: extend designs/{id} rule to allow owner-only nail_shape PATCH
+    change: REPLACE existing permissive `/designs/{designId} allow update` clause with field-scoped union (d2 nail_shape + d7 name). All clauses use `userId` (NOT ownerUid). Per security audit.
   - file: tests/unit/designs/shape-state.test.ts
     change: net-new
   - file: tests/integration/designs-shape-route.test.ts
@@ -122,3 +145,10 @@ references:
     relevant_excerpt: |
       Firebase Storage emulator drops rules deployments under concurrent test files.
       Fix: fileParallelism: false in vitest.config.rules.ts. (Same caution applies to Firestore-rules tests.)
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      Approved rules composition: REPLACE existing `/designs/{designId} allow
+      update` baseline with field-scoped union of d2 (nail_shape + updatedAt)
+      + d7 (name + updatedAt). Owner field is `userId` (NOT ownerUid).
+      Adding field-scoped clauses alongside the permissive baseline is
+      ineffective (Firestore evaluates allow disjunctively).

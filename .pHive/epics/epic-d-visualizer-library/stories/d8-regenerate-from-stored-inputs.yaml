@@ -160,3 +160,8 @@ references:
   - path: lib/designs/lifecycle.ts
     relevant_excerpt: |
       [persistGenerationResult atomically updates latestGenerationId in a Firestore transaction; reuse intact]
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      d8 writes via Admin SDK; bypasses Firestore rules in production.
+      Existing /generations/{id} baseline rules already cover client-SDK
+      behaviors. d8 needs NO rule edit. Owner field is `userId`.
