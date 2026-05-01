@@ -1,7 +1,7 @@
 id: c17-generation-ui
 epic: epic-c-reference-and-generation
 title: '<GenerateButton> + <GenerationPreview> + <GenerationErrorState> — polished pending state, raw image preview, 5-state error taxonomy with adjust-inputs CTA'
-status: pending
+status: shipped
 complexity: high
 methodology: tdd
 depends_on: [c16-generate-design-surface, c11-design-new-workspace-ui]
