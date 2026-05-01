@@ -48,9 +48,10 @@ export const designConverter: FirestoreDataConverter<Design> = {
   },
   fromFirestore(snapshot) {
     const data = snapshot.data();
-    if (!isNailShape(data.nailShape)) {
+    const storedNailShape = data.nail_shape ?? data.nailShape;
+    if (!isNailShape(storedNailShape)) {
       throw new Error(
-        `designConverter: invalid nailShape: ${String(data.nailShape)}`
+        `designConverter: invalid nailShape: ${String(storedNailShape)}`
       );
     }
     const secondary = Array.isArray(data.secondaryReferenceIds)
@@ -63,7 +64,7 @@ export const designConverter: FirestoreDataConverter<Design> = {
       primaryReferenceId: data.primaryReferenceId as string,
       secondaryReferenceIds: secondary,
       promptText: (data.promptText ?? null) as string | null,
-      nailShape: data.nailShape,
+      nailShape: storedNailShape,
       latestGenerationId: (data.latestGenerationId ?? null) as string | null,
       createdAt: data.createdAt as string,
       updatedAt: data.updatedAt as string,
