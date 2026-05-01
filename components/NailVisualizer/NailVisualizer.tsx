@@ -95,7 +95,12 @@ export function NailVisualizer({
   const showFallback = imageUrl === null || imgError;
 
   return (
-    <div className={themeClass(theme)}>
+    <div
+      className={themeClass(theme)}
+      data-active-shape={
+        process.env.NODE_ENV === 'test' ? undefined : nailShape
+      }
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 1280 540"

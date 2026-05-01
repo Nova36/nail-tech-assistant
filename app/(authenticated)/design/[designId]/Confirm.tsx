@@ -3,15 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { NailVisualizer, VisualizerFrame } from '@/components/NailVisualizer';
 import { GenerateButton } from '@/components/studio/GenerateButton';
 import { GenerationErrorState } from '@/components/studio/GenerationErrorState';
-import { GenerationPreview } from '@/components/studio/GenerationPreview';
+import { ShapeSelector } from '@/components/studio/ShapeSelector';
 import { WizardProgressStrip } from '@/components/studio/WizardProgressStrip';
 
 import type {
   GenerateDesignErrorCode,
   GenerateDesignResult,
 } from '@/app/(authenticated)/design/actions';
+import type { NailShape } from '@/lib/types';
 
 type ConfirmProps = {
   designId: string;
@@ -101,11 +103,15 @@ export function Confirm({
   latestGenerationId,
 }: ConfirmProps) {
   const router = useRouter();
+  const initialShape = (nailShape ?? 'almond') as NailShape;
   const [state, setState] = useState<GenerationState>(
     latestGenerationId ? { phase: 'idle' } : { phase: 'pending' }
   );
+  const [activeShape, setActiveShape] = useState<NailShape>(initialShape);
+  const [shapeUpdateError, setShapeUpdateError] = useState<string | null>(null);
   const firedRef = useRef(false);
   const errorHeadingRef = useRef<HTMLHeadingElement>(null);
+  const shapeRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (firedRef.current || latestGenerationId) {
@@ -162,6 +168,51 @@ export function Confirm({
     })();
   }
 
+  async function onShapeChange(nextShape: NailShape) {
+    if (state.phase !== 'success' || nextShape === activeShape) {
+      return;
+    }
+
+    const previousShape = activeShape;
+    const requestId = shapeRequestIdRef.current + 1;
+    shapeRequestIdRef.current = requestId;
+    setShapeUpdateError(null);
+    setActiveShape(nextShape);
+
+    try {
+      const response = await fetch(`/api/designs/${designId}/shape`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nailShape: nextShape }),
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error('[design-page] shape patch failed', {
+          code: response.status,
+          message: responseText || response.statusText,
+        });
+
+        if (shapeRequestIdRef.current === requestId) {
+          setActiveShape(previousShape);
+          setShapeUpdateError('Shape update failed');
+        }
+      }
+    } catch (error) {
+      console.error('[design-page] shape patch failed', {
+        code: 'network_error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+
+      if (shapeRequestIdRef.current === requestId) {
+        setActiveShape(previousShape);
+        setShapeUpdateError('Shape update failed');
+      }
+    }
+  }
+
   const statusText =
     state.phase === 'pending'
       ? STATUS_COPY.pending
@@ -190,12 +241,67 @@ export function Confirm({
       >
         {state.phase === 'pending' ? <PendingView /> : null}
         {state.phase === 'success' ? (
-          <GenerationPreview
-            imageUrl={state.imageUrl}
-            nailShape={nailShape}
-            promptText={promptText}
-            onAdjust={() => router.push('/design/new')}
-          />
+          <div className="space-y-6">
+            <div className="space-y-2 text-center">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+                Step 3 of 3
+              </p>
+              <h2 className="font-heading-display text-4xl font-light tracking-[-0.03em] text-foreground md:text-5xl">
+                Here&apos;s your design.
+              </h2>
+              <p className="mx-auto max-w-prose text-sm text-muted-foreground">
+                Save it to your Library, try another version, or step back and
+                adjust.
+              </p>
+            </div>
+
+            <VisualizerFrame>
+              {/* sr-only off-screen img for screen readers; the visualizer
+                  SVG above is aria-hidden. Next/Image not used because LCP
+                  is irrelevant for sr-only content. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={state.imageUrl}
+                alt="Generated nail design preview"
+                className="sr-only"
+              />
+              <div data-testid="nail-visualizer" aria-hidden="true">
+                <NailVisualizer
+                  theme="flat"
+                  imageUrl={state.imageUrl}
+                  nailShape={activeShape}
+                />
+              </div>
+              <div data-testid="shape-selector">
+                <ShapeSelector value={activeShape} onChange={onShapeChange} />
+              </div>
+            </VisualizerFrame>
+
+            {promptText ? (
+              <div className="rounded-[24px] border border-border/70 bg-card/70 p-4 text-sm shadow-[0_20px_50px_rgba(61,53,48,0.08)]">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Prompt
+                </p>
+                <p className="mt-2 text-foreground">{promptText}</p>
+              </div>
+            ) : null}
+
+            {shapeUpdateError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {shapeUpdateError}
+              </p>
+            ) : null}
+
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => router.push('/design/new')}
+                className="min-h-[44px] text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
+              >
+                ← Back to adjust
+              </button>
+            </div>
+          </div>
         ) : null}
         {state.phase === 'failure' ? (
           <GenerationErrorState
