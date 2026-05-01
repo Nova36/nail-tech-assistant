@@ -7,6 +7,7 @@ import type { Reference } from '@/lib/types';
 type ReferenceCardProps = {
   reference: Reference;
   isPrimary: boolean;
+  previewUrl?: string;
   onMarkPrimary?: () => void;
   onRemove?: () => void;
 };
@@ -14,14 +15,16 @@ type ReferenceCardProps = {
 export function ReferenceCard({
   reference,
   isPrimary,
+  previewUrl,
   onMarkPrimary,
 }: ReferenceCardProps) {
+  const imageSrc = previewUrl ?? reference.sourceUrl ?? null;
   return (
     <article className="overflow-hidden rounded-3xl border border-border bg-card">
       <div className="relative aspect-square w-full bg-muted">
-        {reference.sourceUrl ? (
+        {imageSrc ? (
           <Image
-            src={reference.sourceUrl}
+            src={imageSrc}
             alt={`Reference ${reference.id}`}
             fill
             sizes="(max-width: 768px) 100vw, 33vw"

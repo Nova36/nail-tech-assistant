@@ -5,7 +5,7 @@ import { useId, useState } from 'react';
 import type { Reference } from '@/lib/types';
 
 type UploadZoneProps = {
-  onAdd: (reference: Reference) => void;
+  onAdd: (reference: Reference, previewUrl: string) => void;
   onError?: (reason: string, message: string) => void;
 };
 
@@ -26,6 +26,7 @@ export function UploadZone({ onAdd, onError }: UploadZoneProps) {
     }
 
     setPending(true);
+    const previewUrl = URL.createObjectURL(file);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -40,11 +41,13 @@ export function UploadZone({ onAdd, onError }: UploadZoneProps) {
         | { ok: false; reason: string; message: string };
 
       if (result.ok) {
-        onAdd(result.reference);
+        onAdd(result.reference, previewUrl);
       } else {
+        URL.revokeObjectURL(previewUrl);
         onError?.(result.reason, result.message);
       }
     } catch (error) {
+      URL.revokeObjectURL(previewUrl);
       onError?.(
         'network',
         error instanceof Error ? error.message : 'upload failed'

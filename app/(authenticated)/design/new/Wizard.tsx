@@ -19,6 +19,7 @@ export function Wizard({ initialPins }: WizardProps) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [workingSet, setWorkingSet] = useState<Reference[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [primary, setPrimary] = useState<Reference | null>(null);
   const [secondaryOrder] = useState<string[]>([]);
   const [promptText, setPromptText] = useState('');
@@ -26,7 +27,7 @@ export function Wizard({ initialPins }: WizardProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  function addReference(reference: Reference) {
+  function addReference(reference: Reference, previewUrl: string) {
     setError(null);
     setWorkingSet((current) => {
       if (current.some((item) => item.id === reference.id)) {
@@ -35,6 +36,28 @@ export function Wizard({ initialPins }: WizardProps) {
 
       return [...current, reference];
     });
+    setPreviewUrls((current) =>
+      current[reference.id]
+        ? current
+        : { ...current, [reference.id]: previewUrl }
+    );
+  }
+
+  function removeReference(referenceId: string) {
+    setError(null);
+    setWorkingSet((current) =>
+      current.filter((item) => item.id !== referenceId)
+    );
+    setPreviewUrls((current) => {
+      const url = current[referenceId];
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+      const next = { ...current };
+      delete next[referenceId];
+      return next;
+    });
+    setPrimary((current) => (current?.id === referenceId ? null : current));
   }
 
   async function handleGenerate() {
@@ -78,7 +101,9 @@ export function Wizard({ initialPins }: WizardProps) {
         <WizardStep1Inspiration
           initialPins={initialPins}
           workingSet={workingSet}
+          previewUrls={previewUrls}
           onAddReference={addReference}
+          onRemoveReference={removeReference}
           onContinue={() => {
             setError(null);
             setStep(2);
@@ -87,6 +112,7 @@ export function Wizard({ initialPins }: WizardProps) {
       ) : (
         <WizardStep2Direction
           workingSet={workingSet}
+          previewUrls={previewUrls}
           primary={primary}
           secondaryOrder={secondaryOrder}
           promptText={promptText}

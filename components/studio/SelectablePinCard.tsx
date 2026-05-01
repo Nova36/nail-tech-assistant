@@ -10,7 +10,7 @@ import type { Reference } from '@/lib/types';
 
 type SelectablePinCardProps = {
   pin: PinterestPin;
-  onAdd: (reference: Reference) => void;
+  onAdd: (reference: Reference, previewUrl: string) => void;
   onError?: (reason: string, message: string) => void;
 };
 
@@ -40,7 +40,7 @@ export function SelectablePinCard({
     const result = await selectPinterestPin(pin.id);
 
     if (result.ok) {
-      onAdd(result.reference);
+      onAdd(result.reference, imageUrl || '');
     } else {
       onError?.(result.reason, result.message);
     }

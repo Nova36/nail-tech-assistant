@@ -8,6 +8,7 @@ import type { NailShape, Reference } from '@/lib/types';
 
 type WizardStep2DirectionProps = {
   workingSet: Reference[];
+  previewUrls: Record<string, string>;
   primary: Reference | null;
   secondaryOrder: string[];
   promptText: string;
@@ -23,6 +24,7 @@ type WizardStep2DirectionProps = {
 
 export function WizardStep2Direction({
   workingSet,
+  previewUrls,
   primary,
   secondaryOrder,
   promptText,
@@ -55,6 +57,7 @@ export function WizardStep2Direction({
           <ReferenceCard
             key={reference.id}
             reference={reference}
+            previewUrl={previewUrls[reference.id]}
             isPrimary={primary?.id === reference.id}
             onMarkPrimary={() => onMarkPrimary(reference)}
           />
