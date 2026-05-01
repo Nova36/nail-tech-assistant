@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../styles/visualizer.css';
 
 :root {
   --color-primary: #6b3f5e;

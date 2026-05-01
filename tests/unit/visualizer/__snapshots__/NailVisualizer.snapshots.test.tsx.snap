@@ -1,0 +1,853 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`NailVisualizer snapshots — theme=flat per shape > snapshot nailShape="almond" 1`] = `
+<div
+  class="nail-visualizer-theme-flat"
+>
+  <svg
+    aria-label="Five nail canvas"
+    height="540"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    viewBox="0 0 1280 540"
+    width="1280"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <clippath
+        clipPathUnits="userSpaceOnUse"
+        id="nail-tip-almond"
+      >
+        <path
+          d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        />
+      </clippath>
+    </defs>
+    <g
+      id="nail-thumb"
+      transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)"
+    >
+      <image
+        clip-path="url(#nail-tip-almond)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-index"
+      transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-almond)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-middle"
+      transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-almond)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-ring"
+      transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-almond)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-pinky"
+      transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)"
+    >
+      <image
+        clip-path="url(#nail-tip-almond)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+  </svg>
+</div>
+`;
+
+exports[`NailVisualizer snapshots — theme=flat per shape > snapshot nailShape="coffin" 1`] = `
+<div
+  class="nail-visualizer-theme-flat"
+>
+  <svg
+    aria-label="Five nail canvas"
+    height="540"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    viewBox="0 0 1280 540"
+    width="1280"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <clippath
+        clipPathUnits="userSpaceOnUse"
+        id="nail-tip-coffin"
+      >
+        <path
+          d="M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        />
+      </clippath>
+    </defs>
+    <g
+      id="nail-thumb"
+      transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)"
+    >
+      <image
+        clip-path="url(#nail-tip-coffin)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-index"
+      transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-coffin)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-middle"
+      transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-coffin)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-ring"
+      transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-coffin)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-pinky"
+      transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)"
+    >
+      <image
+        clip-path="url(#nail-tip-coffin)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+  </svg>
+</div>
+`;
+
+exports[`NailVisualizer snapshots — theme=flat per shape > snapshot nailShape="oval" 1`] = `
+<div
+  class="nail-visualizer-theme-flat"
+>
+  <svg
+    aria-label="Five nail canvas"
+    height="540"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    viewBox="0 0 1280 540"
+    width="1280"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <clippath
+        clipPathUnits="userSpaceOnUse"
+        id="nail-tip-oval"
+      >
+        <path
+          d="M 14 138 Q 14 50 50 8 Q 86 50 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        />
+      </clippath>
+    </defs>
+    <g
+      id="nail-thumb"
+      transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)"
+    >
+      <image
+        clip-path="url(#nail-tip-oval)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 14 50 50 8 Q 86 50 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-index"
+      transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-oval)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 14 50 50 8 Q 86 50 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-middle"
+      transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-oval)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 14 50 50 8 Q 86 50 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-ring"
+      transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-oval)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 14 50 50 8 Q 86 50 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-pinky"
+      transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)"
+    >
+      <image
+        clip-path="url(#nail-tip-oval)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 14 50 50 8 Q 86 50 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+  </svg>
+</div>
+`;
+
+exports[`NailVisualizer snapshots — theme=flat per shape > snapshot nailShape="round" 1`] = `
+<div
+  class="nail-visualizer-theme-flat"
+>
+  <svg
+    aria-label="Five nail canvas"
+    height="540"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    viewBox="0 0 1280 540"
+    width="1280"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <clippath
+        clipPathUnits="userSpaceOnUse"
+        id="nail-tip-round"
+      >
+        <path
+          d="M 14 138 L 14 60 Q 14 16 50 16 Q 86 16 86 60 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        />
+      </clippath>
+    </defs>
+    <g
+      id="nail-thumb"
+      transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)"
+    >
+      <image
+        clip-path="url(#nail-tip-round)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 60 Q 14 16 50 16 Q 86 16 86 60 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-index"
+      transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-round)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 60 Q 14 16 50 16 Q 86 16 86 60 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-middle"
+      transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-round)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 60 Q 14 16 50 16 Q 86 16 86 60 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-ring"
+      transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-round)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 60 Q 14 16 50 16 Q 86 16 86 60 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-pinky"
+      transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)"
+    >
+      <image
+        clip-path="url(#nail-tip-round)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 60 Q 14 16 50 16 Q 86 16 86 60 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+  </svg>
+</div>
+`;
+
+exports[`NailVisualizer snapshots — theme=flat per shape > snapshot nailShape="square" 1`] = `
+<div
+  class="nail-visualizer-theme-flat"
+>
+  <svg
+    aria-label="Five nail canvas"
+    height="540"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    viewBox="0 0 1280 540"
+    width="1280"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <clippath
+        clipPathUnits="userSpaceOnUse"
+        id="nail-tip-square"
+      >
+        <path
+          d="M 14 138 L 14 22 Q 14 8 26 8 L 74 8 Q 86 8 86 22 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        />
+      </clippath>
+    </defs>
+    <g
+      id="nail-thumb"
+      transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)"
+    >
+      <image
+        clip-path="url(#nail-tip-square)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 22 Q 14 8 26 8 L 74 8 Q 86 8 86 22 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-index"
+      transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-square)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 22 Q 14 8 26 8 L 74 8 Q 86 8 86 22 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-middle"
+      transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-square)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 22 Q 14 8 26 8 L 74 8 Q 86 8 86 22 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-ring"
+      transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-square)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 22 Q 14 8 26 8 L 74 8 Q 86 8 86 22 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-pinky"
+      transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)"
+    >
+      <image
+        clip-path="url(#nail-tip-square)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 L 14 22 Q 14 8 26 8 L 74 8 Q 86 8 86 22 L 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+  </svg>
+</div>
+`;
+
+exports[`NailVisualizer snapshots — theme=flat per shape > snapshot nailShape="stiletto" 1`] = `
+<div
+  class="nail-visualizer-theme-flat"
+>
+  <svg
+    aria-label="Five nail canvas"
+    height="540"
+    preserveAspectRatio="xMidYMid meet"
+    role="img"
+    viewBox="0 0 1280 540"
+    width="1280"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <clippath
+        clipPathUnits="userSpaceOnUse"
+        id="nail-tip-stiletto"
+      >
+        <path
+          d="M 14 138 Q 22 80 50 2 Q 78 80 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        />
+      </clippath>
+    </defs>
+    <g
+      id="nail-thumb"
+      transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)"
+    >
+      <image
+        clip-path="url(#nail-tip-stiletto)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 22 80 50 2 Q 78 80 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-index"
+      transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-stiletto)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 22 80 50 2 Q 78 80 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-middle"
+      transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-stiletto)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 22 80 50 2 Q 78 80 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-ring"
+      transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)"
+    >
+      <image
+        clip-path="url(#nail-tip-stiletto)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 22 80 50 2 Q 78 80 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+    <g
+      id="nail-pinky"
+      transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)"
+    >
+      <image
+        clip-path="url(#nail-tip-stiletto)"
+        data-testid="nail-image"
+        height="140"
+        href="https://example.com/x.png"
+        preserveAspectRatio="xMidYMid slice"
+        width="100"
+        x="0"
+        y="0"
+      />
+      <path
+        d="M 14 138 Q 22 80 50 2 Q 78 80 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z"
+        fill="none"
+        stroke="var(--nail-outline-color, #8c7e78)"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.5"
+      />
+    </g>
+  </svg>
+</div>
+`;

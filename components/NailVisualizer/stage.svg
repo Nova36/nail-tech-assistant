@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 540" width="1280" height="540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Five nail canvas">
+
+  <defs>
+    
+  </defs>
+
+  
+  <g id="nail-anchors" fill="none" stroke="none">
+    <rect id="anchor-thumb" x="115" y="200" width="230" height="301" data-anchor-w="230" data-anchor-h="301" data-anchor-rotation="-8" transform="rotate(-8 230 350)"></rect>
+    <rect id="anchor-index" x="345" y="100" width="200" height="280" data-anchor-w="200" data-anchor-h="280" data-anchor-rotation="-3" transform="rotate(-3 445 240)"></rect>
+    <rect id="anchor-middle" x="540" y="50" width="200" height="280" data-anchor-w="200" data-anchor-h="280" data-anchor-rotation="0" transform="rotate(0 640 190)"></rect>
+    <rect id="anchor-ring" x="735" y="90" width="200" height="280" data-anchor-w="200" data-anchor-h="280" data-anchor-rotation="3" transform="rotate(3 835 230)"></rect>
+    <rect id="anchor-pinky" x="968" y="205" width="165" height="231" data-anchor-w="165" data-anchor-h="231" data-anchor-rotation="8" transform="rotate(8 1050 320)"></rect>
+  </g>
+
+  
+  <g id="nail-outlines" fill="none" stroke="#8C7E78" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(115 200) rotate(-8 115 150.5) scale(2.30 2.15)" data-anchor-w="230" data-anchor-h="301" data-anchor-rotation="-8">
+      <path d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"></path>
+    </g>
+    <g transform="translate(345 100) rotate(-3 100 140) scale(2.0 2.0)" data-anchor-w="200" data-anchor-h="280" data-anchor-rotation="-3">
+      <path d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"></path>
+    </g>
+    <g transform="translate(540 50) rotate(0 100 140) scale(2.0 2.0)" data-anchor-w="200" data-anchor-h="280" data-anchor-rotation="0">
+      <path d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"></path>
+    </g>
+    <g transform="translate(735 90) rotate(3 100 140) scale(2.0 2.0)" data-anchor-w="200" data-anchor-h="280" data-anchor-rotation="3">
+      <path d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"></path>
+    </g>
+    <g transform="translate(968 205) rotate(8 82.5 115.5) scale(1.65 1.65)" data-anchor-w="165" data-anchor-h="231" data-anchor-rotation="8">
+      <path d="M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z"></path>
+    </g>
+  </g>
+</svg>
