@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { NailVisualizer, VisualizerFrame } from '@/components/NailVisualizer';
+import { RegenerateButton } from '@/components/RegenerateButton';
 import { GenerateButton } from '@/components/studio/GenerateButton';
 import { GenerationErrorState } from '@/components/studio/GenerationErrorState';
 import { ShapeSelector } from '@/components/studio/ShapeSelector';
@@ -295,6 +296,19 @@ export function Confirm({
                 <p className="mt-2 text-foreground">{promptText}</p>
               </div>
             ) : null}
+
+            <div className="flex justify-center">
+              <RegenerateButton
+                designId={designId}
+                onSuccess={(payload) =>
+                  setState({
+                    phase: 'success',
+                    generationId: payload.generationId,
+                    imageUrl: payload.imageUrl ?? state.imageUrl,
+                  })
+                }
+              />
+            </div>
 
             {shapeUpdateError ? (
               <p role="alert" className="text-sm text-destructive">
