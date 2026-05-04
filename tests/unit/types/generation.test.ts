@@ -22,6 +22,7 @@ describe('Generation type', () => {
       userId: 'u1',
       requestJson: { contents: [] },
       resultStoragePath: null,
+      nailSwatchStoragePath: null,
       providerResponseMetadata: null,
       status: 'pending',
       errorCode: null,
@@ -39,6 +40,7 @@ describe('Generation type', () => {
       userId: 'u1',
       requestJson: {},
       resultStoragePath: null,
+      nailSwatchStoragePath: null,
       providerResponseMetadata: null,
       status: 'failure',
       errorCode: 'refusal',
@@ -56,6 +58,7 @@ describe('Generation type', () => {
       userId: 'u1',
       requestJson: {},
       resultStoragePath: null,
+      nailSwatchStoragePath: null,
       providerResponseMetadata: null,
       status: 'failure',
       // @ts-expect-error — 'cancelled' not in GenerationErrorCode union
@@ -74,6 +77,7 @@ describe('Generation type', () => {
       userId: 'u1',
       requestJson: {},
       resultStoragePath: null,
+      nailSwatchStoragePath: null,
       providerResponseMetadata: null,
       // @ts-expect-error — 'queued' is not a Generation status
       status: 'queued',

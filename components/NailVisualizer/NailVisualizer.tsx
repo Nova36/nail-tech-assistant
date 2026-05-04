@@ -72,6 +72,7 @@ function themeClass(theme: Theme): string {
 export interface NailVisualizerProps {
   theme: Theme;
   imageUrl: string | null;
+  nailSwatchUrl?: string | null;
   nailShape: NailShape;
   onImageError?: () => void;
 }
@@ -79,20 +80,24 @@ export interface NailVisualizerProps {
 export function NailVisualizer({
   theme,
   imageUrl,
+  nailSwatchUrl,
   nailShape,
   onImageError,
 }: NailVisualizerProps): ReactElement {
   const [imgError, setImgError] = useState(false);
   const clipId = `nail-tip-${nailShape}`;
   const shapePath = SHAPE_PATHS[nailShape];
+  const effectiveImageUrl = nailSwatchUrl ?? imageUrl;
 
   function handleImageError() {
     setImgError(true);
-    console.error(`NailVisualizer: image load failed for url=${imageUrl}`);
+    console.error(
+      `NailVisualizer: image load failed for url=${effectiveImageUrl}`
+    );
     onImageError?.();
   }
 
-  const showFallback = imageUrl === null || imgError;
+  const showFallback = effectiveImageUrl === null || imgError;
 
   return (
     <div
@@ -124,7 +129,7 @@ export function NailVisualizer({
           >
             {showFallback ? null : (
               <image
-                href={imageUrl!}
+                href={effectiveImageUrl!}
                 x={0}
                 y={0}
                 width={100}

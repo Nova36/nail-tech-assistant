@@ -22,12 +22,18 @@ type ConfirmProps = {
   promptText?: string | null;
   latestGenerationId?: string | null;
   initialImageUrl?: string | null;
+  initialSwatchUrl?: string | null;
 };
 
 type GenerationState =
   | { phase: 'idle' }
   | { phase: 'pending' }
-  | { phase: 'success'; generationId: string; imageUrl: string }
+  | {
+      phase: 'success';
+      generationId: string;
+      imageUrl: string;
+      swatchUrl: string | null;
+    }
   | {
       phase: 'failure';
       errorCode: GenerateDesignErrorCode;
@@ -104,6 +110,7 @@ export function Confirm({
   promptText,
   latestGenerationId,
   initialImageUrl,
+  initialSwatchUrl,
 }: ConfirmProps) {
   const router = useRouter();
   const initialShape = (nailShape ?? 'almond') as NailShape;
@@ -113,6 +120,7 @@ export function Confirm({
           phase: 'success',
           generationId: latestGenerationId,
           imageUrl: initialImageUrl,
+          swatchUrl: initialSwatchUrl ?? null,
         }
       : latestGenerationId
         ? { phase: 'idle' }
@@ -138,6 +146,7 @@ export function Confirm({
           phase: 'success',
           generationId: result.generationId,
           imageUrl: result.imageUrl,
+          swatchUrl: result.nailSwatchUrl ?? null,
         });
         return;
       }
@@ -167,6 +176,7 @@ export function Confirm({
           phase: 'success',
           generationId: result.generationId,
           imageUrl: result.imageUrl,
+          swatchUrl: result.nailSwatchUrl ?? null,
         });
         return;
       }
@@ -280,6 +290,7 @@ export function Confirm({
                 <NailVisualizer
                   theme="flat"
                   imageUrl={state.imageUrl}
+                  nailSwatchUrl={state.swatchUrl}
                   nailShape={activeShape}
                 />
               </div>
@@ -305,6 +316,7 @@ export function Confirm({
                     phase: 'success',
                     generationId: payload.generationId,
                     imageUrl: payload.imageUrl ?? state.imageUrl,
+                    swatchUrl: payload.nailSwatchUrl ?? null,
                   })
                 }
               />

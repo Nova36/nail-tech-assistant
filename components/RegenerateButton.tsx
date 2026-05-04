@@ -4,13 +4,18 @@ import { useRef, useState } from 'react';
 
 type Props = {
   designId: string;
-  onSuccess: (payload: { generationId: string; imageUrl?: string }) => void;
+  onSuccess: (payload: {
+    generationId: string;
+    imageUrl?: string;
+    nailSwatchUrl?: string | null;
+  }) => void;
 };
 
 type ResponseBody = {
   status?: string;
   generationId?: string;
   imageUrl?: string;
+  nailSwatchUrl?: string | null;
   message?: string;
 };
 
@@ -50,6 +55,7 @@ export function RegenerateButton({ designId, onSuccess }: Props) {
         onSuccess({
           generationId: body.generationId,
           imageUrl: body.imageUrl,
+          nailSwatchUrl: body.nailSwatchUrl,
         });
         setMode('idle');
         return;

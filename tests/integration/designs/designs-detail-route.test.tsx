@@ -68,6 +68,7 @@ const baseGeneration = (
   userId: ALICE_UID,
   requestJson: {},
   resultStoragePath: null,
+  nailSwatchStoragePath: null,
   providerResponseMetadata: null,
   status: 'success' as const,
   errorCode: null,

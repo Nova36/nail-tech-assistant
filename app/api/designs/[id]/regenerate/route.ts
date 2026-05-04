@@ -28,6 +28,7 @@ export async function POST(
           status: 'success',
           generationId: result.generationId,
           imageUrl: result.imageUrl,
+          nailSwatchUrl: result.nailSwatchUrl ?? null,
         },
         { status: 200 }
       );

@@ -155,3 +155,54 @@ describe('NailVisualizer', () => {
     });
   });
 });
+
+describe('NailVisualizer — swatch precedence', () => {
+  it('nailSwatchUrl set → all 5 <image> href values reference the swatch (not imageUrl)', () => {
+    const { container } = render(
+      <NailVisualizer
+        theme="flat"
+        imageUrl="https://test/hand.png"
+        nailSwatchUrl="https://test/swatch.png"
+        nailShape="almond"
+      />
+    );
+    const images = Array.from(container.querySelectorAll('image'));
+    expect(images.length).toBe(5);
+    for (const img of images) {
+      const href =
+        img.getAttribute('href') ?? img.getAttribute('xlink:href') ?? '';
+      expect(href).toBe('https://test/swatch.png');
+      expect(href).not.toBe('https://test/hand.png');
+    }
+  });
+
+  it('nailSwatchUrl={null} + imageUrl set → falls back to imageUrl', () => {
+    const { container } = render(
+      <NailVisualizer
+        theme="flat"
+        imageUrl="https://test/hand.png"
+        nailSwatchUrl={null}
+        nailShape="almond"
+      />
+    );
+    const images = Array.from(container.querySelectorAll('image'));
+    expect(images.length).toBe(5);
+    for (const img of images) {
+      const href =
+        img.getAttribute('href') ?? img.getAttribute('xlink:href') ?? '';
+      expect(href).toBe('https://test/hand.png');
+    }
+  });
+
+  it('nailSwatchUrl undefined + imageUrl={null} → fallback rect renders', () => {
+    render(
+      <NailVisualizer
+        theme="flat"
+        imageUrl={null}
+        nailSwatchUrl={undefined}
+        nailShape="almond"
+      />
+    );
+    expect(screen.getByTestId('visualizer-fallback')).toBeTruthy();
+  });
+});

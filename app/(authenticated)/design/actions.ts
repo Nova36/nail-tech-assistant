@@ -15,6 +15,7 @@ import { getSessionForServerAction } from '@/lib/firebase/session';
 import { generationPath } from '@/lib/firebase/storage';
 import {
   designConverter,
+  generationConverter,
   referenceConverter,
 } from '@/lib/firestore/converters';
 import {
@@ -94,7 +95,12 @@ export type GenerateDesignErrorCode =
   | 'unknown';
 
 export type GenerateDesignResult =
-  | { status: 'success'; generationId: string; imageUrl: string }
+  | {
+      status: 'success';
+      generationId: string;
+      imageUrl: string;
+      nailSwatchUrl?: string | null;
+    }
   | {
       status: 'failure';
       errorCode: GenerateDesignErrorCode;
@@ -296,9 +302,22 @@ export async function generateDesign(input: {
     );
   }
 
+  const persistedGenerationSnap = await db
+    .collection('generations')
+    .doc(started.generationId)
+    .withConverter(generationConverter)
+    .get();
+  const persistedGeneration = persistedGenerationSnap.exists
+    ? (persistedGenerationSnap.data() ?? null)
+    : null;
+  const nailSwatchUrl = await resolveImageUrl(
+    persistedGeneration?.nailSwatchStoragePath ?? null
+  );
+
   return {
     status: 'success',
     generationId: started.generationId,
     imageUrl,
+    nailSwatchUrl,
   };
 }

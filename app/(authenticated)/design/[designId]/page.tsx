@@ -34,6 +34,12 @@ export default async function DesignDetailPage({
     designDetail.latestGeneration?.status === 'success'
       ? await resolveImageUrl(designDetail.latestGeneration.resultStoragePath)
       : null;
+  const initialSwatchUrl =
+    designDetail.latestGeneration?.status === 'success'
+      ? await resolveImageUrl(
+          designDetail.latestGeneration.nailSwatchStoragePath
+        )
+      : null;
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-6 md:px-6 md:py-10 lg:py-12">
@@ -47,6 +53,7 @@ export default async function DesignDetailPage({
         promptText={designDetail.design.promptText}
         latestGenerationId={designDetail.design.latestGenerationId}
         initialImageUrl={initialImageUrl}
+        initialSwatchUrl={initialSwatchUrl}
       />
     </main>
   );

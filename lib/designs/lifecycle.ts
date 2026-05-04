@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 
 import { getFirestore } from 'firebase-admin/firestore';
 
+import { extractNailSwatch } from '@/lib/ai/extract-swatch';
 import { createServerFirebaseAdmin } from '@/lib/firebase/server';
 import { uploadGenerationBytes } from '@/lib/firebase/storage';
 import {
@@ -164,6 +165,7 @@ export async function persistGenerationStart(input: {
     userId: input.userId,
     requestJson: input.requestJson,
     resultStoragePath: null,
+    nailSwatchStoragePath: null,
     providerResponseMetadata: null,
     status: 'pending',
     errorCode: null,
@@ -314,7 +316,6 @@ export async function persistGenerationResult(input: {
         updatedAt: now,
       });
     });
-    return { ok: true };
   } catch (err) {
     const code = (err as { code?: string }).code ?? 'unknown';
     const message = (err as Error).message ?? String(err);
@@ -330,4 +331,26 @@ export async function persistGenerationResult(input: {
     );
     return { ok: false, reason: 'firestore_failure', message };
   }
+
+  try {
+    const swatch = await extractNailSwatch({
+      sourceStoragePath: upload.storagePath,
+      designId: input.designId,
+      userId: input.userId,
+    });
+    if (swatch.ok) {
+      await generationRef.update({
+        nailSwatchStoragePath: swatch.storagePath,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('[lifecycle] extractNailSwatch best-effort failed', {
+      generationId: input.generationId,
+      code: (err as { code?: string }).code ?? 'unknown',
+      message: (err as Error).message,
+    });
+  }
+
+  return { ok: true };
 }

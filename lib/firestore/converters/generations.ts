@@ -55,6 +55,7 @@ export const generationConverter: FirestoreDataConverter<Generation> = {
       userId: g.userId,
       requestJson: g.requestJson,
       resultStoragePath: g.resultStoragePath,
+      nailSwatchStoragePath: g.nailSwatchStoragePath,
       providerResponseMetadata: g.providerResponseMetadata,
       status: g.status,
       errorCode: g.errorCode,
@@ -87,6 +88,9 @@ export const generationConverter: FirestoreDataConverter<Generation> = {
       userId: data.userId as string,
       requestJson: data.requestJson as unknown,
       resultStoragePath: (data.resultStoragePath ?? null) as string | null,
+      nailSwatchStoragePath: (data.nailSwatchStoragePath ?? null) as
+        | string
+        | null,
       providerResponseMetadata: (data.providerResponseMetadata ??
         null) as unknown,
       status: data.status,

@@ -64,6 +64,7 @@ export interface Generation {
   /** Provider-opaque pre-flight payload archive. Shape varies by provider. */
   requestJson: unknown;
   resultStoragePath: string | null;
+  nailSwatchStoragePath: string | null;
   providerResponseMetadata: unknown;
   status: GenerationStatus;
   errorCode: GenerationErrorCode | null;
