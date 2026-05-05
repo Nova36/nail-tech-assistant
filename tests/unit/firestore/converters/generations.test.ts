@@ -120,6 +120,7 @@ describe('generationConverter', () => {
       userId: 'u1',
       requestJson: { contents: [] },
       resultStoragePath: null,
+      nailSwatchStoragePath: null,
       providerResponseMetadata: null,
       status: 'pending',
       errorCode: null,

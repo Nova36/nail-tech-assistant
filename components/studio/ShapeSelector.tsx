@@ -7,7 +7,14 @@ type ShapeSelectorProps = {
   onChange: (value: NailShape) => void;
 };
 
-const SHAPES: NailShape[] = ['almond', 'coffin', 'square', 'round', 'oval'];
+const SHAPES: NailShape[] = [
+  'almond',
+  'coffin',
+  'square',
+  'round',
+  'oval',
+  'stiletto',
+];
 
 export function ShapeSelector({ value, onChange }: ShapeSelectorProps) {
   return (

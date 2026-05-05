@@ -1,0 +1,146 @@
+id: d7-design-rename
+epic: epic-d-visualizer-library
+title: Inline design naming + POST /api/designs/[id]/save (rename)
+status: pending
+complexity: low
+methodology: tdd
+depends_on: [d6-design-detail-loader-and-reopen]
+
+description: |
+  Allow renaming a saved design via inline naming UI + POST route. Designs auto-create as drafts in Epic C (createDesign server action), so this story is rename-only — no separate "save" action needed.
+
+  Naming is optional: a design can exist unnamed in /library and be named later (FR-D-7). Empty name = unnamed.
+
+  Source: structured-outline.md Slice 6 manifest #4, #8. Interface saveDesign(designId, name?). PRD FR-D-4, FR-D-7, US-D-3 AC #2.
+
+acceptance_criteria:
+  - 'Given a saved design, when POST /api/designs/[id]/save with { name }, then design.name persisted and 200 returned | maps to FR-D-4'
+  - 'Given a saved design without a name, when /library renders, then the card shows an unnamed-state placeholder + inline naming affordance | maps to FR-D-7, US-D-3 AC #2'
+  - 'Given an unnamed design, when the user enters a name and submits, then design.name persists; on /library reload AND on /design/[id] reopen, the new name displays in both surfaces | maps to FR-D-7, FR-D-8 (unnamed→named round-trip)'
+  - 'Given a name longer than the configured limit (e.g., 80 chars), when POST submitted, then 400 with controlled error | input validation'
+  - 'Given an authenticated user who does not own the design, when POST submitted, then 403 / rules denial | NFR security'
+  - 'Given a renamed design, when reopened, then the new name displays in /design/[id] header (or wherever names render) | maps to FR-D-8'
+
+steps:
+  - id: research
+    description: Confirm whether designs schema currently has a `name` field (research-brief Q2 said schema is rich enough for regenerate, but verify name field). If absent, this story adds it.
+    agent: researcher
+  - id: ui-design
+    description: |
+      Read .pHive/wireframes/epic-d-visualizer-library/library-grid.html + reopened-design.html — confirm wireframe_approval=approved. Verify naming affordance treatment (inline text input, edit-pencil icon for named state, etc.) matches the wireframe.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/integration/designs-save-route.test.ts (`@vitest-environment node`): owner can rename happy path; empty name allowed (unnamed); >80 char rejected; cross-user denied; non-existent design 404.
+
+      tests/unit/design-page/DesignNameField.test.tsx: renders unnamed placeholder, accepts input, posts on blur or explicit save action, optimistic update + revert on failure.
+
+      tests/integration/rules/designs-save-rule.test.ts (rules-lane): owner-only write on `name` field; deny mutation of any other field via this route.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Add app/api/designs/[id]/save/route.ts POST handler. Validate body { name?: string | null }, max 80 chars. Auth gate via `getSession(req)`. Persist via Firestore Admin SDK with field-scoped write (only `name` + `updatedAt`).
+
+      Add components/DesignNameField.tsx — controlled input, optimistic update, error revert.
+
+      Update designs converter if `name` field is missing from schema (research step confirms).
+
+      **Firestore rules:** d2 already wrote BOTH the d2 (nail_shape + updatedAt) AND d7 (name + updatedAt) field-scoped `allow update` clauses per security audit. Verify the d7 clause is present:
+      ```
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'updatedAt']);
+      ```
+      Expected outcome: no rule edit needed (d2 covered it). Defensive add only if missing. Owner field is `userId` — NOT ownerUid. Rule is defense-in-depth (Admin SDK bypasses rules in production).
+
+      Catch blocks log code+message.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Tests pass. Reviewer renames a seeded design end-to-end and confirms it persists across reload.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d7): design rename UI + POST /save route`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15 App Router
+    persistence: Firestore Admin
+    testing: Vitest node + jsdom + rules
+  key_files:
+    - path: lib/firestore/converters/designs.ts
+      purpose: May need `name` field added if missing
+    - path: components/studio/
+      purpose: Reuse existing input + optimistic-update patterns
+
+files_to_modify:
+  - file: app/api/designs/[id]/save/route.ts
+    change: net-new POST handler
+  - file: components/DesignNameField.tsx
+    change: net-new
+  - file: lib/firestore/converters/designs.ts
+    change: ensure `name` field round-trips (verify in research)
+  - file: firestore.rules
+    change: VERIFY d7's name+updatedAt allow-update clause is present (d2 typically wrote it). Defensive add if missing. Owner field is `userId` (NOT ownerUid). Per security audit.
+  - file: tests/integration/designs-save-route.test.ts
+    change: net-new
+  - file: tests/unit/design-page/DesignNameField.test.tsx
+    change: net-new
+  - file: tests/integration/rules/designs-save-rule.test.ts
+    change: net-new
+
+code_examples:
+  - title: Save route I/O
+    snippet: |
+      // POST /api/designs/[id]/save
+      // Input:  { name?: string | null }   // null or '' clears name
+      // Output: { status: 'saved', designId, name: string | null }
+      //       | { status: 'invalid' | 'unauthorized' | 'not_found', message }
+
+design_decisions:
+  - decision: 80-char name limit
+    rationale: Single-user gift app; reasonable default; bumpable later
+  - decision: Empty string = unnamed
+    rationale: Library card shows unnamed-state for empty name; null and '' both unnamed
+  - decision: Field-scoped Firestore rule
+    rationale: prevents drift of non-name fields via this route
+
+cross_cutting:
+  - concern: security-rules
+    action: rules-lane test for save route
+  - concern: jsdom-vs-node
+    action: integration test uses node env
+  - concern: error-logging
+    action: catches log code+message
+  - concern: rules-lane-parallelism
+    action: |
+      vitest.config.rules.ts must keep `fileParallelism: false` (already set
+      from epic B/C). d7 + d8 may run in parallel after d6; their rules-lane
+      tests share the Firestore emulator and will race without this guard.
+      Verify config in research step before authoring rules-lane tests.
+
+risks:
+  - severity: low
+    description: Optimistic UI desyncs with server on slow 3G
+    mitigation: revert on failure + surface error inline
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 6 manifest #4 save route, #8 DesignNameField. Interface saveDesign(designId, name?).
+      Validation: naming optional, can be added later.
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      d7's allow-update clause is written by d2 (REPLACE pattern). d7 verifies
+      and defensively adds only if missing. Use `userId` (NOT ownerUid) +
+      `hasOnly(['name', 'updatedAt'])` diff-key constraint. Strike "via this
+      route's path pattern" wording — Firestore rules have no HTTP route context.

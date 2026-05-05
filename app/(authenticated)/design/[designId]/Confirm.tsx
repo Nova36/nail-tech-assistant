@@ -3,9 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { VisualizerFrame } from '@/components/NailVisualizer';
+import { RegenerateButton } from '@/components/RegenerateButton';
 import { GenerateButton } from '@/components/studio/GenerateButton';
 import { GenerationErrorState } from '@/components/studio/GenerationErrorState';
-import { GenerationPreview } from '@/components/studio/GenerationPreview';
 import { WizardProgressStrip } from '@/components/studio/WizardProgressStrip';
 
 import type {
@@ -18,12 +19,19 @@ type ConfirmProps = {
   nailShape?: string | null;
   promptText?: string | null;
   latestGenerationId?: string | null;
+  initialImageUrl?: string | null;
+  initialSwatchUrl?: string | null;
 };
 
 type GenerationState =
   | { phase: 'idle' }
   | { phase: 'pending' }
-  | { phase: 'success'; generationId: string; imageUrl: string }
+  | {
+      phase: 'success';
+      generationId: string;
+      imageUrl: string;
+      swatchUrl: string | null;
+    }
   | {
       phase: 'failure';
       errorCode: GenerateDesignErrorCode;
@@ -96,16 +104,30 @@ function PendingView() {
 
 export function Confirm({
   designId,
-  nailShape,
   promptText,
   latestGenerationId,
+  initialImageUrl,
+  initialSwatchUrl,
 }: ConfirmProps) {
   const router = useRouter();
   const [state, setState] = useState<GenerationState>(
-    latestGenerationId ? { phase: 'idle' } : { phase: 'pending' }
+    initialImageUrl && latestGenerationId
+      ? {
+          phase: 'success',
+          generationId: latestGenerationId,
+          imageUrl: initialImageUrl,
+          swatchUrl: initialSwatchUrl ?? null,
+        }
+      : latestGenerationId
+        ? { phase: 'idle' }
+        : { phase: 'pending' }
   );
   const firedRef = useRef(false);
   const errorHeadingRef = useRef<HTMLHeadingElement>(null);
+  const priorSuccessRef = useRef<Extract<
+    GenerationState,
+    { phase: 'success' }
+  > | null>(null);
 
   useEffect(() => {
     if (firedRef.current || latestGenerationId) {
@@ -121,6 +143,7 @@ export function Confirm({
           phase: 'success',
           generationId: result.generationId,
           imageUrl: result.imageUrl,
+          swatchUrl: result.nailSwatchUrl ?? null,
         });
         return;
       }
@@ -150,6 +173,7 @@ export function Confirm({
           phase: 'success',
           generationId: result.generationId,
           imageUrl: result.imageUrl,
+          swatchUrl: result.nailSwatchUrl ?? null,
         });
         return;
       }
@@ -190,12 +214,81 @@ export function Confirm({
       >
         {state.phase === 'pending' ? <PendingView /> : null}
         {state.phase === 'success' ? (
-          <GenerationPreview
-            imageUrl={state.imageUrl}
-            nailShape={nailShape}
-            promptText={promptText}
-            onAdjust={() => router.push('/design/new')}
-          />
+          <div className="space-y-6">
+            <div className="space-y-2 text-center">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+                Step 3 of 3
+              </p>
+              <h2 className="font-heading-display text-4xl font-light tracking-[-0.03em] text-foreground md:text-5xl">
+                Here&apos;s your design.
+              </h2>
+              <p className="mx-auto max-w-prose text-sm text-muted-foreground">
+                Save it to your Library, try another version, or step back and
+                adjust.
+              </p>
+            </div>
+
+            <VisualizerFrame>
+              <div
+                data-testid="nail-visualizer"
+                className="flex justify-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={state.imageUrl}
+                  alt="Generated nail design preview"
+                  className="h-auto w-full max-w-[640px] rounded-[20px] object-contain"
+                />
+              </div>
+            </VisualizerFrame>
+
+            {promptText ? (
+              <div className="rounded-[24px] border border-border/70 bg-card/70 p-4 text-sm shadow-[0_20px_50px_rgba(61,53,48,0.08)]">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Prompt
+                </p>
+                <p className="mt-2 text-foreground">{promptText}</p>
+              </div>
+            ) : null}
+
+            <div className="flex justify-center">
+              <RegenerateButton
+                designId={designId}
+                onStart={() => {
+                  if (state.phase === 'success') {
+                    priorSuccessRef.current = state;
+                  }
+                  setState({ phase: 'pending' });
+                }}
+                onError={() => {
+                  if (priorSuccessRef.current) {
+                    setState(priorSuccessRef.current);
+                  }
+                }}
+                onSuccess={(payload) =>
+                  setState({
+                    phase: 'success',
+                    generationId: payload.generationId,
+                    imageUrl:
+                      payload.imageUrl ??
+                      priorSuccessRef.current?.imageUrl ??
+                      '',
+                    swatchUrl: payload.nailSwatchUrl ?? null,
+                  })
+                }
+              />
+            </div>
+
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => router.push('/design/new')}
+                className="min-h-[44px] text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
+              >
+                ← Back to adjust
+              </button>
+            </div>
+          </div>
         ) : null}
         {state.phase === 'failure' ? (
           <GenerationErrorState

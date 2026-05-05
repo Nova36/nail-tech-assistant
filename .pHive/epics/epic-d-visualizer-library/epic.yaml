@@ -1,0 +1,202 @@
+name: epic-d-visualizer-library
+title: 'Epic D — Visualizer + Library: five-nail visualizer with shape switching, design library, save/reopen/regenerate from stored inputs (Slices 5+6)'
+description: |
+  Slices 5 and 6 of the Nail Tech Assistant build, the moment "image from AI"
+  becomes "design on a hand." Epic C produced raw generated images masked into
+  flat preview; Epic D refines that into the actual product visualization on
+  five nails with live shape switching, persists designs into a personal
+  library, supports reopen and rename, and runs regenerate from the stored
+  design inputs (never the transient UI state).
+
+  Flow: generated design → mask one image across five-nail hand layout → live
+  shape switch (almond/coffin/square/round/oval/stiletto, 6-shape canonical
+  union per Don's call 2026-05-01) → save design → /library grid browse →
+  reopen → regenerate from same stored inputs.
+
+  In scope: NailVisualizer composition + theme="flat" rendering (Option A —
+  flat-illustrated SVG hand) with theme-prop scaffold for future C pivot;
+  ShapeSelector wired to PATCH /api/designs/[id]/shape route + persistence;
+  6 nail-tip mask SVG assets; /design/[id] visualizer integration with
+  shape-switch e2e + per-shape Playwright snapshot baselines; GET design
+  loader with reopen hydration; inline naming + POST /save (rename); POST
+  /regenerate from stored inputs; /library grid + DesignLibrary + DesignCard
+  + empty state. Each route gets a Firestore Security Rules update + rules-lane
+  integration test.
+
+  Out of scope: chat refinement (Slice 7, P1, Epic E). Final polish + setup
+  docs + tablet UX hardening (Slice 8, Epic F). Per-nail variation, 3D
+  rendering, presentation mode (deferred to v2 per kickoff #12). Multi-skin
+  -tone visualizer (single-user gift; neutral silhouette v1 per Don's call
+  2026-05-01). Theme="line-art" implementation (scaffolded in d4, asset
+  deferred to post-v1 pivot).
+
+  Sign-off anchors: PRD US-D-1..4, FR-D-1..8. PRD lines 491-590. Structured
+  outline lines 323-418. Vertical plan lines 219-275. Mother's Day 2026-05-10
+  deadline (9 days from epic-d kickoff 2026-05-01). Brand-system locked at
+  .pHive/brand/brand-system.yaml — no creative palette/typography decisions
+  in this epic.
+
+target_codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+methodology: tdd
+
+planning_artifacts:
+  research_brief: .pHive/epics/epic-d-visualizer-library/docs/research-brief.md
+  tpm_review: .pHive/epics/epic-d-visualizer-library/docs/tpm-review.md
+  story_index: .pHive/epics/epic-d-visualizer-library/stories/_INDEX.md
+  prd_anchor: .pHive/planning/prd.md
+  outline_anchor: .pHive/planning/structured-outline.md
+  vertical_plan_anchor: .pHive/planning/vertical-plan.md
+  wireframe_manifest: .pHive/wireframes/epic-d-visualizer-library/manifest.yaml
+  visualizer_canonical_assets: .pHive/wireframes/NailVisualizer/
+
+design_decisions:
+  - id: dd-d-1
+    topic: 'NailShape canonical union — 6 shapes'
+    rationale: |
+      `'almond' | 'coffin' | 'square' | 'round' | 'oval' | 'stiletto'`. Don
+      picked union over PRD canonical 4 to keep both PRD shapes (almond,
+      coffin, square, stiletto) and existing scaffold shapes (round, oval).
+      No data loss, full common-nail-shape coverage. Decided 2026-05-01.
+  - id: dd-d-2
+    topic: 'Aesthetic v1 = Option A (flat-illustrated SVG hand)'
+    rationale: |
+      Designer-presented options A/B/C; B (photo composite) flagged as a trap
+      in 9 days. Don picked A for deadline safety. C (line-art sketch) is
+      pivot path via theme="line-art" prop — scaffolded in d4 (~4-6h pivot
+      cost post-v1). Decided 2026-05-01.
+  - id: dd-d-3
+    topic: 'Skin tone = neutral stylized silhouette'
+    rationale: |
+      Single-user gift app; gift recipient is one specific person. Multi-tone
+      parameterization deferred to v2. Decided 2026-05-01.
+  - id: dd-d-4
+    topic: 'Thumbnail strategy reuses Confirm.tsx imageUrl pattern'
+    rationale: |
+      No new signed-URL helper for v1. d9 research step extracts the existing
+      Confirm.tsx pattern into a shared helper if not already shared.
+      Decided 2026-05-01.
+  - id: dd-d-5
+    topic: 'ShapeSelector stays at components/studio/'
+    rationale: |
+      Outline manifest places it under components/NailVisualizer/, but the
+      component already exists working in the wizard at components/studio/.
+      NailVisualizer imports from there — zero churn. Decided 2026-05-01.
+  - id: dd-d-6
+    topic: 'Card thumbnail = mini visualizer render, not raw flat image'
+    rationale: |
+      Designer pick — reinforces "five-nail preview" identity throughout app
+      and distinguishes library from generic image grid. Fallback to raw
+      image if visualizer render is unavailable at save time. Captured in
+      wireframe manifest dd-1.
+  - id: dd-d-7
+    topic: 'Right rail in reopened state is read-only for prompt + refs'
+    rationale: |
+      Editing prompt or refs after reopen would break regenerate semantics
+      (FR-D-5: regenerate uses stored inputs, not transient UI state).
+      Editing starts a new design via /design/new. Captured in wireframe
+      manifest dd-5.
+  - id: dd-d-8
+    topic: 'Regenerate failure preserves prior image + lineage'
+    rationale: |
+      On failure, prior generation displays at reduced opacity; latest_
+      generation_id NOT updated; old generations row preserved. Aligns with
+      FR-D-6 lineage preservation. Captured in wireframe manifest dd-3.
+  - id: dd-d-9
+    topic: 'Nails-as-focal-point reframe — visualizer drops the hand entirely'
+    rationale: |
+      Don's call 2026-05-01 after seeing the original wireframes: hand
+      silhouette is irrelevant scaffolding; nails are the product. New
+      visualizer stage = 5 large fan-arranged nail anchors (~200×280 user
+      units each) in a 1280×540 viewBox. No painted hand, no finger stubs.
+      Each nail large enough to read brushstroke detail at tablet viewing
+      distance. Library cards become tiles of nail design rather than tiny
+      hands with tiny nails. theme=line-art pivot drops to ~2-4h (no hand
+      asset to redraw).
+      Canonical assets at .pHive/wireframes/NailVisualizer/{stage.svg,
+      stage-line-art.svg, shapes/*.svg, preview.html} — produced by Claude
+      Design + approved by Don. d3 copies shapes/, d4 copies stage assets.
+
+stories:
+  - id: d1-nailshape-union-migration
+    title: NailShape canonical migration to 6-shape union
+    complexity: low
+    slice: 5
+    ui: false
+    depends_on: []
+  - id: d2-shape-state-and-patch-route
+    title: Shape state persistence + PATCH /api/designs/[id]/shape
+    complexity: medium
+    slice: 5
+    ui: false
+    depends_on: [d1-nailshape-union-migration]
+  - id: d3-nail-tip-mask-svg-assets
+    title: 6 nail-tip mask SVG assets with normalized clipPath geometry
+    complexity: low
+    slice: 5
+    ui: true
+    depends_on: [d1-nailshape-union-migration]
+  - id: d4-nailvisualizer-composition
+    title: NailVisualizer + VisualizerFrame composition (theme-scaffolded, flat v1)
+    complexity: high
+    slice: 5
+    ui: true
+    depends_on: [d1-nailshape-union-migration, d3-nail-tip-mask-svg-assets]
+  - id: d5-design-page-visualizer-integration
+    title: /design/[id] visualizer integration + shape-switch e2e + per-shape snapshots
+    complexity: high
+    slice: 5
+    ui: true
+    depends_on:
+      - d2-shape-state-and-patch-route
+      - d4-nailvisualizer-composition
+  - id: d6-design-detail-loader-and-reopen
+    title: GET /api/designs/[id] DesignDetail loader + reopen page hydration
+    complexity: medium
+    slice: 6
+    ui: false
+    depends_on: [d5-design-page-visualizer-integration]
+  - id: d7-design-rename
+    title: Inline design naming + POST /api/designs/[id]/save (rename)
+    complexity: low
+    slice: 6
+    ui: true
+    depends_on: [d6-design-detail-loader-and-reopen]
+  - id: d8-regenerate-from-stored-inputs
+    title: Regenerate from stored inputs + RegenerateButton
+    complexity: high
+    slice: 6
+    ui: true
+    depends_on: [d6-design-detail-loader-and-reopen]
+  - id: d9-library-grid-and-empty-state
+    title: /library grid + DesignLibrary + DesignCard + empty state
+    complexity: medium
+    slice: 6
+    ui: true
+    depends_on:
+      - d7-design-rename
+      - d8-regenerate-from-stored-inputs
+  - id: d10-nail-swatch-extraction
+    title: Extract nail-polish swatch from generated hand photo (visualizer renders design, not photo windows)
+    complexity: high
+    slice: 5
+    ui: true
+    depends_on:
+      - d4-nailvisualizer-composition
+      - d5-design-page-visualizer-integration
+
+execution_gates:
+  wireframe_approval:
+    required_for: [d3, d4, d5, d7, d8, d9]
+    manifest: .pHive/wireframes/epic-d-visualizer-library/manifest.yaml
+    note: |
+      /plugin-hive:execute on a UI story must check that
+      wireframes manifest has wireframe_approval.status == 'approved' before
+      running. Approved at confirmation gate (this epic.yaml's sign-off).
+  pre_exec_security_audit:
+    required_for: [d2, d6, d7, d8, d9]
+    cycle_state: .pHive/cycle-state/epic-d-visualizer-library.yaml
+    trigger: security:plan-audit
+    note: |
+      Five stories modify firestore.rules; the cumulative rules surface needs
+      a pre-exec security audit. Captured as escalation in cycle state per
+      TPM review 2026-05-01.

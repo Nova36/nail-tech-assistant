@@ -1,0 +1,136 @@
+id: d3-nail-tip-mask-svg-assets
+epic: epic-d-visualizer-library
+title: 6 nail-tip mask SVG assets — copy + integrate from approved Claude Design output
+status: pending
+complexity: low
+methodology: tdd
+depends_on: [d1-nailshape-union-migration]
+
+description: |
+  Copy the 6 mask SVG assets Don approved (produced by Claude Design 2026-05-01)
+  from `.pHive/wireframes/NailVisualizer/shapes/*.svg` into
+  `components/NailVisualizer/shapes/*.svg` and add unit tests.
+
+  Each asset: viewBox `0 0 100 140`, one `<clipPath id="nail-tip-{shape}">`
+  containing one `<path>`. Source files already conform — just copy + verify
+  + assert via tests.
+
+  Source assets:
+  - .pHive/wireframes/NailVisualizer/shapes/almond.svg
+  - .pHive/wireframes/NailVisualizer/shapes/coffin.svg
+  - .pHive/wireframes/NailVisualizer/shapes/square.svg
+  - .pHive/wireframes/NailVisualizer/shapes/round.svg
+  - .pHive/wireframes/NailVisualizer/shapes/oval.svg
+  - .pHive/wireframes/NailVisualizer/shapes/stiletto.svg
+
+  Destination:
+  - components/NailVisualizer/shapes/{shape}.svg
+
+  Pure asset story. No React rendering. d4 composes these into the visualizer.
+
+acceptance_criteria:
+  - 'Given each of the 6 shape assets exists, when validated, then each has a unique clipPath id matching nail-tip-{shape} and identical viewBox dimensions | maps to FR-D-1 (uniform rendering across hand)'
+  - 'Given a renderer applies one clipPath as a mask on a 100x140 image, when rendered, then no clipping artifact extends past the viewBox | enables FR-D-3 silent-break risk mitigation (cheap rendering)'
+  - 'Given the asset directory listing, when counted, then exactly 6 .svg files match the NailShape union | maps to FR-D-2'
+
+steps:
+  - id: research
+    description: Read research-brief Q1 (no existing visualizer assets). Sketch the 6 shapes mentally (almond pointed, coffin tapered-flat, square flat-flat, round arched, oval long-arched, stiletto sharp-point).
+    agent: researcher
+  - id: ui-design
+    description: |
+      Confirm `.pHive/wireframes/NailVisualizer/manifest.yaml` shows
+      wireframe_approval status=approved (Don approved Claude Design output
+      2026-05-01). Open `.pHive/wireframes/NailVisualizer/preview.html` in
+      browser to confirm the 6 shapes render correctly under the composite
+      preview before copying into components/.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/unit/visualizer/shape-assets.test.ts: assert each of the 6 SVG
+      files exists at components/NailVisualizer/shapes/{shape}.svg, has
+      viewBox `0 0 100 140`, contains exactly one `<clipPath>` element with
+      id `nail-tip-{shape}`. Use Node fs + regex assertions; no dom parser
+      dep. Tests written from spec — do not read implementation first.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Copy 6 SVG files from `.pHive/wireframes/NailVisualizer/shapes/` into
+      `components/NailVisualizer/shapes/`. Source assets are
+      already-approved Claude Design output. No content edits — preserve
+      Claude Design path commands and clipPath ids verbatim.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: 'Tests pass. Reviewer visually inspects each SVG in browser preview before approving (review step is dual-checked: code + visual).'
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d3): nail-tip mask SVG assets x6`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    rendering: SVG (clipPath)
+    testing: Vitest
+  key_files:
+    - path: .pHive/wireframes/epic-d-visualizer-library/aesthetic-option-1.html
+      purpose: Reference flat-illustrated treatment and shape silhouette intent
+
+files_to_modify:
+  - file: components/NailVisualizer/shapes/almond.svg
+    change: net-new
+  - file: components/NailVisualizer/shapes/coffin.svg
+    change: net-new
+  - file: components/NailVisualizer/shapes/square.svg
+    change: net-new
+  - file: components/NailVisualizer/shapes/round.svg
+    change: net-new
+  - file: components/NailVisualizer/shapes/oval.svg
+    change: net-new
+  - file: components/NailVisualizer/shapes/stiletto.svg
+    change: net-new
+  - file: tests/unit/visualizer/shape-assets.test.ts
+    change: net-new
+
+code_examples:
+  - title: Asset SVG skeleton
+    snippet: |
+      <!-- components/NailVisualizer/shapes/almond.svg -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">
+        <clipPath id="nail-tip-almond" clipPathUnits="userSpaceOnUse">
+          <path d="M50 0 C 80 20, 90 80, 50 140 C 10 80, 20 20, 50 0 Z"/>
+        </clipPath>
+      </svg>
+  - title: Asset existence test pattern
+    snippet: |
+      const SHAPES = ['almond','coffin','square','round','oval','stiletto'] as const;
+      for (const s of SHAPES) {
+        const file = readFileSync(`components/NailVisualizer/shapes/${s}.svg`, 'utf8');
+        expect(file).toMatch(/viewBox="0 0 100 140"/);
+        expect(file).toMatch(new RegExp(`id="nail-tip-${s}"`));
+      }
+
+design_decisions:
+  - decision: clipPath only, no fill/stroke
+    rationale: Visualizer (d4) controls outline color + fill via theme CSS vars; assets must be paint-agnostic
+  - decision: Normalized viewBox 0 0 100 140
+    rationale: Uniform aspect ratio across shapes lets visualizer layout assume a single nail-tip footprint per finger
+
+cross_cutting: []
+
+risks:
+  - severity: low
+    description: Hand-tuned path data may produce visually-uneven silhouettes across the 6 shapes
+    mitigation: review step includes visual inspection in browser before integrate
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 5 manifest items 3-6: shape mask SVGs for almond/coffin/square/stiletto.
+      [Extended to 6 per d1.]

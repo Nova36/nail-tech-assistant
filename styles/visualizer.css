@@ -1,0 +1,18 @@
+:root {
+  --nail-outline-color: #8c7e78;
+  --nail-stroke-style: 1.5px solid;
+}
+
+.nail-visualizer-theme-flat {
+  --nail-outline-color: #8c7e78;
+}
+
+.nail-visualizer-theme-line-art {
+  --nail-outline-color: #6b3f5e;
+}
+
+.visualizer-frame {
+  min-width: 768px;
+  width: 100%;
+  overflow-x: auto;
+}

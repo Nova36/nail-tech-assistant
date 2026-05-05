@@ -29,9 +29,21 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
+
+      // Shape update (d2): only nail_shape + updatedAt may change.
       allow update: if request.auth != null
         && resource.data.userId == request.auth.uid
-        && request.resource.data.userId == resource.data.userId;
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['nail_shape', 'updatedAt']);
+
+      // Name update (d7): only name + updatedAt may change.
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'updatedAt']);
+
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }

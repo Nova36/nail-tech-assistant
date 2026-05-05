@@ -1,0 +1,167 @@
+id: d8-regenerate-from-stored-inputs
+epic: epic-d-visualizer-library
+title: Regenerate from stored inputs — POST /api/designs/[id]/regenerate + RegenerateButton
+status: pending
+complexity: high
+methodology: tdd
+depends_on: [d6-design-detail-loader-and-reopen]
+
+description: |
+  Re-run the generation pipeline using the stored design's primary reference,
+  secondary references, prompt, and nail shape — never the transient UI state.
+  Reuses Epic C's persistGenerationStart → generate → persistGenerationResult
+  pipeline (lifecycle.ts already covers latestGenerationId atomic update;
+  research Q2).
+
+  Source: structured-outline.md Slice 6 manifest #5, #7. Interface
+  regenerateDesign(designId). PRD FR-D-5, FR-D-6, US-D-4 AC #2 + #3.
+
+  Critical: this is the silent-break risk surface for the entire epic. If
+  regenerate uses anything except stored design inputs, the save/reopen model
+  is fundamentally broken (PRD silent-break risk). Tests must lock this hard.
+
+acceptance_criteria:
+  - 'Given a saved design with stored references + prompt + shape, when POST /api/designs/[id]/regenerate, then a new generation runs using ONLY stored inputs and persists as a new generations row | maps to FR-D-5, US-D-4 AC #2'
+  - 'Given regenerate succeeds, when reload, then design.latestGenerationId points to the NEW generation, prior generations rows still exist | maps to FR-D-6, US-D-4 AC #2'
+  - "Given any stored reference is missing/stale, when regenerate runs, then a controlled failure surfaces (no fake 'success' with degraded inputs) | maps to US-D-4 AC #3, silent-break risk"
+  - 'Given regenerate is in flight, when the user clicks again, then a second request is rejected (idempotency on in-flight) or queued safely | concurrency'
+  - 'Given an authenticated user does not own the design, when POST submitted, then 403 / rules denial | NFR security'
+  - 'Given the RegenerateButton on /design/[id], when in flight, then the button disables + shows the regenerating state | maps to wireframe-approved UX'
+
+steps:
+  - id: research
+    description: |
+      Read research-brief Q2: lifecycle.ts:300-316 already does atomic latestGenerationId update. Read lib/designs/lifecycle.ts persistGenerationStart + persistGenerationResult signatures. Confirm reference resolution helper (built in d6) returns staleReferenceCount.
+    agent: researcher
+  - id: ui-design
+    description: |
+      Read .pHive/wireframes/epic-d-visualizer-library/reopened-design.html — confirm wireframe_approval=approved. Verify RegenerateButton placement + idle/regenerating/failed states match wireframe.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/integration/designs-regenerate-route.test.ts (`@vitest-environment node`):
+        - happy path: stored inputs drive request to mocked Gemini; new generations row written; design.latestGenerationId updated; old generations row preserved.
+        - assert request payload sent to provider matches stored design — NOT current UI state (set a different transient UI state in test setup, confirm provider receives stored values only).
+        - missing primary reference → controlled failure (status='failure'); design.latestGenerationId unchanged.
+        - cross-user denied.
+        - second concurrent POST while first in flight → rejected/queued safely (test the chosen strategy).
+
+      tests/unit/components/RegenerateButton.test.tsx: idle / regenerating / failed states; disabled in flight; surface error message on failure.
+
+      tests/e2e/regenerate-flow.spec.ts (Playwright): seed a design, click regenerate, await success, reload, confirm latestGenerationId reflects new generation while older one is still queryable.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Add app/api/designs/[id]/regenerate/route.ts POST handler. Auth gate. Load DesignDetail via d6 loader (validates ownership + reference availability). If staleReferenceCount > 0, return controlled failure without calling provider.
+
+      Build provider request via existing buildGeminiRequest (c14) using stored inputs only. Call lifecycle.persistGenerationStart → generate → lifecycle.persistGenerationResult. Mirror Epic C generation pipeline exactly.
+
+      Concurrency: simplest viable — Firestore-level guard via design's `pendingGenerationId` field, or rely on persistGenerationStart returning conflict. Test the chosen strategy.
+
+      Add components/RegenerateButton.tsx. Wire to POST /regenerate + DesignDetail refetch on success.
+
+      Per memory feedback_silent_catches_cost_time.md: every failure path logs code+message.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: All unit + integration + e2e + concurrency tests pass. Reviewer triggers regenerate end-to-end on a real design and confirms the new generation reflects stored inputs (not whatever UI state happens to be open).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d8): regenerate from stored inputs + RegenerateButton`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15 App Router
+    ai: Vertex AI via @google/genai (per c1 spike)
+    persistence: Firestore Admin
+    testing: Vitest node + jsdom + Playwright
+  key_files:
+    - path: lib/designs/lifecycle.ts
+      purpose: persistGenerationStart + persistGenerationResult — reuse exactly
+    - path: lib/ai/buildGeminiRequest.ts
+      purpose: Reuse from c14 (one-silent-retry policy applies)
+    - path: lib/designs/load.ts
+      purpose: From d6 — DesignDetail loader with staleReferenceCount
+
+files_to_modify:
+  - file: app/api/designs/[id]/regenerate/route.ts
+    change: net-new POST handler
+  - file: components/RegenerateButton.tsx
+    change: net-new
+  - file: app/(authenticated)/design/[designId]/Confirm.tsx
+    change: mount RegenerateButton in success branch (or reopened state)
+  - file: tests/integration/designs-regenerate-route.test.ts
+    change: net-new
+  - file: tests/unit/components/RegenerateButton.test.tsx
+    change: net-new
+  - file: tests/e2e/regenerate-flow.spec.ts
+    change: net-new
+  - file: firestore.rules
+    change: deny direct mutation of latestGenerationId / generations rows from client; only via Admin SDK route (verify; epic C may already cover this)
+
+code_examples:
+  - title: Regenerate route shape
+    snippet: |
+      // POST /api/designs/[id]/regenerate
+      // Output success: { status: 'success', generationId }
+      // Output failure: { status: 'failure', message }
+      //
+      // Implementation invariant: provider request payload built ONLY from
+      // DesignDetail.{primaryReference, secondaryReferences, prompt, nailShape}.
+      // No request body fields from the UI — body is empty (or ignored).
+  - title: Stored-inputs invariant test (asserts no UI bleed)
+    snippet: |
+      // Setup: design has stored prompt='red glitter', UI fetch sends {prompt:'something else'}
+      // Assertion: provider mock receives 'red glitter', not 'something else'
+
+design_decisions:
+  - decision: regenerate body is empty (or ignored), inputs come from server-loaded DesignDetail
+    rationale: prevents UI-state leak into stored-input regeneration; PRD US-D-4 AC #2 guarantee
+  - decision: stale-reference fail-fast before provider call
+    rationale: PRD US-D-4 AC #3 silent-break risk — never produce a result with degraded inputs
+  - decision: reuse lifecycle.persistGenerationStart/Result exactly
+    rationale: Epic C's anti-zombie state machine + atomic latestGenerationId already covers FR-D-6
+
+cross_cutting:
+  - concern: security-rules
+    action: rules-lane test verifies cross-user regenerate denied
+  - concern: jsdom-vs-node
+    action: route handler test uses node env
+  - concern: error-logging
+    action: every catch logs code+message
+  - concern: provider-isolation
+    action: integration test uses MSW mock of Gemini; no live calls
+  - concern: rules-lane-parallelism
+    action: |
+      vitest.config.rules.ts must keep `fileParallelism: false` (already set
+      from epic B/C). d8 + d7 may run in parallel after d6; their rules-lane
+      tests share the Firestore emulator and will race without this guard.
+
+risks:
+  - severity: high
+    description: Stored-input invariant silently broken — regenerate uses any current UI state field
+    mitigation: integration test explicitly differs UI state from stored state and asserts provider sees stored only
+  - severity: medium
+    description: Concurrency — double-click regenerates twice, both succeed, latestGenerationId race
+    mitigation: Firestore-transaction-level guard or persistGenerationStart conflict handling; test the chosen path
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 6 manifest #5 regenerate route. Interface regenerateDesign(designId).
+      Silent-break risk: regenerate may appear to work while using incomplete or mutated input lineage.
+  - path: lib/designs/lifecycle.ts
+    relevant_excerpt: |
+      [persistGenerationResult atomically updates latestGenerationId in a Firestore transaction; reuse intact]
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      d8 writes via Admin SDK; bypasses Firestore rules in production.
+      Existing /generations/{id} baseline rules already cover client-SDK
+      behaviors. d8 needs NO rule edit. Owner field is `userId`.

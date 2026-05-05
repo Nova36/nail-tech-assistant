@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Epic D — /library · Design Library Grid</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&display=swap');
+
+      :root {
+        --background:         #faf7f2;
+        --foreground:         #3d3530;
+        --card:               #f0ebe3;
+        --primary:            #6b3f5e;
+        --primary-foreground: #faf7f2;
+        --primary-tint:       #d4a5a8;
+        --accent:             #c9a96e;
+        --muted-foreground:   #6f625c;
+        --border:             rgba(140,126,120,0.22);
+        --destructive:        #b04848;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: 'Inter', ui-sans-serif, sans-serif;
+      }
+      body {
+        background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.15), transparent 35%);
+        min-height: 100vh;
+        padding: 28px 16px 64px;
+      }
+
+      /* ─── Frame chrome (c17 pattern) ─────────────────────────────── */
+      .frame {
+        margin: 0 auto 40px;
+        background: var(--background);
+        background-image: radial-gradient(circle at top, rgb(212 165 168 / 0.15), transparent 35%);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 24px 56px rgba(61,53,48,0.12);
+        width: 1280px;
+        max-width: calc(100vw - 32px);
+      }
+      .frame-bar {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 14px; background: #ede4d9;
+        border-bottom: 1px solid var(--border);
+        font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .frame-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-tint); }
+      .frame-bar .dot.b { background: var(--accent); opacity: 0.7; }
+      .frame-bar .dot.c { background: var(--primary); opacity: 0.55; }
+      .frame-bar .tag { margin-left: auto; border: 1px solid rgba(140,126,120,0.3); padding: 2px 8px; border-radius: 999px; font-size: 10px; }
+
+      .frame-label {
+        margin: 24px auto 8px; max-width: 1280px;
+        display: flex; align-items: baseline; gap: 14px; padding: 0 4px; flex-wrap: wrap;
+      }
+      .frame-num  { font-family: 'Fraunces', serif; font-size: 14px; color: var(--primary); font-style: italic; }
+      .frame-title { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 300; letter-spacing: -0.02em; }
+      .frame-sub  { font-size: 12px; color: var(--muted-foreground); }
+
+      aside.anno {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+        color: var(--muted-foreground); padding: 3px 8px; border-radius: 4px;
+        background: rgba(250,247,242,0.85); border: 1px dashed rgba(140,126,120,0.42);
+      }
+      aside.anno::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); opacity: 0.55; }
+
+      .callout {
+        border: 1px dashed rgba(107,63,94,0.4); background: rgba(212,165,168,0.12);
+        border-radius: 10px; padding: 10px 12px; font-size: 11.5px; line-height: 1.55;
+      }
+      .callout strong { color: var(--primary); font-weight: 500; }
+
+      /* ─── App shell ───────────────────────────────────────────────── */
+      .app-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 820px; }
+
+      /* ─── Sidebar ─────────────────────────────────────────────────── */
+      .sidebar {
+        width: 240px; background: var(--background);
+        border-right: 1px solid rgba(140,126,120,0.18);
+        padding: 20px 14px; display: flex; flex-direction: column; gap: 18px;
+      }
+      .sb-logo { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+      .sb-mark {
+        width: 28px; height: 28px; border-radius: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-tint));
+        display: grid; place-items: center;
+        color: var(--primary-foreground); font-family: 'Fraunces', serif; font-style: italic; font-size: 14px;
+      }
+      .sb-name { font-family: 'Fraunces', serif; font-size: 16px; }
+      .sb-name em { color: var(--primary); font-style: italic; }
+      .sb-nav { display: flex; flex-direction: column; gap: 2px; }
+      .sb-nav a {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 12px; border-radius: 10px;
+        color: var(--foreground); font-size: 14px; text-decoration: none; min-height: 44px; position: relative;
+      }
+      .sb-nav a .ico { width: 18px; height: 18px; color: var(--muted-foreground); }
+      .sb-nav a.active { background: rgba(107,63,94,0.12); color: var(--primary); font-weight: 500; }
+      .sb-nav a.active .ico { color: var(--primary); }
+      .sb-nav a.active::before {
+        content: ''; position: absolute; left: -14px; top: 8px; bottom: 8px;
+        width: 3px; border-radius: 0 3px 3px 0; background: var(--primary);
+      }
+
+      /* ─── Library main ────────────────────────────────────────────── */
+      .lib-main {
+        display: flex; flex-direction: column; min-width: 0;
+      }
+
+      .lib-header {
+        display: flex; align-items: center; gap: 16px;
+        padding: 20px 28px;
+        border-bottom: 1px solid rgba(140,126,120,0.16);
+        background: var(--background);
+      }
+      .lib-header h1 {
+        font-family: 'Fraunces', serif; font-size: 26px; font-weight: 300; letter-spacing: -0.01em;
+        flex: 1;
+      }
+      .lib-header h1 em { color: var(--primary); font-style: italic; }
+
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 10px 18px; border-radius: 12px;
+        font-size: 14px; font-weight: 500; min-height: 44px; cursor: pointer; border: none;
+      }
+      .btn-primary { background: var(--primary); color: var(--primary-foreground); box-shadow: 0 6px 16px rgba(107,63,94,0.25); }
+      .btn-ghost { background: transparent; color: var(--foreground); border: 1px solid rgba(140,126,120,0.32); }
+
+      /* ─── Grid container ──────────────────────────────────────────── */
+      /*
+        3-col on tablet landscape (1280px − 240px sidebar = 1040px content).
+        2-col on narrow tablet (~900px − sidebar). Each card ~300px wide is comfortable.
+        Decision: 3-col default. Implementer: use CSS grid auto-fill min 280px.
+      */
+      .lib-grid {
+        padding: 28px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        align-content: start;
+      }
+
+      /* ─── Design card ─────────────────────────────────────────────── */
+      .design-card {
+        background: var(--card);
+        border-radius: 16px;
+        border: 1px solid rgba(140,126,120,0.18);
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(61,53,48,0.07);
+        cursor: pointer;
+        transition: box-shadow 160ms, transform 160ms;
+        display: flex; flex-direction: column;
+        position: relative;
+      }
+      .design-card:hover { box-shadow: 0 8px 24px rgba(61,53,48,0.14); transform: translateY(-2px); }
+
+      /* Thumbnail — mini visualizer render or raw image placeholder */
+      /*
+        Design call: show mini visualizer render (hand silhouette + masked design)
+        as thumbnail rather than raw flat image. This reinforces the "five-nail preview"
+        identity and distinguishes library cards from generic image grids.
+        Fallback to raw image if visualizer render unavailable.
+      */
+      .card-thumb {
+        aspect-ratio: 4 / 3;
+        background: linear-gradient(135deg, rgba(107,63,94,0.08), rgba(212,165,168,0.22) 60%, rgba(201,169,110,0.12));
+        position: relative; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .card-thumb::after {
+        content: '';
+        position: absolute; inset: 0;
+        background: radial-gradient(110% 65% at 30% 25%, rgba(255,255,255,0.45), transparent 55%),
+                    repeating-linear-gradient(45deg, transparent 0 22px, rgba(61,53,48,0.03) 22px 23px);
+        pointer-events: none;
+      }
+
+      /* Mini hand SVG inside card thumbnail */
+      .mini-hand { position: relative; z-index: 1; }
+
+      /* Shape badge on card */
+      .shape-badge {
+        position: absolute; top: 10px; right: 10px; z-index: 2;
+        background: rgba(250,247,242,0.88); backdrop-filter: blur(4px);
+        border: 1px solid rgba(140,126,120,0.28);
+        border-radius: 999px; padding: 3px 9px;
+        font-size: 10.5px; font-weight: 500; color: var(--muted-foreground);
+        letter-spacing: 0.06em;
+      }
+
+      .card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+
+      .card-name {
+        font-family: 'Fraunces', serif; font-size: 16px; font-weight: 400;
+        color: var(--foreground); line-height: 1.3;
+      }
+      .card-name.unnamed {
+        color: var(--muted-foreground); font-style: italic; font-size: 14px;
+      }
+
+      /* Inline naming affordance — appears when card has no name */
+      .card-name-input {
+        font-family: 'Fraunces', serif; font-size: 15px;
+        background: transparent; border: none;
+        border-bottom: 1.5px dashed rgba(140,126,120,0.5);
+        color: var(--foreground); outline: none; width: 100%; padding: 2px 0;
+      }
+      .card-name-input::placeholder { color: var(--muted-foreground); font-style: italic; }
+
+      .card-meta {
+        font-size: 11.5px; color: var(--muted-foreground);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .card-meta .dot-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.5; }
+
+      .card-actions {
+        display: flex; align-items: center; gap: 8px; margin-top: 4px;
+      }
+      .card-action-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; color: var(--muted-foreground);
+        background: transparent; border: none; cursor: pointer; padding: 4px 0;
+      }
+      .card-action-btn:hover { color: var(--primary); }
+
+      /* ─── Empty state ─────────────────────────────────────────────── */
+      .empty-state {
+        grid-column: 1 / -1;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 80px 24px; gap: 20px; text-align: center;
+      }
+      .empty-icon {
+        width: 64px; height: 64px; border-radius: 20px;
+        background: linear-gradient(135deg, rgba(107,63,94,0.1), rgba(212,165,168,0.2));
+        display: grid; place-items: center;
+      }
+      .empty-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 400; color: var(--foreground); }
+      .empty-sub { font-size: 14px; color: var(--muted-foreground); max-width: 320px; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+
+    <!-- ── Frame label ── -->
+    <div class="frame-label">
+      <span class="frame-num">D·2</span>
+      <span class="frame-title">/library — Design Library Grid</span>
+      <span class="frame-sub">Tablet landscape · 3-col grid · card = mini visualizer thumb + name + meta · inline naming for unnamed</span>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         FRAME 1 — Library with 4 saved designs (mixed named/unnamed)
+         ════════════════════════════════════════════════════════════ -->
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span><span class="dot c"></span>
+        /library · 4 designs
+        <span class="tag">tablet · 1280×820 · 3-col</span>
+      </div>
+
+      <div class="app-shell">
+
+        <!-- Sidebar -->
+        <nav class="sidebar">
+          <div class="sb-logo">
+            <div class="sb-mark">N</div>
+            <div class="sb-name">Nail <em>Tech</em></div>
+          </div>
+          <div class="sb-nav">
+            <a href="#">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              Dashboard
+            </a>
+            <a href="#">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+              Designs
+            </a>
+            <a href="#" class="active">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Library
+            </a>
+          </div>
+        </nav>
+
+        <!-- Library main -->
+        <div class="lib-main">
+
+          <div class="lib-header">
+            <h1>My <em>Library</em></h1>
+            <aside class="anno">3-col tablet · 2-col on narrow · auto-fill min 280px</aside>
+            <a href="/design/new" class="btn btn-primary" style="text-decoration:none;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New design
+            </a>
+          </div>
+
+          <div class="lib-grid">
+
+            <!-- Card 1: named, almond, has mini visualizer thumb -->
+            <div class="design-card">
+              <div class="card-thumb">
+                <span class="shape-badge">Almond</span>
+                <!-- Mini hand visualizer (scaled down) -->
+                <svg class="mini-hand" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" width="220" height="140">
+                  <defs>
+                    <linearGradient id="sw1" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#E8D5E0"/><stop offset="40%" stop-color="#C9B4C9"/>
+                      <stop offset="70%" stop-color="#D4A8B0"/><stop offset="100%" stop-color="#E8C9A0"/>
+                    </linearGradient>
+                    <clipPath id="c1p"><ellipse cx="34" cy="36" rx="9" ry="14"/></clipPath>
+                    <clipPath id="c1r"><ellipse cx="90" cy="26" rx="11" ry="17"/></clipPath>
+                    <clipPath id="c1m"><ellipse cx="154" cy="20" rx="12" ry="19"/></clipPath>
+                    <clipPath id="c1i"><ellipse cx="217" cy="26" rx="11" ry="17"/></clipPath>
+                    <clipPath id="c1t"><ellipse cx="273" cy="46" rx="10" ry="15"/></clipPath>
+                  </defs>
+                  <path d="M 60 168 Q 38 158 30 138 Q 22 116 26 96 L 32 64 Q 33 48 41 48 Q 49 48 50 64 L 51 74
+                            Q 52 56 54 40 Q 56 24 64 24 Q 72 24 73 40 L 74 52
+                            Q 75 36 81 26 Q 88 16 96 16 Q 104 16 105 28 L 106 44
+                            Q 108 28 116 20 Q 126 14 132 24 Q 138 34 136 52 L 134 68
+                            Q 138 56 145 50 Q 157 42 163 52 Q 170 62 166 78
+                            L 157 108 L 255 108 Q 280 118 279 138 Q 278 154 260 162 Z"
+                        fill="#F0EBE3" stroke="#D4CBC5" stroke-width="1"/>
+                  <ellipse cx="34" cy="36" rx="9" ry="14" fill="url(#sw1)" clip-path="url(#c1p)"/>
+                  <ellipse cx="34" cy="36" rx="9" ry="14" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <ellipse cx="90" cy="26" rx="11" ry="17" fill="url(#sw1)" clip-path="url(#c1r)"/>
+                  <ellipse cx="90" cy="26" rx="11" ry="17" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <ellipse cx="154" cy="20" rx="12" ry="19" fill="url(#sw1)" clip-path="url(#c1m)"/>
+                  <ellipse cx="154" cy="20" rx="12" ry="19" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <ellipse cx="217" cy="26" rx="11" ry="17" fill="url(#sw1)" clip-path="url(#c1i)"/>
+                  <ellipse cx="217" cy="26" rx="11" ry="17" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <ellipse cx="273" cy="46" rx="10" ry="15" fill="url(#sw1)" clip-path="url(#c1t)"/>
+                  <ellipse cx="273" cy="46" rx="10" ry="15" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="card-body">
+                <div class="card-name">Floral French Tips</div>
+                <div class="card-meta">
+                  <span>Almond</span>
+                  <span class="dot-sep"></span>
+                  <span>Saved today, 2:14 pm</span>
+                </div>
+                <div class="card-actions">
+                  <button class="card-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.87"/></svg>
+                    Regenerate
+                  </button>
+                  <span class="dot-sep" style="margin-left:4px;"></span>
+                  <button class="card-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Rename
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: named, coffin -->
+            <div class="design-card">
+              <div class="card-thumb" style="background: linear-gradient(135deg, rgba(201,169,110,0.18), rgba(212,165,168,0.28) 60%, rgba(107,63,94,0.12));">
+                <span class="shape-badge">Coffin</span>
+                <svg class="mini-hand" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" width="220" height="140">
+                  <defs>
+                    <linearGradient id="sw2" x1="0%" y1="100%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#C9B4C9"/><stop offset="60%" stop-color="#E8C9A0"/>
+                      <stop offset="100%" stop-color="#D4A8B0"/>
+                    </linearGradient>
+                    <!-- Coffin: flat top, tapered sides -->
+                    <clipPath id="c2p"><rect x="25" y="20" width="18" height="28" rx="2" ry="8"/></clipPath>
+                    <clipPath id="c2r"><rect x="79" y="10" width="22" height="34" rx="3" ry="11"/></clipPath>
+                    <clipPath id="c2m"><rect x="142" y="4"  width="24" height="38" rx="3" ry="12"/></clipPath>
+                    <clipPath id="c2i"><rect x="207" y="10" width="22" height="34" rx="3" ry="11"/></clipPath>
+                    <clipPath id="c2t"><rect x="263" y="28" width="20" height="30" rx="2" ry="10"/></clipPath>
+                  </defs>
+                  <path d="M 60 168 Q 38 158 30 138 Q 22 116 26 96 L 32 64 Q 33 48 41 48 Q 49 48 50 64 L 51 74
+                            Q 52 56 54 40 Q 56 24 64 24 Q 72 24 73 40 L 74 52
+                            Q 75 36 81 26 Q 88 16 96 16 Q 104 16 105 28 L 106 44
+                            Q 108 28 116 20 Q 126 14 132 24 Q 138 34 136 52 L 134 68
+                            Q 138 56 145 50 Q 157 42 163 52 Q 170 62 166 78
+                            L 157 108 L 255 108 Q 280 118 279 138 Q 278 154 260 162 Z"
+                        fill="#F0EBE3" stroke="#D4CBC5" stroke-width="1"/>
+                  <rect x="25" y="20" width="18" height="28" rx="2" ry="8" fill="url(#sw2)" clip-path="url(#c2p)"/>
+                  <rect x="25" y="20" width="18" height="28" rx="2" ry="8" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="79" y="10" width="22" height="34" rx="3" ry="11" fill="url(#sw2)" clip-path="url(#c2r)"/>
+                  <rect x="79" y="10" width="22" height="34" rx="3" ry="11" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="142" y="4"  width="24" height="38" rx="3" ry="12" fill="url(#sw2)" clip-path="url(#c2m)"/>
+                  <rect x="142" y="4"  width="24" height="38" rx="3" ry="12" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="207" y="10" width="22" height="34" rx="3" ry="11" fill="url(#sw2)" clip-path="url(#c2i)"/>
+                  <rect x="207" y="10" width="22" height="34" rx="3" ry="11" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="263" y="28" width="20" height="30" rx="2" ry="10" fill="url(#sw2)" clip-path="url(#c2t)"/>
+                  <rect x="263" y="28" width="20" height="30" rx="2" ry="10" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="card-body">
+                <div class="card-name">Marble Swirl</div>
+                <div class="card-meta">
+                  <span>Coffin</span><span class="dot-sep"></span><span>Saved yesterday</span>
+                </div>
+                <div class="card-actions">
+                  <button class="card-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.87"/></svg>
+                    Regenerate
+                  </button>
+                  <span class="dot-sep" style="margin-left:4px;"></span>
+                  <button class="card-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Rename
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: UNNAMED — inline naming affordance visible -->
+            <div class="design-card" style="outline: 2px dashed rgba(107,63,94,0.3);">
+              <aside class="anno" style="position:absolute;top:8px;left:8px;z-index:10;">unnamed — inline naming active</aside>
+              <div class="card-thumb" style="background: linear-gradient(135deg, rgba(212,165,168,0.25), rgba(201,169,110,0.18) 60%, rgba(107,63,94,0.08));">
+                <span class="shape-badge">Stiletto</span>
+                <!-- Simplified placeholder for unnamed card -->
+                <svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg" width="220" height="140" style="position:relative;z-index:1;">
+                  <defs>
+                    <linearGradient id="sw3" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#E8D5E0"/><stop offset="100%" stop-color="#E8C9A0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M 40 128 Q 24 120 18 106 Q 12 90 15 72 L 20 48 Q 21 36 28 36 Q 35 36 36 48 L 37 56
+                            Q 38 42 40 30 Q 42 18 49 18 Q 56 18 57 30 L 58 40
+                            Q 59 28 65 20 Q 72 12 79 12 Q 86 12 87 22 L 88 34
+                            Q 90 22 98 16 Q 107 11 113 20 Q 119 29 117 42 L 115 54
+                            Q 119 44 126 38 Q 136 32 141 40 Q 147 48 143 62 L 137 84 L 194 84 Q 212 92 211 108 Q 210 120 196 126 Z"
+                      fill="#F0EBE3" stroke="#D4CBC5" stroke-width="1"/>
+                  <!-- Stiletto points -->
+                  <polygon points="21,68 27,18 33,68" fill="url(#sw3)" opacity="0.9"/>
+                  <polygon points="21,68 27,18 33,68" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <polygon points="68,72 76,16 84,72" fill="url(#sw3)" opacity="0.9"/>
+                  <polygon points="68,72 76,16 84,72" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <polygon points="113,76 122,12 131,76" fill="url(#sw3)" opacity="0.9"/>
+                  <polygon points="113,76 122,12 131,76" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <polygon points="158,72 167,16 176,72" fill="url(#sw3)" opacity="0.9"/>
+                  <polygon points="158,72 167,16 176,72" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <polygon points="196,82 204,30 212,82" fill="url(#sw3)" opacity="0.9"/>
+                  <polygon points="196,82 204,30 212,82" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="card-body">
+                <!-- Inline naming input — focused state -->
+                <input class="card-name-input" type="text" placeholder="Name this design…" value=""/>
+                <div class="card-meta">
+                  <span>Stiletto</span><span class="dot-sep"></span><span>Saved 1 hour ago</span>
+                </div>
+                <div style="font-size:11px; color:var(--muted-foreground); font-style:italic; margin-top:2px;">
+                  Press Enter to save name, or skip
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 4: named, square -->
+            <div class="design-card">
+              <div class="card-thumb" style="background: linear-gradient(135deg, rgba(107,63,94,0.12), rgba(201,169,110,0.25) 60%, rgba(212,165,168,0.15));">
+                <span class="shape-badge">Square</span>
+                <svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg" width="220" height="140" style="position:relative;z-index:1;">
+                  <defs>
+                    <linearGradient id="sw4" x1="100%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#C9B4C9"/><stop offset="100%" stop-color="#E8C9A0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M 40 128 Q 24 120 18 106 Q 12 90 15 72 L 20 48 Q 21 36 28 36 Q 35 36 36 48 L 37 56
+                            Q 38 42 40 30 Q 42 18 49 18 Q 56 18 57 30 L 58 40
+                            Q 59 28 65 20 Q 72 12 79 12 Q 86 12 87 22 L 88 34
+                            Q 90 22 98 16 Q 107 11 113 20 Q 119 29 117 42 L 115 54
+                            Q 119 44 126 38 Q 136 32 141 40 Q 147 48 143 62 L 137 84 L 194 84 Q 212 92 211 108 Q 210 120 196 126 Z"
+                      fill="#F0EBE3" stroke="#D4CBC5" stroke-width="1"/>
+                  <!-- Square nails -->
+                  <rect x="20" y="32" width="16" height="22" rx="1" fill="url(#sw4)" opacity="0.9"/>
+                  <rect x="20" y="32" width="16" height="22" rx="1" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="68" y="20" width="18" height="26" rx="1" fill="url(#sw4)" opacity="0.9"/>
+                  <rect x="68" y="20" width="18" height="26" rx="1" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="113" y="14" width="20" height="28" rx="1" fill="url(#sw4)" opacity="0.9"/>
+                  <rect x="113" y="14" width="20" height="28" rx="1" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="158" y="20" width="18" height="26" rx="1" fill="url(#sw4)" opacity="0.9"/>
+                  <rect x="158" y="20" width="18" height="26" rx="1" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                  <rect x="196" y="36" width="16" height="22" rx="1" fill="url(#sw4)" opacity="0.9"/>
+                  <rect x="196" y="36" width="16" height="22" rx="1" fill="none" stroke="#D4A5A8" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="card-body">
+                <div class="card-name">Chrome Minimalist</div>
+                <div class="card-meta">
+                  <span>Square</span><span class="dot-sep"></span><span>Saved 3 days ago</span>
+                </div>
+                <div class="card-actions">
+                  <button class="card-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.87"/></svg>
+                    Regenerate
+                  </button>
+                  <span class="dot-sep" style="margin-left:4px;"></span>
+                  <button class="card-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Rename
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /lib-grid -->
+
+          <!-- Design notes callout -->
+          <div style="padding: 0 28px 28px;">
+            <div class="callout">
+              <strong>Grid decisions:</strong> 3-col at 1280px (cards ~300px); collapses to 2-col below ~860px content width via CSS grid auto-fill.
+              Card thumbnail = mini visualizer render (hand + masked nails), not raw generated image — reinforces five-nail identity.
+              Unnamed card shows inline `&lt;input&gt;` as name field; named card shows name + edit pencil icon in card-actions row.
+              Hover: card lifts 2px with deeper shadow — minimal motion, respects prefers-reduced-motion.
+            </div>
+          </div>
+
+        </div><!-- /lib-main -->
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         FRAME 2 — Empty state (zero designs)
+         ════════════════════════════════════════════════════════════ -->
+    <div class="frame-label">
+      <span class="frame-num">D·2b</span>
+      <span class="frame-title">Empty library state</span>
+      <span class="frame-sub">Zero saved designs — US-D-3 first-use state</span>
+    </div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot b"></span><span class="dot c"></span>
+        /library · 0 designs
+        <span class="tag">empty state</span>
+      </div>
+      <div class="app-shell">
+        <nav class="sidebar">
+          <div class="sb-logo"><div class="sb-mark">N</div><div class="sb-name">Nail <em>Tech</em></div></div>
+          <div class="sb-nav">
+            <a href="#">Dashboard</a>
+            <a href="#">Designs</a>
+            <a href="#" class="active">Library</a>
+          </div>
+        </nav>
+        <div class="lib-main">
+          <div class="lib-header">
+            <h1>My <em>Library</em></h1>
+            <a href="/design/new" class="btn btn-primary" style="text-decoration:none;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New design
+            </a>
+          </div>
+          <div class="lib-grid">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B3F5E" stroke-width="1.5">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </div>
+              <div class="empty-title">Your library is empty</div>
+              <div class="empty-sub">Generate your first design and save it — it'll appear here as a browsable card with a five-nail preview.</div>
+              <a href="/design/new" class="btn btn-primary" style="text-decoration:none; margin-top:4px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Start a new design
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

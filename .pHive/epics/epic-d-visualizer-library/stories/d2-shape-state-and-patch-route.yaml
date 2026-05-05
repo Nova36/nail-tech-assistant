@@ -1,0 +1,154 @@
+id: d2-shape-state-and-patch-route
+epic: epic-d-visualizer-library
+title: Shape state persistence module + PATCH /api/designs/[id]/shape route
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [d1-nailshape-union-migration]
+
+description: |
+  Centralize NailShape persistence behavior in `lib/designs/shape-state.ts` and
+  expose a PATCH route at `app/api/designs/[id]/shape/route.ts` so live shape
+  switching can persist to Firestore without triggering an AI generation.
+
+  Source: structured-outline.md Slice 5 manifest #8 + #11. PRD FR-D-3.
+
+  No UI surface; the visualizer story (d4/d5) wires this module + route into the
+  shape selector. Firestore rule additionally allows authenticated owner to
+  PATCH `nail_shape` field only (no other field mutation via this route).
+
+acceptance_criteria:
+  - 'Given an authenticated owner of a design, when PATCH /api/designs/[id]/shape with valid shape, then 200 + design.nail_shape persisted | maps to FR-D-3'
+  - 'Given an invalid shape value, when PATCH submitted, then 400 with controlled error message and design unchanged | maps to FR-D-2 invalid-shape error condition'
+  - 'Given an authenticated user who does not own the design, when PATCH submitted, then 403 (or rules denial path) | maps to NFR security'
+  - 'Given the design page reloads after a shape switch, when the workspace mounts, then the previously selected shape is restored from stored state | maps to US-D-2 AC #2 (persistence on reload)'
+
+steps:
+  - id: research
+    description: Confirm existing route pattern (server action vs route handler) per epic C convention. Confirm Firestore rule pattern for field-scoped PATCH.
+    agent: researcher
+  - id: test-spec
+    description: |
+      tests/unit/designs/shape-state.test.ts: assert applyShape({designId, nailShape}) returns updated state, assert invalid shape rejected.
+      tests/integration/designs-shape-route.test.ts: vitest @vitest-environment node directive (per reference_jsdom_formdata_node_env.md). Cover happy path, invalid shape, unauthenticated, cross-user denial. Use Firestore + Auth emulators. Mock generation provider — this route must NOT call it.
+      tests/integration/rules/designs-shape-rule.test.ts (rules-lane vitest config): cover authenticated owner allow + cross-user deny + non-shape-field deny.
+
+      Tests written against spec only — do not read route implementation first.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Add lib/designs/shape-state.ts: pure `applyShape` validator + Firestore Admin SDK writer wrapper that updates only `nail_shape` + `updatedAt`.
+
+      Add app/api/designs/[id]/shape/route.ts: PATCH handler. Auth gate via `getSession(req)` (route-handler session helper, NOT the server-action variant). Use Admin SDK Firestore for the write — same convention as Epic C lifecycle.ts. Validate body { nailShape: NailShape } using imported union (catches drift if d1 changes). Reject any other body keys.
+
+      **Update firestore.rules per the approved north-star composition** at `.pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md`:
+      - Canonical owner field is `userId` (NOT ownerUid). All rule clauses use `userId`.
+      - Existing baseline `/designs/{designId} allow update` clause is permissive (any field, owner-only). It MUST be REPLACED — not added alongside. Adding alongside leaves the permissive clause in effect (Firestore evaluates `allow` clauses disjunctively) and the field-scope is never enforced.
+      - The replacement is the union of d2's update clause + d7's update clause. d2 writes BOTH clauses now (so d7 has nothing to add later). d2's clause:
+        ```
+        allow update: if request.auth != null
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['nail_shape', 'updatedAt']);
+        ```
+      - d7's clause (write now, d7 verifies):
+        ```
+        allow update: if request.auth != null
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['name', 'updatedAt']);
+        ```
+
+      Firestore rule is defense-in-depth (Admin SDK bypasses rules in production); rules-lane tests assert it independently with the client SDK emulator.
+
+      Catch blocks log code+message per feedback_silent_catches_cost_time.md.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + lint + unit + integration + rules-lane all pass. Verify route does NOT trigger generation pipeline.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d2): shape state module + PATCH route + rule`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15 App Router
+    language: TypeScript
+    persistence: Firebase Firestore (Admin SDK server-side)
+    testing: Vitest (jsdom + node + rules lanes), Firebase emulators
+  key_files:
+    - path: app/api/designs/route.ts
+      purpose: Reuse auth gate + error envelope pattern from epic C
+    - path: firestore.rules
+      purpose: Add field-scoped allow rule for nail_shape PATCH
+    - path: lib/designs/lifecycle.ts
+      purpose: Reference for Firestore Admin SDK usage + transaction pattern
+
+files_to_modify:
+  - file: lib/designs/shape-state.ts
+    change: net-new — applyShape pure validator + persistence wrapper
+  - file: app/api/designs/[id]/shape/route.ts
+    change: net-new — PATCH handler
+  - file: firestore.rules
+    change: REPLACE existing permissive `/designs/{designId} allow update` clause with field-scoped union (d2 nail_shape + d7 name). All clauses use `userId` (NOT ownerUid). Per security audit.
+  - file: tests/unit/designs/shape-state.test.ts
+    change: net-new
+  - file: tests/integration/designs-shape-route.test.ts
+    change: net-new (`@vitest-environment node`)
+  - file: tests/integration/rules/designs-shape-rule.test.ts
+    change: net-new (rules-lane config)
+
+code_examples:
+  - title: Route shape (PATCH input/output contract)
+    snippet: |
+      // PATCH /api/designs/[id]/shape
+      // Input:  { nailShape: NailShape }
+      // Output: { status: 'updated', nailShape: NailShape } | { status: 'invalid' | 'unauthorized' | 'not_found', message: string }
+  - title: Rule diff-key constraint pattern
+    snippet: |
+      // request.resource.data.diff(resource.data).affectedKeys()
+      //   .hasOnly(['nail_shape', 'updatedAt'])
+
+design_decisions:
+  - decision: PATCH route, not server action
+    rationale: Outline Slice 5 interfaces specify `PATCH /api/designs/[id]/shape`; client-side fetch keeps shape switch low-overhead and decoupled from React-server-component lifecycle
+  - decision: Field-scoped Firestore rule
+    rationale: Prevents this PATCH from mutating any other design fields even if route validator drifts
+
+cross_cutting:
+  - concern: security-rules
+    action: Add rules-lane integration test for shape PATCH
+  - concern: jsdom-vs-node
+    action: Route handler test uses `@vitest-environment node` directive
+  - concern: error-logging
+    action: Catch blocks log error code+message for diagnostic trail
+
+risks:
+  - severity: medium
+    description: Stale shape value desync between client state and Firestore after rapid switching
+    mitigation: route returns echoed nailShape; client commits to that value as source of truth post-response
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 5 manifest #8: lib/designs/shape-state.ts — centralize nail-shape enum handling and persistence glue.
+      Slice 5 interfaces: PATCH /api/designs/[id]/shape; Input {nailShape: 'almond'|...}; Output {status: 'updated', nailShape}.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/feedback_storage_emulator_parallel_race.md
+    relevant_excerpt: |
+      Firebase Storage emulator drops rules deployments under concurrent test files.
+      Fix: fileParallelism: false in vitest.config.rules.ts. (Same caution applies to Firestore-rules tests.)
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      Approved rules composition: REPLACE existing `/designs/{designId} allow
+      update` baseline with field-scoped union of d2 (nail_shape + updatedAt)
+      + d7 (name + updatedAt). Owner field is `userId` (NOT ownerUid).
+      Adding field-scoped clauses alongside the permissive baseline is
+      ineffective (Firestore evaluates allow disjunctively).

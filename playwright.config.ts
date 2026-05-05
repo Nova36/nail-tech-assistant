@@ -27,6 +27,12 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,
+  expect: {
+    toHaveScreenshot: {
+      threshold: 0.02,
+      maxDiffPixelRatio: 0.02,
+    },
+  },
   use: {
     baseURL: E2E_BASE_URL,
     ...devices['Desktop Chrome'],

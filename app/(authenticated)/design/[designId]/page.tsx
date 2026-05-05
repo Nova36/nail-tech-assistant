@@ -1,11 +1,10 @@
-import { getFirestore } from 'firebase-admin/firestore';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
-import { createServerFirebaseAdmin } from '@/lib/firebase/server';
+import { Confirm } from '@/app/(authenticated)/design/[designId]/Confirm';
+import { DesignNameField } from '@/components/DesignNameField';
+import { resolveImageUrl } from '@/lib/designs/imageUrl';
+import { loadDesignDetail } from '@/lib/designs/load';
 import { getSessionForServerAction } from '@/lib/firebase/session';
-import { designConverter } from '@/lib/firestore/converters';
-
-import { Confirm } from './Confirm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,30 +21,39 @@ export default async function DesignDetailPage({
     redirect('/');
   }
 
-  const db = getFirestore(createServerFirebaseAdmin());
-  const snap = await db
-    .collection('designs')
-    .doc(designId)
-    .withConverter(designConverter)
-    .get();
+  const designDetail = await loadDesignDetail({
+    designId,
+    userId: session.uid,
+  });
 
-  if (!snap.exists) {
-    redirect('/design/new');
+  if (!designDetail || designDetail.design.userId !== session.uid) {
+    notFound();
   }
 
-  const design = snap.data();
-
-  if (!design || design.userId !== session.uid) {
-    redirect('/design/new');
-  }
+  const initialImageUrl =
+    designDetail.latestGeneration?.status === 'success'
+      ? await resolveImageUrl(designDetail.latestGeneration.resultStoragePath)
+      : null;
+  const initialSwatchUrl =
+    designDetail.latestGeneration?.status === 'success'
+      ? await resolveImageUrl(
+          designDetail.latestGeneration.nailSwatchStoragePath
+        )
+      : null;
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-6 md:px-6 md:py-10 lg:py-12">
+      <DesignNameField
+        designId={designDetail.design.id}
+        initialName={designDetail.design.name}
+      />
       <Confirm
-        designId={designId}
-        nailShape={design.nailShape}
-        promptText={design.promptText}
-        latestGenerationId={design.latestGenerationId}
+        designId={designDetail.design.id}
+        nailShape={designDetail.design.nailShape}
+        promptText={designDetail.design.promptText}
+        latestGenerationId={designDetail.design.latestGenerationId}
+        initialImageUrl={initialImageUrl}
+        initialSwatchUrl={initialSwatchUrl}
       />
     </main>
   );

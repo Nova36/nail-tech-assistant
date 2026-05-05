@@ -3,6 +3,7 @@
 import { getFirestore } from 'firebase-admin/firestore';
 
 import { generate } from '@/lib/ai/generate';
+import { resolveImageUrl } from '@/lib/designs/imageUrl';
 import {
   createDesignDraft,
   type CreateDesignDraftResult,
@@ -11,12 +12,10 @@ import {
 } from '@/lib/designs/lifecycle';
 import { createServerFirebaseAdmin } from '@/lib/firebase/server';
 import { getSessionForServerAction } from '@/lib/firebase/session';
-import {
-  generationPath,
-  getServerFirebaseStorage,
-} from '@/lib/firebase/storage';
+import { generationPath } from '@/lib/firebase/storage';
 import {
   designConverter,
+  generationConverter,
   referenceConverter,
 } from '@/lib/firestore/converters';
 import {
@@ -96,7 +95,12 @@ export type GenerateDesignErrorCode =
   | 'unknown';
 
 export type GenerateDesignResult =
-  | { status: 'success'; generationId: string; imageUrl: string }
+  | {
+      status: 'success';
+      generationId: string;
+      imageUrl: string;
+      nailSwatchUrl?: string | null;
+    }
   | {
       status: 'failure';
       errorCode: GenerateDesignErrorCode;
@@ -287,17 +291,33 @@ export async function generateDesign(input: {
   }
 
   const ext = mimeTypeToExtension(outcome.mimeType);
-  const bucket = getServerFirebaseStorage();
-  const [imageUrl] = await bucket
-    .file(generationPath(session.uid, started.generationId, ext))
-    .getSignedUrl({
-      action: 'read',
-      expires: Date.now() + 15 * 60 * 1000,
-    });
+  const imageUrl = await resolveImageUrl(
+    generationPath(session.uid, started.generationId, ext)
+  );
+
+  if (!imageUrl) {
+    return generateDesignFailure(
+      'storage_fail',
+      'generation image unavailable'
+    );
+  }
+
+  const persistedGenerationSnap = await db
+    .collection('generations')
+    .doc(started.generationId)
+    .withConverter(generationConverter)
+    .get();
+  const persistedGeneration = persistedGenerationSnap.exists
+    ? (persistedGenerationSnap.data() ?? null)
+    : null;
+  const nailSwatchUrl = await resolveImageUrl(
+    persistedGeneration?.nailSwatchStoragePath ?? null
+  );
 
   return {
     status: 'success',
     generationId: started.generationId,
     imageUrl,
+    nailSwatchUrl,
   };
 }

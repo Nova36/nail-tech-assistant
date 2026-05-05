@@ -1,4 +1,14 @@
-export type NailShape = 'almond' | 'coffin' | 'square' | 'round' | 'oval';
+export type NailShape =
+  | 'almond'
+  | 'coffin'
+  | 'square'
+  | 'round'
+  | 'oval'
+  | 'stiletto';
+
+export function assertUnreachableShape(s: never): never {
+  throw new Error(`Unexpected NailShape: ${String(s)}`);
+}
 
 export interface AuthUser {
   uid: string;
@@ -54,6 +64,7 @@ export interface Generation {
   /** Provider-opaque pre-flight payload archive. Shape varies by provider. */
   requestJson: unknown;
   resultStoragePath: string | null;
+  nailSwatchStoragePath: string | null;
   providerResponseMetadata: unknown;
   status: GenerationStatus;
   errorCode: GenerationErrorCode | null;

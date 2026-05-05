@@ -164,6 +164,7 @@ export async function persistGenerationStart(input: {
     userId: input.userId,
     requestJson: input.requestJson,
     resultStoragePath: null,
+    nailSwatchStoragePath: null,
     providerResponseMetadata: null,
     status: 'pending',
     errorCode: null,
@@ -314,7 +315,6 @@ export async function persistGenerationResult(input: {
         updatedAt: now,
       });
     });
-    return { ok: true };
   } catch (err) {
     const code = (err as { code?: string }).code ?? 'unknown';
     const message = (err as Error).message ?? String(err);
@@ -330,4 +330,11 @@ export async function persistGenerationResult(input: {
     );
     return { ok: false, reason: 'firestore_failure', message };
   }
+
+  // Swatch extraction disabled: pivoted to gemini-3-pro-image-preview which
+  // generates the full five-nail composition directly. Swatch + clip-path
+  // visualizer assumed flat monochrome polish; mismatches nail-art designs.
+  // Re-enable behind a designKind: 'solid' flag if/when solid-color flow returns.
+
+  return { ok: true };
 }

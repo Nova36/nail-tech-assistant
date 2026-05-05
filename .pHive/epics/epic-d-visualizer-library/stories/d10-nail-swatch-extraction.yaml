@@ -1,0 +1,225 @@
+id: d10-nail-swatch-extraction
+epic: epic-d-visualizer-library
+title: Extract nail-polish swatch from generated hand photo so visualizer renders the design (not photo windows)
+status: pending
+complexity: high
+methodology: tdd
+depends_on:
+  [d4-nailvisualizer-composition, d5-design-page-visualizer-integration]
+
+description: |
+  **Planning-gap fix surfaced 2026-05-02.** d4 ships v1 masking the full
+  generated hand photo into each nail-shape silhouette — so each "nail" is
+  a tiny window into the source photo (skin, fingertip, polish, background
+  all clipped together). Don's intent: the visualizer should render *just
+  the polish design* on each nail anchor, identical across all 5 in v1, and
+  ultimately distinct per nail.
+
+  This story closes the gap by adding a post-generation extraction step
+  that produces a polish-only swatch image, persists it alongside the hand
+  photo, and rewires the visualizer to prefer the swatch.
+
+  ## Architecture
+
+  After c-pipeline writes a successful Generation:
+    1. Re-send the result image to Vertex Gemini multimodal with a prompt
+       asking for a single isolated nail-polish region (PNG, tight crop,
+       transparent or matte background).
+    2. Persist the returned PNG to Firebase Storage at
+       `designs/{designId}/swatch.png`.
+    3. Write `nailSwatchStoragePath` onto the Generation doc (new optional
+       field — null when extraction skipped/failed).
+  Visualizer reads `nailSwatchUrl` (preferred); falls back to `imageUrl`
+  when null so v1-style cheap-clip still works on legacy designs.
+
+  Extraction is best-effort: failure leaves `nailSwatchStoragePath` null,
+  generation overall still `success`, visualizer falls back gracefully.
+  Logged per feedback_silent_catches_cost_time (code+message).
+
+  Future work (out of scope here): per-nail unique designs — extend swatch
+  to an array `nailSwatchStoragePaths[]` of length 5, anchor[i] reads
+  swatch[i]. d10 keeps the contract single-swatch-shared-across-5; the
+  array refactor is a separate story.
+
+acceptance_criteria:
+  - 'Given a successful Generation with a hand-photo result, when the post-extraction step runs, then a polish-only PNG is persisted at designs/{designId}/swatch.png and nailSwatchStoragePath is set on the Generation doc | maps to FR-D-1 visual-correctness'
+  - 'Given the extraction step fails (Vertex error / non-image response / timeout), when persisted, then nailSwatchStoragePath stays null, generation status stays `success`, and the failure is logged with code+message | maps to NFR error-budget'
+  - 'Given a Generation with nailSwatchStoragePath set, when the visualizer renders, then all 5 nail anchors are filled with the swatch image (not the hand photo) | maps to US-D-1 AC #1'
+  - 'Given a legacy Generation without nailSwatchStoragePath (pre-d10), when the visualizer renders, then it falls back to the hand-photo cheap-clip path so existing designs still render | backward-compat'
+  - 'Given the swatch image, when inspected, then it shows polish color/pattern only — no fingertip skin, no nail bed pink edge, no background | enforces "design renders, not photo window"'
+  - 'Given snapshot tests under theme=flat with a swatched Generation, when run, then a stable baseline replaces the photo-window snapshot from d4 | regression coverage'
+
+steps:
+  - id: research
+    description: |
+      Spike: confirm Vertex Gemini 2.x can return a cropped polish-only
+      PNG from a hand-photo input. Two candidate prompts to test:
+        (a) "Return only the painted nail region of the index finger as
+             PNG. Transparent background. Tight crop. No skin."
+        (b) Bbox + sharp crop fallback: ask for `{x,y,w,h}` JSON,
+             server-side crop with `sharp` from the original image.
+      Pick whichever produces consistent polish-only output across 5
+      sample designs from existing c-pipeline runs. Document chosen
+      approach + sample outputs in a brief artifact at
+      `.pHive/spikes/d10-extraction/findings.md`.
+    agent: researcher
+  - id: ui-design
+    description: |
+      Confirm visualizer expectation: each nail anchor renders the swatch
+      filling the entire clipPath silhouette. No tiling, no aspect-ratio
+      letterbox. Swatch should fill 100% of clipped area. Update
+      `.pHive/wireframes/NailVisualizer/preview.html` swatched variant
+      with a sample polish-only PNG to confirm the visual reads as
+      "painted nail" not "tiny image window."
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/unit/ai/extract-swatch.test.ts:
+        - happy path: mock Vertex response → returns PNG buffer →
+          persisted to storage + path returned
+        - failure: Vertex returns non-image → null returned, code+message
+          logged
+        - failure: storage upload throws → null returned, logged
+      tests/unit/designs/persist-swatch.test.ts:
+        - sets nailSwatchStoragePath on existing Generation doc when
+          extraction succeeds
+        - leaves field null on extraction failure; status stays success
+      tests/unit/visualizer/NailVisualizer.test.tsx (extend):
+        - given nailSwatchUrl prop, all 5 anchors clip the swatch (not
+          imageUrl)
+        - given nailSwatchUrl=null + imageUrl set, falls back to d4
+          cheap-clip behavior
+      Snapshot rebaseline per shape under swatched theme=flat.
+      Tests against contract only; do not read implementation.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Add lib/ai/extract-swatch.ts:
+        - export async function extractNailSwatch(args: {
+            sourceStoragePath: string;
+            designId: string;
+            userId: string;
+          }): Promise<{ ok: true; storagePath: string } | { ok: false }>
+        - Reads source from Firebase Storage admin SDK; sends to Vertex
+          Gemini per chosen approach (research output); writes result
+          PNG to designs/{designId}/swatch.png; returns path.
+      Add to c-pipeline post-success: persistGenerationResult success
+      path triggers extractNailSwatch best-effort, writes
+      nailSwatchStoragePath onto the Generation doc.
+      Schema: extend Generation type + generationConverter with optional
+      `nailSwatchStoragePath: string | null` (default null).
+      Visualizer: NailVisualizer accepts new optional `nailSwatchUrl`
+      prop; when present, masks it instead of imageUrl. Pages hydrating
+      from Generation pass swatchUrl resolved via lib/designs/imageUrl.ts
+      sibling helper `swatchUrl.ts`.
+      Catch all extraction errors with code+message logging
+      (feedback_silent_catches_cost_time). Generation doc never blocked
+      by extraction failure.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Type-check + lint + tests + snapshots pass. Reviewer opens design
+      page in browser with a fresh generation, confirms swatch fills
+      anchors and reads as "painted nail." Confirms legacy generation
+      (no swatch field) still renders via fallback. Confirms extraction
+      failure path doesn't break design save. Cross-verify: spike
+      findings match implemented Vertex prompt.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d10): nail-swatch extraction + visualizer rewire`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    ai: Vertex AI Gemini via @google/genai (vertexai:true)
+    storage: Firebase Storage admin SDK
+    image-ops: sharp (add as dep) — only if bbox+crop approach chosen in spike
+    testing: Vitest jsdom + node + snapshot
+  key_files:
+    - path: lib/ai/provider.ts
+      purpose: existing Vertex AI client wiring (re-use)
+    - path: lib/firestore/converters/generations.ts
+      purpose: schema extension target (nailSwatchStoragePath field)
+    - path: lib/designs/lifecycle.ts
+      purpose: persistGenerationResult — extraction hook here
+    - path: lib/designs/imageUrl.ts
+      purpose: sibling helper pattern for swatchUrl resolver
+    - path: components/NailVisualizer/NailVisualizer.tsx
+      purpose: prop + masking rewire target
+
+files_to_modify:
+  - file: lib/ai/extract-swatch.ts
+    change: net-new
+  - file: lib/designs/swatchUrl.ts
+    change: net-new (mirror imageUrl.ts pattern)
+  - file: lib/firestore/converters/generations.ts
+    change: 'add nailSwatchStoragePath: string | null'
+  - file: lib/designs/lifecycle.ts
+    change: hook extractNailSwatch into persistGenerationResult success path
+  - file: lib/types/index.ts
+    change: extend Generation type
+  - file: components/NailVisualizer/NailVisualizer.tsx
+    change: add nailSwatchUrl prop; prefer over imageUrl when present
+  - file: app/(authenticated)/design/[designId]/page.tsx
+    change: pass swatchUrl to visualizer
+  - file: tests/unit/ai/extract-swatch.test.ts
+    change: net-new
+  - file: tests/unit/designs/persist-swatch.test.ts
+    change: net-new
+  - file: tests/unit/visualizer/NailVisualizer.test.tsx
+    change: extend with swatch cases
+  - file: .pHive/spikes/d10-extraction/findings.md
+    change: net-new (research artifact)
+
+design_decisions:
+  - decision: Extraction is best-effort, never blocks generation success
+    rationale: Vertex extraction call could fail / time out / cost-cap; the user has already paid the wait for the hand photo, don't fail the design over a polish step
+  - decision: Single shared swatch in v1 (5 anchors, 1 swatch)
+    rationale: Don's stated v1 goal — "all 5 nails being the same design." Per-nail unique designs deferred to a future story
+  - decision: New `nailSwatchStoragePath` field on Generation, not Design
+    rationale: Swatch is derived from a specific Generation result; lifecycle is tied to that Generation, not the Design (which can have multiple Generations)
+  - decision: Visualizer prop is `nailSwatchUrl` (resolved URL), not storage path
+    rationale: Mirrors existing `imageUrl` pattern; resolution stays at the page boundary via swatchUrl.ts helper
+  - decision: Fallback to imageUrl when swatch null
+    rationale: Legacy data + extraction failures still render *something*. Visual is cheap (d4 behavior) but functional
+
+cross_cutting:
+  - concern: error-logging
+    action: Vertex / storage / parse failures all log code+message before returning null
+  - concern: types-coverage
+    action: Generation type extension + converter tests cover null + present cases
+  - concern: data-migration
+    action: None required — new field is optional, existing docs read as null
+
+risks:
+  - severity: high
+    description: Vertex Gemini may not reliably produce polish-only PNGs across diverse hand photos (lighting, skin tone, polish opacity)
+    mitigation: Spike step gates implementation; if no consistent prompt found, pivot to bbox + sharp crop approach OR escalate to Path A (regenerate as nail-only output instead of post-extraction). Don approves pivot in research review.
+  - severity: medium
+    description: Extra Vertex call doubles per-design AI cost
+    mitigation: Best-effort + can be feature-flagged off if cost spikes. Document expected monthly cost in spike findings.
+  - severity: medium
+    description: Snapshot regressions on existing d4 baseline
+    mitigation: Story explicitly rebaselines snapshots; reviewer eyeballs each shape
+
+references:
+  - path: .pHive/epics/epic-d-visualizer-library/stories/d4-nailvisualizer-composition.yaml
+    relevant_excerpt: |
+      Risk #5 (high): "2D visualizer technically renders but feels cheap"
+      — d10 directly addresses the predicted cheapness.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/project_vertex_firebase_shared_credential.md
+    relevant_excerpt: |
+      FIREBASE_SERVICE_ACCOUNT_JSON auths both Firebase Admin AND Vertex AI;
+      SDK is @google/genai (vertexai:true). Re-use for extraction call.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/feedback_silent_catches_cost_time.md
+    relevant_excerpt: |
+      Always log error code+message in catch blocks touching third-party APIs.

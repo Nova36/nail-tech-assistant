@@ -1,0 +1,165 @@
+id: d9-library-grid-and-empty-state
+epic: epic-d-visualizer-library
+title: /library grid + DesignLibrary + DesignCard + empty state
+status: pending
+complexity: medium
+methodology: tdd
+depends_on:
+  - d7-design-rename
+  - d8-regenerate-from-stored-inputs
+
+description: |
+  Replace the /library stub with a real grid of saved designs. Each card
+  surfaces thumbnail, name (with unnamed-state placeholder + inline naming via
+  d7), and updated-at metadata. Empty state covers the zero-design case.
+
+  Reuses Confirm.tsx imageUrl resolution pattern for thumbnails (research Q2 +
+  Don's lock 2026-05-01 — no new signed-URL helper).
+
+  Source: structured-outline.md Slice 6 manifest #1, #2. PRD US-D-3, FR-D-4, FR-D-7.
+
+  Card click → /design/[id] reopen flow (d6).
+
+acceptance_criteria:
+  - 'Given >= 1 saved design exists, when /library loads, then each design renders as a card with thumbnail + name (or unnamed placeholder) + updated-at | maps to US-D-3 AC #1, FR-D-4'
+  - 'Given zero saved designs, when /library loads, then an empty state with a primary CTA to /design/new renders | maps to US-D-3 (zero state)'
+  - 'Given a card click, when activated, then /design/[id] reopens the design via d6 loader | maps to US-D-3 AC #1, US-D-4 AC #1'
+  - 'Given an unnamed design, when its card renders, then the unnamed placeholder + inline rename affordance from d7 are present | maps to FR-D-7'
+  - "Given an authenticated user lists /library, when Firestore rules are tested, then only the user's own designs are returned | NFR security"
+  - 'Given Playwright e2e on the library, when run, then login → browse list → click card → reopen → switch shape → save name → return to library shows updated name | maps to FR-D-8 + Slice 6 verification'
+
+steps:
+  - id: research
+    description: |
+      Read research-brief Q2 (Library page is a pure stub). **MUST resolve before test-spec:** Read `app/(authenticated)/design/[designId]/Confirm.tsx` imageUrl resolution path end-to-end. Surface the exact helper or fetch (e.g., direct Firebase Storage `gs://`-to-https resolution, signed URL via Admin SDK, or a Firebase Web SDK getDownloadURL on the client). Output the resolved pattern in the research findings — d9 implement consumes this as the canonical thumbnail URL strategy. If no shared helper exists, the research step also names the helper to extract (e.g., `lib/designs/imageUrl.ts`). **Don's lock 2026-05-01:** no new signed-URL helper for v1; reuse only.
+
+      Also confirm /designs collection list query pattern (likely owner-scoped query established in epic C; reuse).
+    agent: researcher
+  - id: ui-design
+    description: |
+      Read .pHive/wireframes/epic-d-visualizer-library/library-grid.html — confirm wireframe_approval=approved. Verify card layout + empty-state treatment + grid columns + navigation pattern match wireframe. Confirm thumbnail render is the visualizer-mini OR raw image (Don's pick is whatever wireframe shows).
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/unit/components/DesignLibrary.test.tsx (jsdom): renders N cards from input designs[]; renders empty state for designs=[]; card click navigates to /design/[id]; integrates DesignNameField from d7 for unnamed cards.
+
+      tests/unit/components/DesignCard.test.tsx (jsdom): thumbnail src resolution matches Confirm.tsx pattern; renders unnamed placeholder when name is null/empty; renders updated-at relative time.
+
+      tests/integration/library-list-route.test.ts (`@vitest-environment node`) — if a list endpoint is added, otherwise skip; if list runs server-side via page.tsx Firestore query, this test asserts the page-level fetch returns owner-scoped designs.
+
+      tests/integration/rules/designs-list-rule.test.ts (rules-lane): authenticated user lists own designs allowed; cross-user list rejected.
+
+      tests/e2e/library-flow.spec.ts (Playwright): the full Slice 6 verification flow per outline.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Replace app/(authenticated)/library/page.tsx stub with server component that lists owner's designs via Firestore Admin SDK + converter (.withConverter()). Render <DesignLibrary>.
+
+      Add components/DesignLibrary.tsx + components/DesignCard.tsx + components/LibraryEmptyState.tsx. DesignCard uses Confirm.tsx imageUrl resolution helper (extract to lib/designs/imageUrl.ts if not already shared). Mount DesignNameField from d7 inline.
+
+      **Firestore rules:** the existing `allow read` clause on `/designs/{designId}` covers BOTH `get` AND `list` queries (Firestore semantics — `allow read` is shorthand for both). Verify in research; expected outcome is no rule edit needed (Epic C baseline already covers it). Owner field is `userId` (NOT ownerUid). Rules-lane test asserts the read rule for list queries with `where userId == request.auth.uid`. Per security audit `.pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md`.
+
+      No new Storage rule changes if thumbnail uses Confirm.tsx pattern.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: All tests pass. Reviewer browses /library on real seed, confirms empty state, fills with seeds, click-reopens, renames, regenerates, returns to library — full Slice 6 happy path.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d9): /library grid + DesignLibrary + empty state`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15 App Router (server component + client islands)
+    persistence: Firestore Admin
+    testing: Vitest jsdom + node + rules + Playwright
+  key_files:
+    - path: app/(authenticated)/library/page.tsx
+      purpose: Replace stub
+    - path: app/(authenticated)/design/[designId]/Confirm.tsx
+      purpose: Source of imageUrl resolution pattern to reuse
+    - path: components/DesignNameField.tsx (d7)
+      purpose: Inline naming on card
+
+files_to_modify:
+  - file: app/(authenticated)/library/page.tsx
+    change: replace stub with real list view
+  - file: components/DesignLibrary.tsx
+    change: net-new
+  - file: components/DesignCard.tsx
+    change: net-new
+  - file: components/LibraryEmptyState.tsx
+    change: net-new
+  - file: lib/designs/imageUrl.ts
+    change: extract from Confirm.tsx if not shared (research step decides)
+  - file: firestore.rules
+    change: VERIFY existing `allow read` covers list (per Firestore semantics it does). Owner field is `userId` (NOT ownerUid). Expected no edit needed. Per security audit.
+  - file: tests/unit/components/DesignLibrary.test.tsx
+    change: net-new
+  - file: tests/unit/components/DesignCard.test.tsx
+    change: net-new
+  - file: tests/integration/rules/designs-list-rule.test.ts
+    change: net-new
+  - file: tests/e2e/library-flow.spec.ts
+    change: net-new
+
+code_examples:
+  - title: Card shape
+    snippet: |
+      type DesignCardProps = {
+        design: Design;
+        latestImageUrl: string | null;
+        onRename: (name: string | null) => Promise<void>;
+      };
+  - title: Empty state CTA
+    snippet: |
+      // empty state: "No designs yet — start with /design/new"
+      // primary action: <Link href="/design/new">Start a new design</Link>
+
+design_decisions:
+  - decision: Server component lists designs (not a list endpoint)
+    rationale: Epic A pattern — read in server component via Admin SDK; reduces client surface
+  - decision: Thumbnail reuses Confirm.tsx imageUrl pattern
+    rationale: Don's lock 2026-05-01 — no new signed-URL helper for v1
+  - decision: Inline DesignNameField on card
+    rationale: Aligns with FR-D-7 (name later) without forcing a separate edit modal
+
+cross_cutting:
+  - concern: security-rules
+    action: rules-lane test for /designs list query
+  - concern: jsdom-vs-node
+    action: any route handler test uses node env
+  - concern: error-logging
+    action: server-side fetch errors log code+message
+
+risks:
+  - severity: medium
+    description: Server-component list query loads all designs without pagination
+    mitigation: Mother's Day v1 single user, low N — defer pagination; document in story as known v2 work
+  - severity: low
+    description: Thumbnail imageUrl resolution diverges from Confirm.tsx after future refactor
+    mitigation: extract shared lib/designs/imageUrl.ts in this story so both paths share one source
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 6 manifest #1 library/page.tsx, #2 DesignLibrary.tsx.
+      Verification: design cards render thumbnail, name, and updated-at metadata.
+  - path: .pHive/planning/vertical-plan.md
+    relevant_excerpt: |
+      Slice 6 — Design Library + Regenerate. WHAT WORKS: a generated design can
+      be named, revisited later, reopened into the visualizer, and regenerated
+      from the same stored inputs.
+  - path: .pHive/specialist-phases/security-plan-audit/epic-d-visualizer-library/audit-report.md
+    relevant_excerpt: |
+      Owner field is `userId` (NOT ownerUid). Existing `allow read` on
+      `/designs/{designId}` covers both get + list per Firestore semantics —
+      Epic C baseline likely already covers d9's list rule needs. Composite
+      index for userId + createdAt already present in firestore.indexes.json.

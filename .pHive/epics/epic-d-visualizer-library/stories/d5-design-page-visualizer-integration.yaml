@@ -1,0 +1,150 @@
+id: d5-design-page-visualizer-integration
+epic: epic-d-visualizer-library
+title: /design/[id] visualizer integration + shape-switch e2e + per-shape snapshots
+status: pending
+complexity: high
+methodology: tdd
+depends_on:
+  - d2-shape-state-and-patch-route
+  - d4-nailvisualizer-composition
+
+description: |
+  Wire NailVisualizer into the existing /design/[designId] page so a successful
+  generation displays as a five-nail visualization with live shape switching.
+  Shape selector posts to PATCH /api/designs/[id]/shape (d2). Switching shape
+  must NOT trigger a generation.
+
+  Replace the flat GenerationPreview branch in app/(authenticated)/design/[designId]/Confirm.tsx for the success path; preserve the existing pending/failure/idle branches.
+
+  Add Playwright tests:
+  - tests/e2e/visualizer-shapes.spec.ts: log in, open a seeded design, switch through all 6 shapes, assert no generate call fired and that the persisted shape survives reload.
+  - tests/e2e/visualizer-snapshots.spec.ts: capture screenshot snapshots per shape (theme=flat) and assert against baseline.
+
+acceptance_criteria:
+  - 'Given a design with successful latest generation, when /design/[id] loads, then NailVisualizer renders the result imageUrl masked across 5 nails | maps to US-D-1 AC #1, FR-D-1'
+  - 'Given the visualizer is open, when the user selects a different shape, then preview updates immediately + PATCH /shape persists + no generation request fires | maps to US-D-2 AC #1, NFR perf'
+  - 'Given a shape was selected, when the page reloads, then the previously selected shape is restored from stored design state | maps to US-D-2 AC #2, FR-D-3'
+  - 'Given an invalid shape value is submitted (synthetic test), when PATCH responds, then the UI reverts to the prior valid shape and surfaces a controlled error | maps to US-D-2 AC #3'
+  - 'Given Playwright per-shape snapshots, when the visualizer renders each of the 6 shapes, then a stable baseline screenshot exists | maps to FR-D-1 silent-break mitigation'
+
+steps:
+  - id: research
+    description: Read research-brief Q1 (Confirm.tsx success path), Slice 5 manifest #7 + verification, verify Playwright snapshot config exists or needs initial baseline.
+    agent: researcher
+  - id: ui-design
+    description: |
+      Read .pHive/wireframes/epic-d-visualizer-library/visualizer-view.html — confirm wireframe_approval=approved. Verify the page-level layout (visualizer top + prompt/refs right rail + shape selector position) is what Don approved.
+    agent: ui-designer
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      tests/unit/design-page/Confirm.success-path.test.tsx: assert success branch renders NailVisualizer + ShapeSelector; selecting a shape triggers fetch to PATCH /api/designs/[id]/shape; rejection on invalid shape reverts UI; no /generate call ever fires from this branch.
+
+      tests/e2e/visualizer-shapes.spec.ts (Playwright): seed a design with successful generation; iterate through all 6 shapes; assert preview class/data-attribute changes; assert page network log shows no /generate POST; reload page; assert shape attribute reflects last selection.
+
+      tests/e2e/visualizer-snapshots.spec.ts: per-shape `await expect(page).toHaveScreenshot('visualizer-{shape}.png')`. First run generates baselines; subsequent runs assert.
+
+      Test directives: Playwright config + screenshot tolerances tuned to allow font-rendering jitter but catch real geometry drift.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Update app/(authenticated)/design/[designId]/Confirm.tsx success branch to render <NailVisualizer> + <ShapeSelector>. Reuse current state.imageUrl resolution path. Wire shape selector onChange → fetch PATCH + optimistic update + revert on failure.
+
+      Update app/(authenticated)/design/[designId]/page.tsx if needed to pass nailShape from server-loaded design state.
+
+      Verify no other routes reference the old GenerationPreview-only success path (grep + reviewer check).
+
+      **Playwright snapshot setup is a first-time CI step in this project.** If `playwright.config.ts` lacks `snapshotDir`, `toHaveScreenshot` defaults, or `expect.toHaveScreenshot.threshold` tuning, set them up in this story. Establish initial baselines via `pnpm exec playwright test --update-snapshots` for the 6 visualizer-snapshot files; commit baselines under `tests/e2e/visualizer-snapshots.spec.ts-snapshots/`. Document the regen command in `tests/e2e/README.md` (or equivalent) for future shape-asset edits.
+
+      Per memory feedback_silent_catches_cost_time.md: catch the PATCH fetch failure with code+message logging.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: All unit + e2e + snapshots pass. Reviewer opens production-like preview (Vercel preview deploy or local prod build) and tablet-tests at landscape. Confirms NO generation call when switching. Visual sanity per shape.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(d5): /design/[id] visualizer integration + shape-switch e2e + snapshots`.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-d/visualizer-library
+  tech_stack:
+    framework: Next.js 15 App Router
+    testing: Vitest + Playwright + screenshot baselines
+  key_files:
+    - path: app/(authenticated)/design/[designId]/Confirm.tsx
+      purpose: Modify success branch — replace flat GenerationPreview with NailVisualizer
+    - path: app/(authenticated)/design/[designId]/page.tsx
+      purpose: Pass nailShape to client island
+    - path: components/NailVisualizer/NailVisualizer.tsx
+      purpose: Consumer of integration
+
+files_to_modify:
+  - file: app/(authenticated)/design/[designId]/Confirm.tsx
+    change: success branch → NailVisualizer + ShapeSelector wired to PATCH route
+  - file: app/(authenticated)/design/[designId]/page.tsx
+    change: pass nailShape (if not already)
+  - file: tests/unit/design-page/Confirm.success-path.test.tsx
+    change: net-new
+  - file: tests/e2e/visualizer-shapes.spec.ts
+    change: net-new
+  - file: tests/e2e/visualizer-snapshots.spec.ts
+    change: net-new
+  - file: tests/e2e/visualizer-snapshots.spec.ts-snapshots/
+    change: net-new (Playwright baseline directory; first-run generates 6 baseline images)
+
+code_examples:
+  - title: Success-branch wiring sketch
+    snippet: |
+      if (state.phase === 'success') {
+        const onShapeChange = async (next: NailShape) => {
+          const prev = state.nailShape;
+          setState({ ...state, nailShape: next });
+          const res = await fetch(`/api/designs/${designId}/shape`, {
+            method: 'PATCH',
+            body: JSON.stringify({ nailShape: next }),
+          });
+          if (!res.ok) {
+            console.error('[design-page] shape patch failed', { code: res.status });
+            setState({ ...state, nailShape: prev, error: 'Shape update failed' });
+          }
+        };
+        return (
+          <VisualizerFrame>
+            <NailVisualizer theme="flat" imageUrl={state.imageUrl} nailShape={state.nailShape} />
+            <ShapeSelector value={state.nailShape} onChange={onShapeChange} />
+          </VisualizerFrame>
+        );
+      }
+
+design_decisions:
+  - decision: PATCH route over server action for shape switching
+    rationale: client-side fetch keeps live switching low-overhead; matches d2 contract
+  - decision: theme="flat" hardcoded at integration site
+    rationale: v1 ships flat only; theme is a future toggle in user settings or feature-flag, not a design-page knob
+
+cross_cutting:
+  - concern: error-logging
+    action: PATCH failure logs code+message
+  - concern: regression
+    action: Playwright snapshot baselines guard FR-D-1 silent-break risk
+
+risks:
+  - severity: medium
+    description: Snapshot tests flake on font/AA rendering jitter
+    mitigation: tune Playwright threshold; allow small pixel diff; baseline regen documented in story
+  - severity: medium
+    description: Stale state.imageUrl source if Confirm.tsx hydration changes
+    mitigation: integration test asserts pass-through
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      Slice 5 verification: Playwright shape-switch test + visual regression snapshots per shape.
+  - path: app/(authenticated)/design/[designId]/Confirm.tsx
+    relevant_excerpt: |
+      [success branch currently passes state.imageUrl to GenerationPreview]
