@@ -1,0 +1,178 @@
+id: e1-chat-turns-persistence
+epic: epic-e-chat-refinement
+title: 'chat_turns persistence: schema + firestore.rules + indexes'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: []
+
+description: |
+  Add the persistence surface for Epic E's ordered refinement turns by extending
+  Firestore coverage for `designs/{designId}/chat_turns/{turnId}`. The subcollection
+  choice is locked: prefer the nested design-scoped model over any top-level
+  `chat_turns` collection because it keeps ownership reasoning aligned with the
+  parent design and auto-cascades naturally when a design is removed. Anchor:
+  Slice 7 manifest item #1 in `structured-outline.md` L428 and Epic E FR-E-1 in
+  `prd.md` L661-L663. Subcollection direction is reinforced by the research brief's
+  persistence section and the explicit override in this task brief (`research-brief.md`
+  "Firestore rules + indexes precedent"; `tpm-story-sequence.md` Story e1).
+
+  Scope here is storage shape, rules, and index coverage only. This story does
+  NOT define the runtime `ChatTurn` TypeScript type, does NOT add API handlers,
+  and does NOT add UI. The stored document shape should still be spelled out in
+  the story because downstream stories need a stable contract: `userId`,
+  `designId`, `message`, `status`, nullable `generationId`, and ISO timestamps
+  ordered by `createdAt`. That separation preserves TPM's parallel seam: e1 owns
+  persistence and e2 owns the pure accumulation contract (`tpm-story-sequence.md`
+  "e1 ⫼ e2"; `prd.md` L661-L672).
+
+acceptance_criteria:
+  - 'Given an authenticated owner, when they read or create `designs/{designId}/chat_turns/{turnId}`, then Firestore rules allow only owner-scoped access and deny cross-user reads/writes | maps to FR-E-1, Security NFR (`prd.md` L661-L663, L681-L682)'
+  - 'Given the rules lane runs, when a non-owner or anonymous client touches the chat-turn path, then the emulator denies the request above the default-deny fallback | maps to FR-E-1 and Slice 7 validation (`structured-outline.md` L441-L449)'
+  - 'Given chat turns are queried in chronological order for prompt accumulation, when indexes are deployed, then `chat_turns` supports ascending `createdAt` reads within the subcollection contract | maps to FR-E-2 (`structured-outline.md` L430-L444, `research-brief.md` Firestore rules + indexes precedent)'
+
+steps:
+  - id: research
+    description: Confirm the exact parent/child rules composition for `designs/{designId}/chat_turns/{turnId}` and verify whether the repo's rules lane expects `tests/rules/*.test.ts` naming, not the older `tests/integration/rules/*` draft path.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing rules-lane tests first in `tests/rules/chat-turns.rules.test.ts`.
+      Mirror the d2/d6/d7 precedent: owner allow, cross-user deny, anonymous deny,
+      update/delete scope checks, and one "default deny still catches unknown paths"
+      assertion. Add an index-shape test only if the existing `tests/rules/indexes.test.ts`
+      lane is the accepted guard for new `firestore.indexes.json` entries.
+
+      Do not read an implementation stub first; write the tests from the persistence
+      contract and the Firestore path shape.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Update `firestore.rules` with an explicit nested match under
+      `/designs/{designId}/chat_turns/{turnId}` above the deny-all clause. Reads and
+      creates are owner-scoped; updates/deletes must keep `userId` immutable and only
+      permit the chat-turn lifecycle fields needed by later stories. Storage shape
+      is denormalized enough for rules to evaluate ownership without route-time joins:
+      include `userId` and `designId` on the row even though the collection is nested.
+
+      Update `firestore.indexes.json` for the `chat_turns` collection group using the
+      existing JSON structure in `tests/rules/indexes.test.ts:34-69` and the Epic E
+      requirement that chronological reads key off `createdAt ASC`. Per this task,
+      keep scope here at persistence only; the TypeScript `ChatTurn` type lives in e2.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + rules lane + index shape pass. Verify the nested rules inherit the same owner model as `designs` and do not create a permissive escape hatch below the default deny.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(e1): add chat turn persistence rules` on epic-e/chat-refinement.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-e/chat-refinement
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: firestore.rules
+      purpose: Existing owner-scoped collection matches live here; add the nested `chat_turns` rule above the deny-all block (`firestore.rules:9-71`, `researcher-raw-findings.md` Q2).
+    - path: firestore.indexes.json
+      purpose: Existing collection-group index structure is the canonical JSON shape to extend (`firestore.indexes.json:1-32`, `structured-outline.md` L428).
+    - path: tests/rules/designs-shape-rule.test.ts
+      purpose: Closest rules-lane precedent for owner allow / cross-user deny / field-scope assertions (`tests/rules/designs-shape-rule.test.ts:1-126`).
+    - path: tests/rules/indexes.test.ts
+      purpose: Structural guard pattern for `firestore.indexes.json` additions (`tests/rules/indexes.test.ts:1-69`).
+
+files_to_modify:
+  - file: firestore.rules
+    change: Add nested `chat_turns` owner-scoped rules under `/designs/{designId}`.
+  - file: firestore.indexes.json
+    change: Add `chat_turns` collection-group index for chronological reads.
+  - file: tests/rules/chat-turns.rules.test.ts
+    change: net-new rules-lane coverage for nested chat-turn ownership and allowed field updates.
+  - file: tests/rules/indexes.test.ts
+    change: extend only if the current structural lane needs an explicit `chat_turns` entry assertion.
+
+code_examples:
+  - title: Existing field-scoped rules-lane pattern
+    file: tests/rules/designs-shape-rule.test.ts:52
+    snippet: |
+      describe('designs/{designId} — d2 field-scoped update rules', () => {
+        it('ALLOWS authenticated owner update with {nail_shape, updatedAt}', async () => {
+          await testEnv.withSecurityRulesDisabled(async (ctx) => {
+            await setDoc(doc(ctx.firestore(), 'designs', 'd1'), aliceDesignData());
+          });
+          const alice = testEnv.authenticatedContext(ALICE_UID);
+          await assertSucceeds(
+            updateDoc(doc(alice.firestore(), 'designs', 'd1'), {
+              nail_shape: 'coffin',
+              updatedAt: '2026-05-01T01:00:00Z',
+            })
+          );
+        });
+      });
+  - title: Existing index JSON shape
+    file: firestore.indexes.json:1
+    snippet: |
+      {
+        "indexes": [
+          {
+            "collectionGroup": "designs",
+            "queryScope": "COLLECTION",
+            "fields": [
+              { "fieldPath": "userId", "order": "ASCENDING" },
+              { "fieldPath": "createdAt", "order": "DESCENDING" }
+            ]
+          }
+        ],
+        "fieldOverrides": []
+      }
+
+design_decisions:
+  - decision: Persist chat turns as a Firestore subcollection under the parent design
+    rationale: Locked by this task and preferred over a top-level collection because it matches the parent ownership model and design lifecycle more cleanly (`research-brief.md` Firestore precedent, `prd.md` L661-L663).
+  - decision: Keep e1 limited to storage shape and rules, not runtime typing
+    rationale: TPM split e1 and e2 explicitly so persistence can move in parallel with the pure accumulation library (`tpm-story-sequence.md` table + "e1 ⫼ e2").
+  - decision: Model the chat-turn lane after the existing rules test suite, not as a one-off integration path
+    rationale: Epic D already established the rules-lane pattern in `tests/rules/` and this task explicitly calls for mirroring d2/d6/d7 precedent.
+
+cross_cutting:
+  - concern: security-rules
+    action: Require a rules-lane test that covers owner allow, cross-user deny, anonymous deny, and update field scope.
+  - concern: types-coverage
+    action: Document the persisted storage shape here, but defer the `ChatTurn` TypeScript type itself to e2.
+
+risks:
+  - severity: high
+    description: Nested `chat_turns` rules could accidentally bypass parent ownership assumptions if they do not enforce `resource.data.userId == request.auth.uid` directly.
+    mitigation: Denormalize `userId` onto each chat-turn doc and mirror the explicit owner checks used by `designs` and `generations` (`firestore.rules:25-63`).
+  - severity: medium
+    description: Index guidance for a subcollection can drift if the team copies the old top-level collection pattern blindly.
+    mitigation: Research step verifies the accepted `collectionGroup` entry shape against `firestore.indexes.json` and `tests/rules/indexes.test.ts:34-69` before writing.
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      1. **`firestore.rules`** and **`firestore.indexes.json`** — extend coverage for `chat_turns` if P1 ships.
+      4. **`lib/designs/chat-refinement.ts`** — accumulate prior refinement instructions and map them into the next provider request.
+      7. **`tests/e2e/chat-refinement.spec.ts`** — verify multi-turn refinement on one saved design.
+  - path: tests/rules/designs-shape-rule.test.ts
+    relevant_excerpt: |
+      Covers:
+       - Authenticated owner update {nail_shape, updatedAt} → ALLOWED
+       - Authenticated non-owner update → DENIED
+       - Unauthenticated update → DENIED
+  - path: firestore.rules
+    relevant_excerpt: |
+      match /generations/{generationId} {
+        allow read: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid;
+      }
