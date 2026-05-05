@@ -163,7 +163,71 @@ firestore transaction failed after storage write succeeded` + `code` + `message`
 
 ## e4 — POST /api/designs/[id]/chat route
 
-_Populated at e4 integrate step._
+**Surface:** `app/api/designs/[id]/chat/route.ts`. Validated via
+`tests/integration/designs/designs-chat-route.test.ts` (11 tests, real
+Firestore + Storage emulator, mocked `generate`). Run with `pnpm test:rules`.
+
+### Happy path
+
+- Authenticated owner posts `{ message: "<≤500 chars>" }`:
+  - 200 `{ status:'success', chatTurnId, generationId }`.
+  - chat_turn doc persisted at `designs/{id}/chat_turns/{turnId}` with
+    `userId`, `designId`, message, `status:'success'`, `generationId`
+    linked, ISO `createdAt` and `updatedAt`.
+- With prior turns: provider receives `promptText` containing chronological
+  `[Refinement N]:` blocks (e2 contract preserved).
+- Provider promptText assembly:
+  `[design.promptText, compiledPrompt].filter(Boolean).join('\n')`.
+
+### Edge cases
+
+- Cap (5 prior turns + new): 409 `session_full`, no chat_turn write, no
+  provider call.
+- Stale primary reference: 4xx failure, no provider call, no chat_turn write.
+- Whitespace-only / empty / >500 char message: 400 `invalid_input`, no
+  chat_turn write, no provider call.
+- Cross-user: 403/404, no chat_turn write.
+- Non-existent design: 404, no chat_turn write.
+
+### Security probes
+
+- Auth bypass — `getSession(req)` returns null → 401.
+- Cross-tenant — design.userId mismatch even with Admin SDK bypassing rules.
+- userId/designId smuggling — body has only `message`; route uses session.uid
+  and URL designId, never client-supplied fields.
+- Path traversal — chat_turn ref via `db.collection().doc().collection().doc()`
+  (no string concat).
+- Length cap — 500-char trimmed limit blocks long-prompt DOS / Vertex token
+  cost abuse.
+- Cap denial — 5-turn 409 returned BEFORE any Firestore writes.
+- Prompt-injection adjacency — user message lands verbatim inside
+  `[Refinement N]:` prefix. Provider sandbox + content policy defend.
+
+### Orphan prevention (AC4)
+
+- chat_turn created with `status:'pending'` BEFORE pipeline runs.
+- On `persistGenerationStart` failure: chat_turn → `'failed'`.
+- On provider failure (`outcome.ok=false`): chat_turn → `'failed'`.
+- On `persistGenerationResult` failure: chat_turn → `'failed'`.
+- On unexpected throw: best-effort `'failed'` marker, then 500.
+
+### Regression watches
+
+- Full rules lane (20 files / 119 tests) green — no rules drift.
+- `designs-regenerate-route.test.ts` (d8) green — non-chat path unchanged.
+- `persist-generation-result.test.ts` (e3 baseline) green.
+
+### Handoff notes for `/plugin-hive:test`
+
+- Adversarial message bodies: unicode normalization tricks, RTL overrides,
+  markdown system-prompt tokens (`[INST]`, `<|system|>`, `<<SYS>>`),
+  multi-byte unicode at the 500-char boundary.
+- **Race-condition flag:** the route reads chat_turns then writes a new one
+  WITHOUT an optimistic lock on the 5-turn cap. Two concurrent posts could
+  result in 6 turns. Acceptable for v1 (tablet single-user) but flag if a
+  manual test exposes it.
+- Cap + failure replay: post 5 successful, then probe a 6th with provider
+  returning `ok:false` — confirm 6th never lands as `'pending'`.
 
 ## e5 — ChatRefinementPanel + /design/[id] integration
 
