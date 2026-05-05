@@ -4,7 +4,6 @@ import crypto from 'node:crypto';
 
 import { getFirestore } from 'firebase-admin/firestore';
 
-import { extractNailSwatch } from '@/lib/ai/extract-swatch';
 import { createServerFirebaseAdmin } from '@/lib/firebase/server';
 import { uploadGenerationBytes } from '@/lib/firebase/storage';
 import {
@@ -332,25 +331,10 @@ export async function persistGenerationResult(input: {
     return { ok: false, reason: 'firestore_failure', message };
   }
 
-  try {
-    const swatch = await extractNailSwatch({
-      sourceStoragePath: upload.storagePath,
-      designId: input.designId,
-      userId: input.userId,
-    });
-    if (swatch.ok) {
-      await generationRef.update({
-        nailSwatchStoragePath: swatch.storagePath,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  } catch (err) {
-    console.error('[lifecycle] extractNailSwatch best-effort failed', {
-      generationId: input.generationId,
-      code: (err as { code?: string }).code ?? 'unknown',
-      message: (err as Error).message,
-    });
-  }
+  // Swatch extraction disabled: pivoted to gemini-3-pro-image-preview which
+  // generates the full five-nail composition directly. Swatch + clip-path
+  // visualizer assumed flat monochrome polish; mismatches nail-art designs.
+  // Re-enable behind a designKind: 'solid' flag if/when solid-color flow returns.
 
   return { ok: true };
 }

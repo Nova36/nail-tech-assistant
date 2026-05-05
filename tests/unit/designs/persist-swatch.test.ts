@@ -104,7 +104,11 @@ const SUCCESSFUL_UPLOAD = {
   storagePath: 'users/alice-uid/generations/g1.png',
 };
 
-describe('persistGenerationResult — swatch extraction hook', () => {
+// Skipped: swatch extraction is temporarily disabled in lib/designs/lifecycle.ts
+// after pivoting to gemini-3-pro-image-preview which generates the full
+// five-nail composition directly. Re-enable when the solid-color flow returns
+// behind a designKind: 'solid' flag.
+describe.skip('persistGenerationResult — swatch extraction hook', () => {
   it('writes nailSwatchStoragePath to the generation doc when extractNailSwatch returns { ok: true }', async () => {
     mockUploadGenerationBytes.mockResolvedValue(SUCCESSFUL_UPLOAD);
     mockExtractNailSwatch.mockResolvedValue({

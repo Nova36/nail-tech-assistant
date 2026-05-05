@@ -175,6 +175,14 @@ stories:
     depends_on:
       - d7-design-rename
       - d8-regenerate-from-stored-inputs
+  - id: d10-nail-swatch-extraction
+    title: Extract nail-polish swatch from generated hand photo (visualizer renders design, not photo windows)
+    complexity: high
+    slice: 5
+    ui: true
+    depends_on:
+      - d4-nailvisualizer-composition
+      - d5-design-page-visualizer-integration
 
 execution_gates:
   wireframe_approval:

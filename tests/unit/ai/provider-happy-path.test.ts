@@ -110,7 +110,7 @@ describe('generateImage — happy path', () => {
     expect(lastConstructorArgs).toMatchObject({
       vertexai: true,
       project: 'nail-tech-assistant',
-      location: 'us-central1',
+      location: 'global',
       googleAuthOptions: {
         credentials: expect.objectContaining({
           client_email: FAKE_SERVICE_ACCOUNT.client_email,
@@ -174,7 +174,7 @@ describe('generateImage — happy path', () => {
       contents: Array<{ role: string; parts: unknown[] }>;
       config?: { responseModalities?: string[] };
     };
-    expect(payload.model).toBe('gemini-2.5-flash-image');
+    expect(payload.model).toBe('gemini-3.1-flash-image-preview');
     expect(payload.contents).toHaveLength(1);
     expect(payload.contents[0].role).toBe('user');
     expect(payload.contents[0].parts.length).toBeGreaterThanOrEqual(2);

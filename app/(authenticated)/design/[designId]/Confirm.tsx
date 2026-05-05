@@ -3,18 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { NailVisualizer, VisualizerFrame } from '@/components/NailVisualizer';
+import { VisualizerFrame } from '@/components/NailVisualizer';
 import { RegenerateButton } from '@/components/RegenerateButton';
 import { GenerateButton } from '@/components/studio/GenerateButton';
 import { GenerationErrorState } from '@/components/studio/GenerationErrorState';
-import { ShapeSelector } from '@/components/studio/ShapeSelector';
 import { WizardProgressStrip } from '@/components/studio/WizardProgressStrip';
 
 import type {
   GenerateDesignErrorCode,
   GenerateDesignResult,
 } from '@/app/(authenticated)/design/actions';
-import type { NailShape } from '@/lib/types';
 
 type ConfirmProps = {
   designId: string;
@@ -106,14 +104,12 @@ function PendingView() {
 
 export function Confirm({
   designId,
-  nailShape,
   promptText,
   latestGenerationId,
   initialImageUrl,
   initialSwatchUrl,
 }: ConfirmProps) {
   const router = useRouter();
-  const initialShape = (nailShape ?? 'almond') as NailShape;
   const [state, setState] = useState<GenerationState>(
     initialImageUrl && latestGenerationId
       ? {
@@ -126,11 +122,12 @@ export function Confirm({
         ? { phase: 'idle' }
         : { phase: 'pending' }
   );
-  const [activeShape, setActiveShape] = useState<NailShape>(initialShape);
-  const [shapeUpdateError, setShapeUpdateError] = useState<string | null>(null);
   const firedRef = useRef(false);
   const errorHeadingRef = useRef<HTMLHeadingElement>(null);
-  const shapeRequestIdRef = useRef(0);
+  const priorSuccessRef = useRef<Extract<
+    GenerationState,
+    { phase: 'success' }
+  > | null>(null);
 
   useEffect(() => {
     if (firedRef.current || latestGenerationId) {
@@ -189,51 +186,6 @@ export function Confirm({
     })();
   }
 
-  async function onShapeChange(nextShape: NailShape) {
-    if (state.phase !== 'success' || nextShape === activeShape) {
-      return;
-    }
-
-    const previousShape = activeShape;
-    const requestId = shapeRequestIdRef.current + 1;
-    shapeRequestIdRef.current = requestId;
-    setShapeUpdateError(null);
-    setActiveShape(nextShape);
-
-    try {
-      const response = await fetch(`/api/designs/${designId}/shape`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ nailShape: nextShape }),
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        console.error('[design-page] shape patch failed', {
-          code: response.status,
-          message: responseText || response.statusText,
-        });
-
-        if (shapeRequestIdRef.current === requestId) {
-          setActiveShape(previousShape);
-          setShapeUpdateError('Shape update failed');
-        }
-      }
-    } catch (error) {
-      console.error('[design-page] shape patch failed', {
-        code: 'network_error',
-        message: error instanceof Error ? error.message : String(error),
-      });
-
-      if (shapeRequestIdRef.current === requestId) {
-        setActiveShape(previousShape);
-        setShapeUpdateError('Shape update failed');
-      }
-    }
-  }
-
   const statusText =
     state.phase === 'pending'
       ? STATUS_COPY.pending
@@ -277,25 +229,16 @@ export function Confirm({
             </div>
 
             <VisualizerFrame>
-              {/* sr-only off-screen img for screen readers; the visualizer
-                  SVG above is aria-hidden. Next/Image not used because LCP
-                  is irrelevant for sr-only content. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={state.imageUrl}
-                alt="Generated nail design preview"
-                className="sr-only"
-              />
-              <div data-testid="nail-visualizer" aria-hidden="true">
-                <NailVisualizer
-                  theme="flat"
-                  imageUrl={state.imageUrl}
-                  nailSwatchUrl={state.swatchUrl}
-                  nailShape={activeShape}
+              <div
+                data-testid="nail-visualizer"
+                className="flex justify-center"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={state.imageUrl}
+                  alt="Generated nail design preview"
+                  className="h-auto w-full max-w-[640px] rounded-[20px] object-contain"
                 />
-              </div>
-              <div data-testid="shape-selector">
-                <ShapeSelector value={activeShape} onChange={onShapeChange} />
               </div>
             </VisualizerFrame>
 
@@ -311,22 +254,30 @@ export function Confirm({
             <div className="flex justify-center">
               <RegenerateButton
                 designId={designId}
+                onStart={() => {
+                  if (state.phase === 'success') {
+                    priorSuccessRef.current = state;
+                  }
+                  setState({ phase: 'pending' });
+                }}
+                onError={() => {
+                  if (priorSuccessRef.current) {
+                    setState(priorSuccessRef.current);
+                  }
+                }}
                 onSuccess={(payload) =>
                   setState({
                     phase: 'success',
                     generationId: payload.generationId,
-                    imageUrl: payload.imageUrl ?? state.imageUrl,
+                    imageUrl:
+                      payload.imageUrl ??
+                      priorSuccessRef.current?.imageUrl ??
+                      '',
                     swatchUrl: payload.nailSwatchUrl ?? null,
                   })
                 }
               />
             </div>
-
-            {shapeUpdateError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {shapeUpdateError}
-              </p>
-            ) : null}
 
             <div className="flex justify-center">
               <button

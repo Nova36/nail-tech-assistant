@@ -6,7 +6,7 @@ type Theme = 'flat' | 'line-art';
 
 const SHAPE_PATHS: Record<NailShape, string> = {
   almond:
-    'M 12 138 Q 8 60 50 4 Q 92 60 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z',
+    'M 14 138 C 6 100 8 50 30 24 C 40 16 60 16 70 24 C 92 50 94 100 86 138 Q 86 140 82 140 L 18 140 Q 14 140 14 138 Z',
   coffin:
     'M 12 138 L 18 50 Q 20 14 34 8 L 66 8 Q 80 14 82 50 L 88 138 Q 88 140 84 140 L 16 140 Q 12 140 12 138 Z',
   square:

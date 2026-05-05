@@ -206,9 +206,7 @@ export default async function AuthenticatedHomePage() {
               ))}
             </div>
             <Link
-              href="#"
-              aria-disabled="true"
-              data-state="placeholder"
+              href="/design/new"
               style={{ color: '#6B3F5E' }}
               className="inline-flex min-h-[44px] items-center gap-3 rounded-full bg-background px-6 py-3 font-body text-sm font-medium shadow-[0_6px_16px_rgba(61,53,48,0.10)] outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
             >
@@ -246,9 +244,7 @@ export default async function AuthenticatedHomePage() {
               saved · 18 favorites
             </p>
             <Link
-              href="#"
-              aria-disabled="true"
-              data-state="placeholder"
+              href="/library"
               style={{ color: '#6B3F5E' }}
               className="inline-flex min-h-[44px] items-center gap-3 rounded-full border border-[color:rgb(107_63_94_/_0.30)] bg-background px-6 py-3 font-body text-sm font-medium outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
             >

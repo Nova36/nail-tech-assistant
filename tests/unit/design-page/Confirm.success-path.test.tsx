@@ -92,7 +92,9 @@ describe('AC#1 — success branch renders NailVisualizer + ShapeSelector', () =>
     expect(screen.getByTestId('nail-visualizer')).toBeTruthy();
   });
 
-  it('renders ShapeSelector (data-testid="shape-selector") on success', async () => {
+  it.skip('renders ShapeSelector (data-testid="shape-selector") on success', async () => {
+    // Removed: shape is now selected only in WizardStep2Direction (initial
+    // prompt step). Result page is read-only; no shape selector or live remask.
     await renderConfirmSuccess('almond');
     expect(screen.getByTestId('shape-selector')).toBeTruthy();
   });
@@ -110,7 +112,9 @@ describe('AC#1 — success branch renders NailVisualizer + ShapeSelector', () =>
 
 // ── AC #2: shape selection triggers PATCH /api/designs/[id]/shape ──────────
 
-describe('AC#2 — shape selection PATCHes /api/designs/[id]/shape', () => {
+// Skipped: shape selector removed from result page; shape is committed
+// during WizardStep2Direction and not editable post-generation.
+describe.skip('AC#2 — shape selection PATCHes /api/designs/[id]/shape', () => {
   it('clicking a shape pill sends PATCH with { nailShape }', async () => {
     fetchSpy.mockResolvedValue(
       new Response(JSON.stringify({ status: 'updated', nailShape: 'coffin' }), {
@@ -161,7 +165,7 @@ describe('AC#2 — shape selection PATCHes /api/designs/[id]/shape', () => {
 
 // ── AC #3: PATCH 200 → new shape committed ────────────────────────────────
 
-describe('AC#3 — PATCH 200 → UI commits to new shape', () => {
+describe.skip('AC#3 — PATCH 200 → UI commits to new shape', () => {
   it('shape pill remains selected (aria-pressed=true) after successful PATCH', async () => {
     fetchSpy.mockResolvedValue(
       new Response(JSON.stringify({ status: 'updated', nailShape: 'round' }), {
@@ -184,7 +188,7 @@ describe('AC#3 — PATCH 200 → UI commits to new shape', () => {
 
 // ── AC #4: PATCH failure → revert + controlled error message ──────────────
 
-describe('AC#4 — PATCH failure reverts shape and shows error', () => {
+describe.skip('AC#4 — PATCH failure reverts shape and shows error', () => {
   it('reverts to previous shape when PATCH returns 404', async () => {
     fetchSpy.mockResolvedValue(
       new Response(JSON.stringify({ error: 'not_found' }), { status: 404 })
@@ -246,7 +250,7 @@ describe('AC#4 — PATCH failure reverts shape and shows error', () => {
 
 // ── Negative: generateDesign never fires on shape switch ──────────────────
 
-describe('Negative — generateDesign not triggered by shape switch', () => {
+describe.skip('Negative — generateDesign not triggered by shape switch', () => {
   it('generateDesign is called exactly once on mount, never again on shape click', async () => {
     fetchSpy.mockResolvedValue(
       new Response(JSON.stringify({ status: 'updated', nailShape: 'oval' }), {

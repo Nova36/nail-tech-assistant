@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 
 type Props = {
   designId: string;
+  onStart?: () => void;
+  onError?: () => void;
   onSuccess: (payload: {
     generationId: string;
     imageUrl?: string;
@@ -19,7 +21,12 @@ type ResponseBody = {
   message?: string;
 };
 
-export function RegenerateButton({ designId, onSuccess }: Props) {
+export function RegenerateButton({
+  designId,
+  onStart,
+  onError,
+  onSuccess,
+}: Props) {
   const [mode, setMode] = useState<'idle' | 'regenerating' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
   const inFlightRef = useRef(false);
@@ -32,6 +39,7 @@ export function RegenerateButton({ designId, onSuccess }: Props) {
     inFlightRef.current = true;
     setMode('regenerating');
     setError(null);
+    onStart?.();
 
     try {
       const response = await fetch(`/api/designs/${designId}/regenerate`, {
@@ -48,6 +56,7 @@ export function RegenerateButton({ designId, onSuccess }: Props) {
       if (!response.ok) {
         setMode('failed');
         setError(body?.message || "Couldn't regenerate");
+        onError?.();
         return;
       }
 
@@ -63,9 +72,11 @@ export function RegenerateButton({ designId, onSuccess }: Props) {
 
       setMode('failed');
       setError(body?.message || "Couldn't regenerate");
+      onError?.();
     } catch {
       setMode('failed');
       setError("Couldn't regenerate");
+      onError?.();
     } finally {
       inFlightRef.current = false;
     }
