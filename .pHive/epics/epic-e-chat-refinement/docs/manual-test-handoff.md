@@ -113,7 +113,53 @@ this doc as the scenario seed. After PR2 ships, re-run with `--include ui,e2e`.
 
 ## e3 — lifecycle.ts chat-turn lineage attachment
 
-_Populated at e3 integrate step._
+**Surface:** `persistGenerationResult` in `lib/designs/lifecycle.ts` extended with optional
+`chatTurnId`. Validated via `tests/unit/designs/lifecycle-chat.test.ts` (4 tests) and the
+preserved `tests/unit/designs/persist-generation-result.test.ts` (7 tests, no regression).
+
+### Happy path
+
+- Chat-driven success (chatTurnId present): one `runTransaction` callback issues 3 atomic
+  `txn.update` calls — generation `{status, resultStoragePath, chatTurnId, updatedAt}`,
+  design `{latestGenerationId, updatedAt}`, chat_turn `{generationId, status: 'success',
+updatedAt}`.
+- Non-chat success (chatTurnId omitted): exactly 2 `txn.update` calls (generation + design).
+  No chat_turn ref is constructed and no chat_turns subcollection is touched.
+
+### Edge cases
+
+- Provider failure with chatTurnId: generation row is patched to include `chatTurnId` so
+  failed generations remain queryable by chat lineage. The chat_turn doc itself is NOT
+  touched at lifecycle layer — e4 owns the orphan-prevention `'failed'` status update.
+- Storage rescue with chatTurnId: the rescue patch also tags `chatTurnId` so the failure
+  row is consistent.
+- Firestore txn fails after storage upload: existing single error log preserved with
+  `code` + `message` keys.
+
+### Security probes
+
+- Confused-deputy / cross-tenant: lifecycle does NOT verify chatTurnId belongs to the
+  same `(userId, designId)`. The route layer (e4) MUST gate this. If e4 ever calls
+  lifecycle with a forged chatTurnId, the transaction would write to the wrong chat_turn
+  doc — but Security Rules at `designs/{designId}/chat_turns/{turnId}` deny cross-user
+  access at the rule layer, so the txn would fail and roll back cleanly.
+- Path traversal: chat_turn ref is constructed via `db.collection('designs').doc(designId)
+.collection('chat_turns').doc(chatTurnId)` — no string concat.
+- Generation row pollution: an arbitrary `chatTurnId` value lands in the generation patch
+  unmodified. e4 must validate format/ownership before passing in.
+
+### Regression watches
+
+- `persist-generation-result.test.ts` 7/7 green — non-chat success/failure paths unchanged.
+- `pnpm typecheck` clean — `chatTurnId?: string` widening is the only signature change.
+
+### Handoff notes for `/plugin-hive:test`
+
+- Simulate a failed Firestore txn after storage success with `chatTurnId` present →
+  expect `firestore_failure` reason in result, expect log entry with `[lifecycle]
+firestore transaction failed after storage write succeeded` + `code` + `message`.
+- The 3-doc atomicity is the AC1 hinge — any test that catches a partial write would
+  flag a regression.
 
 ## e4 — POST /api/designs/[id]/chat route
 
