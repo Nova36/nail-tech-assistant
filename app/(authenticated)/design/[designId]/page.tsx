@@ -4,6 +4,7 @@ import { Confirm } from '@/app/(authenticated)/design/[designId]/Confirm';
 import { DesignNameField } from '@/components/DesignNameField';
 import { resolveImageUrl } from '@/lib/designs/imageUrl';
 import { loadDesignDetail } from '@/lib/designs/load';
+import { loadDesignChatTurns } from '@/lib/designs/loadChatTurns';
 import { getSessionForServerAction } from '@/lib/firebase/session';
 
 export const runtime = 'nodejs';
@@ -40,6 +41,16 @@ export default async function DesignDetailPage({
           designDetail.latestGeneration.nailSwatchStoragePath
         )
       : null;
+  let initialChatTurns: Awaited<ReturnType<typeof loadDesignChatTurns>> = [];
+
+  try {
+    initialChatTurns = await loadDesignChatTurns({
+      designId,
+      userId: session.uid,
+    });
+  } catch {
+    initialChatTurns = [];
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-6 md:px-6 md:py-10 lg:py-12">
@@ -54,6 +65,8 @@ export default async function DesignDetailPage({
         latestGenerationId={designDetail.design.latestGenerationId}
         initialImageUrl={initialImageUrl}
         initialSwatchUrl={initialSwatchUrl}
+        initialChatTurns={initialChatTurns}
+        designName={designDetail.design.name}
       />
     </main>
   );
