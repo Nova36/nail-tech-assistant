@@ -67,7 +67,49 @@ this doc as the scenario seed. After PR2 ships, re-run with `--include ui,e2e`.
 
 ## e2 — chat-refinement.ts accumulation lib + ChatTurn type
 
-_Populated at e2 integrate step._
+**Surface:** Pure library at `lib/designs/chat-refinement.ts`. Validated via
+`tests/unit/designs/chat-accumulation.test.ts` (11 tests). Run with
+`pnpm exec vitest run tests/unit/designs/chat-accumulation.test.ts`.
+
+**Public API:**
+
+- `type ChatTurn` — canonical persistence shape mirror.
+- `class EmptyMessageError extends Error` — thrown on empty/whitespace next message.
+- `accumulateChatInstructions({ priorTurns, nextMessage }) → { compiledPrompt, sessionFull? }`.
+
+### Happy path
+
+- 0 prior turns + valid next → single `[Refinement 1]: <msg>` block.
+- N prior turns (1 ≤ N ≤ 4) + valid next → N+1 chronological blocks joined by `\n`.
+
+### Edge cases
+
+- Whitespace-only next message → `EmptyMessageError` thrown synchronously, no prompt emitted.
+- Prior turns with surrounding whitespace in `message` → trimmed in compiled output.
+- Caller-supplied prior-turn order is preserved verbatim — the lib does NOT re-sort by
+  `createdAt` (callers own ordering, e.g., e4 route loads with `orderBy('createdAt', 'asc')`).
+- Boundary: 4 prior turns + new → emits `[Refinement 5]`, no `sessionFull` signal.
+- Boundary: 5 prior turns + new → returns `sessionFull: true`, `compiledPrompt` covers
+  the 5 prior turns only, the would-be `[Refinement 6]` is NOT in the output.
+
+### Security probes
+
+- N/A — pure function with no external surface, no Firestore, no provider call.
+- Adversarial input via `message` strings (e.g., shell metacharacters, prompt-injection
+  patterns) is the responsibility of the e4 route layer + the provider sandbox; e2 only
+  composes deterministic strings.
+
+### Regression watches
+
+- The lib must remain free of `server-only`, Firestore SDK, `firebase-admin`, `next/*`,
+  or provider imports. A regression here would force the file out of the unit lane.
+
+### Handoff notes for `/plugin-hive:test`
+
+- Treat `sessionFull` as a hard cap. If the testing hive simulates a 6th-turn user input,
+  expect the UI in e5 to surface a banner — not a silent truncation.
+- The structured prefix `[Refinement N]:` is API-level contract; downstream stories
+  (e4 prompt assembly, Playwright snapshots) lock the format.
 
 ## e3 — lifecycle.ts chat-turn lineage attachment
 
