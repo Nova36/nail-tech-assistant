@@ -1,0 +1,176 @@
+name: epic-e-chat-refinement
+title: 'Epic E — Chat Refinement: multi-turn iterative refinement on saved designs (Slice 7, P1 stretch)'
+description: |
+  Slice 7 of the Nail Tech Assistant build. A cuttable P1 layer that adds
+  conversational refinement on top of the saved-design lineage Epic D
+  established. The nail technician types instructions like "make it more
+  pastel" or "add gold accents"; the app accumulates prior turns into the
+  next generation request, records each turn in `chat_turns`, and keeps the
+  iteration sequence visible.
+
+  This epic is intentionally isolated from the P0 ship line. Epic D's
+  save/reopen/regenerate path must work without any Epic E code; Epic E adds
+  on top of that stable foundation.
+
+  Flow: open a saved design → type a refinement message → app persists
+  chat_turn + triggers a new generation linked to the design lineage →
+  generation result appears in the visualizer → second turn accumulates the
+  first → ChatRefinementPanel shows ordered turn history with current-image
+  clarity → failed generation shows explicit turn status (not a silent orphan).
+
+  In scope: `chat_turns` subcollection persistence + Security Rules extension,
+  `POST /api/designs/[id]/chat` route, `lib/designs/chat-refinement.ts`
+  accumulation logic, `lib/designs/lifecycle.ts` lineage extension,
+  ChatRefinementPanel component (turn history + input + iteration state),
+  IterationTimeline component (conditional — see wireframe_approval gate),
+  chat accumulation unit tests, chat-refinement Playwright e2e happy path.
+
+  Out of scope: P0 save/reopen/regenerate (Epic D). Tablet polish and
+  error-state hardening (Epic F). Any generative AI co-pilot behavior beyond
+  explicit user-entered refinement messages (v2+).
+
+  Cuttability guarantee: if Epic E is cut before or during execution, no P0
+  contract is affected. The absence of this epic must not block evaluation
+  of the P0 ship line (FR-E-5, US-E-2 AC3).
+
+  Sign-off anchors: PRD US-E-1..2, FR-E-1..6. PRD lines 618-700. Structured
+  outline lines 420-465 (Slice 7). Vertical plan lines 276-310. Mother's Day
+  2026-05-10 deadline — Epic E ships only if P0 execution preserves schedule
+  margin. Brand-system locked at .pHive/brand/brand-system.yaml.
+
+target_codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+methodology: tdd
+priority: P1-stretch
+depends_on: [epic-d-visualizer-library]
+p0_ship_line: false
+
+planning_artifacts:
+  researcher_findings: .pHive/epics/epic-e-chat-refinement/docs/researcher-raw-findings.md
+  prd_anchor: .pHive/planning/prd.md
+  outline_anchor: .pHive/planning/structured-outline.md
+  vertical_plan_anchor: .pHive/planning/vertical-plan.md
+  wireframe_manifest: .pHive/wireframes/epic-e-chat-refinement/manifest.yaml
+
+stories:
+  - id: e1-chat-turns-persistence
+    title: 'chat_turns persistence: schema + firestore.rules + indexes'
+    complexity: medium
+    slice: 7
+    ui: false
+    depends_on: []
+    notes: |
+      Adds the `designs/{designId}/chat_turns/{turnId}` persistence surface,
+      owner-scoped rules, and chronological index support for turn accumulation.
+
+  - id: e2-chat-refinement-accumulation
+    title: 'chat-refinement.ts accumulation lib + ChatTurn type'
+    complexity: low
+    slice: 7
+    ui: false
+    depends_on: []
+    notes: |
+      Pure-library seam in `lib/designs/chat-refinement.ts`. Defines `ChatTurn`,
+      prompt accumulation order, empty-message rejection, and the 5-turn cap.
+
+  - id: e3-lifecycle-chat-lineage
+    title: 'lifecycle.ts chat-turn lineage attachment'
+    complexity: medium
+    slice: 7
+    ui: false
+    depends_on: [e1-chat-turns-persistence, e2-chat-refinement-accumulation]
+    notes: |
+      BLOCKED-UNTIL d8 merge. Extends `lib/designs/lifecycle.ts` so successful
+      generations attach back to the originating chat turn without regressing the
+      non-chat Epic D path.
+
+  - id: e4-chat-route
+    title: 'POST /api/designs/[id]/chat route'
+    complexity: high
+    slice: 7
+    ui: false
+    depends_on:
+      [
+        e1-chat-turns-persistence,
+        e2-chat-refinement-accumulation,
+        e3-lifecycle-chat-lineage,
+      ]
+    notes: |
+      BLOCKED-UNTIL d8 merge. Mirrors the d8 request pipeline with chat-turn
+      accumulation and lifecycle linkage layered onto stored design inputs.
+
+  - id: e5-chat-refinement-panel-integration
+    title: ChatRefinementPanel + /design/[id] integration
+    complexity: high
+    slice: 7
+    ui: true
+    depends_on: [e4-chat-route]
+    wireframe_required: true
+    notes: |
+      Adds the user-facing panel to the design detail page. `IterationTimeline`
+      is folded into this story as an optional component gated by wireframe
+      decision #2, not a separate story.
+
+  - id: e6-chat-refinement-e2e
+    title: Playwright chat-refinement.spec.ts e2e
+    complexity: medium
+    slice: 7
+    ui: false
+    depends_on: [e5-chat-refinement-panel-integration]
+    notes: |
+      BLOCKED-UNTIL d8 merge and e5 ship. Final two-turn happy-path regression
+      guard for Epic E using the existing Playwright emulator harness.
+
+execution_gates:
+  wireframe_approval:
+    required_for: [e5]
+    scale_call: pre-exec
+    raised_by: ui-designer
+    manifest: .pHive/wireframes/epic-e-chat-refinement/manifest.yaml
+    open_decisions:
+      - id: 1
+        label: tablet-landscape-layout
+        options: [right-side-drawer, bottom-strip, split-30pct]
+        prd_ref: FR-E-4 / NFR UX
+      - id: 2
+        label: iteration-timeline-separation
+        options: [separate-component, collapse-into-panel]
+        prd_ref: Slice 7 Changes #8
+      - id: 3
+        label: orphaned-turn-failure-ux
+        options:
+          [inline-error-badge-retry, system-message-retry, dismissible-banner]
+        prd_ref: FR-E-6 / US-E-2 AC2
+      - id: 4
+        label: current-image-indicator
+        options: [auto-latest-badge, user-selectable]
+        prd_ref: US-E-2 AC1
+      - id: 5
+        label: phone-scope
+        options: [tablet-only, first-class-phone]
+        prd_ref: NFR UX
+    note: |
+      All five open_decisions must be resolved by Don before wireframe production
+      begins. Wireframes produced via Claude Design (Don's separate token budget) —
+      see .pHive/epics/epic-e-chat-refinement/docs/claude-design-prompt.md for the
+      ready-to-paste prompt. Output goes to .pHive/wireframes/epic-e-chat-refinement/.
+      /plugin-hive:execute on e5 must confirm wireframe_approval.status == 'approved'
+      in the manifest before running.
+
+  pre_exec_security_audit:
+    required_for: [e1, e3, e4]
+    trigger: security:plan-audit
+    note: |
+      e1 adds chat_turns rules surface (currently default-deny). e3 cross-collection
+      lineage writes (chat_turns + generations atomic txn). e4 new authenticated POST
+      accepting free-text user input flowing into Gemini (prompt-injection adjacent).
+      Aligns with Epic D d2/d6/d7/d8/d9 audit precedent. e2 is pure-function lib —
+      no security surface, excluded.
+
+  d8_dependency_gate:
+    required_for: [e3, e4, e6]
+    blocked_until: epic-d/d8-regenerate-from-stored-inputs merged to epic-d branch
+    note: |
+      e3 and e4 outline against d8's persistGenerationResult + buildGeminiRequest
+      contract. They cannot enter integrate step until d8 ships. /plugin-hive:execute
+      on these stories must verify d8 status before running.
+      e6 e2e additionally requires d8 working in the UI.

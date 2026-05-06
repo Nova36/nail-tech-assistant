@@ -46,6 +46,23 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
+
+      match /chat_turns/{turnId} {
+        allow read: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.designId == designId;
+        allow update: if request.auth != null
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.designId == resource.data.designId
+          && request.resource.data.message == resource.data.message
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'generationId', 'updatedAt']);
+        allow delete: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+      }
     }
 
     // Epic C — generations collection.

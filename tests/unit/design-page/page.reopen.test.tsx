@@ -81,6 +81,12 @@ vi.mock('@/app/(authenticated)/design/actions', () => ({
   createDesign: vi.fn(),
 }));
 
+// e5: page hydrates initialChatTurns via loadDesignChatTurns
+const mockLoadChatTurns = vi.fn();
+vi.mock('@/lib/designs/loadChatTurns', () => ({
+  loadDesignChatTurns: mockLoadChatTurns,
+}));
+
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
 const ALICE_UID = 'alice-reopen-uid';
@@ -139,6 +145,8 @@ beforeEach(() => {
   mockConfirm.mockClear();
   mockLoadDesignDetail.mockReset();
   mockGetSession.mockReset();
+  mockLoadChatTurns.mockReset();
+  mockLoadChatTurns.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -250,5 +258,75 @@ describe('d6 — page reopen: not-found path', () => {
     mockLoadDesignDetail.mockResolvedValue(makeDesignDetail(aliceDesign));
 
     await expect(renderPage(DESIGN_ID)).rejects.toThrow();
+  });
+});
+
+describe('e5 — page reopen: chat turn hydration into Confirm', () => {
+  const turns = [
+    {
+      id: 't1',
+      message: 'first',
+      status: 'success' as const,
+      generationId: 'gen-t1',
+      imageUrl: 'https://example.com/t1.jpg',
+      createdAt: '2026-05-05T00:00:01Z',
+    },
+    {
+      id: 't2',
+      message: 'second',
+      status: 'success' as const,
+      generationId: 'gen-t2',
+      imageUrl: 'https://example.com/t2.jpg',
+      createdAt: '2026-05-05T00:00:02Z',
+    },
+  ];
+
+  it('passes initialChatTurns from loadDesignChatTurns to Confirm', async () => {
+    mockGetSession.mockResolvedValue({
+      uid: ALICE_UID,
+      email: 'alice@test.com',
+      name: null,
+    });
+    mockLoadDesignDetail.mockResolvedValue(makeDesignDetail(aliceDesign));
+    mockLoadChatTurns.mockResolvedValue(turns);
+
+    await renderPage(DESIGN_ID);
+
+    expect(mockLoadChatTurns).toHaveBeenCalledWith({
+      designId: DESIGN_ID,
+      userId: ALICE_UID,
+    });
+    const props = mockConfirm.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(props.initialChatTurns).toEqual(turns);
+  });
+
+  it('passes designName from design to Confirm', async () => {
+    mockGetSession.mockResolvedValue({
+      uid: ALICE_UID,
+      email: 'alice@test.com',
+      name: null,
+    });
+    mockLoadDesignDetail.mockResolvedValue(makeDesignDetail(aliceDesign));
+    mockLoadChatTurns.mockResolvedValue([]);
+
+    await renderPage(DESIGN_ID);
+
+    const props = mockConfirm.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(props.designName).toBe('My floral design');
+  });
+
+  it('renders page even when loadDesignChatTurns rejects (no throw bubbles)', async () => {
+    mockGetSession.mockResolvedValue({
+      uid: ALICE_UID,
+      email: 'alice@test.com',
+      name: null,
+    });
+    mockLoadDesignDetail.mockResolvedValue(makeDesignDetail(aliceDesign));
+    mockLoadChatTurns.mockRejectedValue(new Error('boom'));
+
+    await renderPage(DESIGN_ID);
+
+    const props = mockConfirm.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(props.initialChatTurns).toEqual([]);
   });
 });

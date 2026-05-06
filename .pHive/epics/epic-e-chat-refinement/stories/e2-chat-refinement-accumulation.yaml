@@ -1,0 +1,164 @@
+id: e2-chat-refinement-accumulation
+epic: epic-e-chat-refinement
+title: 'chat-refinement.ts accumulation lib + ChatTurn type'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+description: |
+  Add Epic E's pure prompt-accumulation library in `lib/designs/chat-refinement.ts`
+  and define the canonical `ChatTurn` type beside it. This story is intentionally
+  parallel to e1: it should be fully testable without Firestore, UI, or any Epic D
+  merge state because the core contract is deterministic string assembly plus input
+  guards. Anchor: Slice 7 manifest items #4 and #6 in `structured-outline.md`
+  L431-L433, plus FR-E-2 in `prd.md` L664-L666.
+
+  The v1 strategy is intentionally simple and explicit: chronological turns compile
+  into a stable string format with one structured prefix per turn,
+  `[Refinement N]: <message>`, then the next message is appended using the same
+  pattern. Cap accumulation at 5 turns per design, per the design discussion's
+  recommendation for Q3 in section 6 (`design-discussion.md` §6 Q3) so prompt
+  sprawl stays bounded for the stretch-scope demo window. Empty or whitespace-only
+  input throws `EmptyMessageError`; a full 5-turn session must surface an explicit
+  full-session signal instead of silently truncating (`prd.md` L635-L639,
+  `structured-outline.md` L441-L449).
+
+  Out of scope: no provider call, no Firestore writes, no route schema, and no
+  d8 dependency. This story defines the type and the compilation rule only.
+  Downstream e4 consumes the library when it assembles the request for
+  `buildGeminiRequest` in `lib/ai/generate.ts:41-98`.
+
+acceptance_criteria:
+  - 'Given ordered prior turns and a valid next message, when `accumulateChatInstructions` runs, then it emits deterministic `[Refinement N]: ...` blocks in chronological order | maps to FR-E-2 (`prd.md` L664-L666, `structured-outline.md` L439-L444)'
+  - 'Given a whitespace-only or empty message, when the helper is called, then it throws `EmptyMessageError` and does not emit a prompt | maps to US-E-1 AC3 (`prd.md` L635-L639)'
+  - 'Given 5 prior turns already exist, when a sixth turn is attempted, then the helper returns an explicit full-session signal rather than silently exceeding the cap | maps to Slice 7 silent-break mitigation and FR-E-6 (`structured-outline.md` L447-L460, `design-discussion.md` §6 Q3)'
+
+steps:
+  - id: research
+    description: Confirm the repo convention for colocating small domain types with their helper module and verify whether any nearby lib surface already uses a stable error-class pattern worth mirroring.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing unit tests first in `tests/unit/designs/chat-accumulation.test.ts`.
+      Cover ordering, compiled prompt text, structured prefix stability, empty-message
+      rejection, whitespace trimming, and the 5-turn cap/full-session signal. Do not
+      read the implementation first; derive the assertions from `structured-outline.md`
+      L439-L449 and the design-discussion Q3 recommendation.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Add `lib/designs/chat-refinement.ts` with the `ChatTurn` type, `EmptyMessageError`,
+      and `accumulateChatInstructions({ priorTurns, nextMessage })`. Keep the function
+      pure and deterministic. Default compile shape:
+
+      `[Refinement 1]: ...`
+      `[Refinement 2]: ...`
+      `[Refinement N]: ...`
+
+      Preserve a stable return contract that includes the compiled prompt and an
+      explicit session-full signal when the 5-turn cap blocks another message.
+      No Firestore, provider, or route imports belong in this file.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + unit pass. Confirm the library is still pure, has no server-only imports, and can be consumed by e4 without touching d8 work.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(e2): add chat refinement accumulation lib` on epic-e/chat-refinement.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-e/chat-refinement
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: lib/designs/load.ts
+      purpose: Existing colocated `DesignDetail` type shows the repo convention for pairing small domain types with their owning module (`lib/designs/load.ts:10-21`).
+    - path: lib/ai/generate.ts
+      purpose: Downstream consumer of accumulated prompt text; e2 must stay provider-agnostic while matching the request builder's prompt slot (`lib/ai/generate.ts:13-18`, `85-97`).
+    - path: tests/unit/designs/persist-generation-start.test.ts
+      purpose: Existing unit-lane naming under `tests/unit/designs/` shows where a pure design helper test belongs.
+
+files_to_modify:
+  - file: lib/designs/chat-refinement.ts
+    change: net-new pure accumulation helper + `ChatTurn` type + stable error contract.
+  - file: tests/unit/designs/chat-accumulation.test.ts
+    change: net-new deterministic unit coverage for ordering, formatting, and cap behavior.
+
+code_examples:
+  - title: Existing colocated domain type pattern
+    file: lib/designs/load.ts:10
+    snippet: |
+      export type DesignDetail = {
+        design: Design;
+        references: {
+          primary: Reference | null;
+          secondary: Reference[];
+          staleReferenceCount: number;
+          primaryReferenceMissing?: true;
+        };
+        latestGeneration: Generation | null;
+      };
+  - title: Current provider request shape that consumes `promptText`
+    file: lib/ai/generate.ts:85
+    snippet: |
+      const request: ProviderRequest = {
+        images: [
+          {
+            bytes: primaryBytes.bytes,
+            mimeType:
+              primaryBytes.contentType as ProviderRequest['images'][number]['mimeType'],
+            role: 'primary',
+          },
+          ...secondaryImages,
+        ],
+        promptText: input.promptText,
+        nailShape: input.nailShape,
+      };
+
+design_decisions:
+  - decision: Keep prompt accumulation as a pure function in its own module
+    rationale: TPM explicitly split e2 in parallel with e1 because this seam is independently testable and should not wait on Firestore or d8 (`tpm-story-sequence.md` table and parallelism section).
+  - decision: Use stable structured-prefix concatenation instead of summarization
+    rationale: Design discussion Q3 recommends simple concatenation plus a hard 5-turn cap for v1 to avoid hidden behavior in a stretch-scope feature (`design-discussion.md` §6 Q3).
+  - decision: Define `ChatTurn` in `lib/designs/chat-refinement.ts`
+    rationale: Research brief notes type colocation in this repo, and `lib/designs/load.ts` demonstrates the pattern directly (`research-brief.md` UI integration surface, `lib/designs/load.ts:10-21`).
+
+cross_cutting:
+  - concern: types-coverage
+    action: Keep `ChatTurn` exhaustive and drive the helper contract through unit tests rather than inline object literals spread across route/UI layers.
+
+risks:
+  - severity: medium
+    description: Prompt formatting drift between tests and implementation could make later turns unstable without obvious failures.
+    mitigation: Lock the exact prefix format in unit tests and treat those strings as API-level contract for downstream stories.
+  - severity: low
+    description: A too-clever helper could absorb provider or Firestore concerns and break the intended parallel seam.
+    mitigation: Review step rejects any server-only import or side effect in `lib/designs/chat-refinement.ts`.
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      - `accumulateChatInstructions(input: { priorTurns: ChatTurn[]; nextMessage: string }): { compiledPrompt: string }`
+      - Error conditions:
+        empty message, chat turn order corruption, generation failure after turn persistence, prompt explosion across many turns
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      - Given a prior refinement already exists, when I submit a second message, then the app accumulates prior instructions instead of accidentally replacing the earlier refinement context.
+      - Given I submit an empty or invalid message, when the chat route processes it, then the app rejects the turn cleanly.
+  - path: lib/ai/generate.ts
+    relevant_excerpt: |
+      export interface GenerateInput {
+        primaryReference: Reference;
+        secondaryReferences: Reference[];
+        promptText: string | null;
+        nailShape: NailShape;
+      }

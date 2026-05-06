@@ -11,3 +11,4 @@
 export { referenceConverter } from './references';
 export { designConverter } from './designs';
 export { generationConverter } from './generations';
+export { chatTurnConverter } from './chat-turns';
