@@ -24,4 +24,4 @@ Data is retained indefinitely at the user's discretion. The single user may dele
 
 ## Contact
 
-Contact the owner at the email configured as the sole allowlisted address for the app.
+Contact the owner at bigpedro36@gmail.com.
