@@ -1,0 +1,133 @@
+id: f4-tablet-layout
+epic: epic-f-polish-tablet-ux
+title: 'Tablet layout: sidebar responsive collapse + touch target fixes'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: [f1-dashboard-responsive]
+
+description: |
+  The authenticated layout has a fixed 260px sidebar (`w-[260px] shrink-0`) with no
+  responsive behavior. At 1180px (iPad landscape), this consumes 22% of the viewport
+  and leaves 920px for content — workable but tight. At iPad portrait (~820px) and
+  iPhone (390px), the layout breaks entirely — content area collapses to near-zero.
+
+  This story implements the minimum viable tablet fix per the Slice 8 scope decision:
+  sidebar collapses at the `md` breakpoint (768px) into a hidden off-canvas drawer
+  triggered by a hamburger button in the main header. At `lg` and above (1024px+),
+  the sidebar remains visible as-is.
+
+  Additionally, ShapeSelector buttons and WizardProgressStrip pill buttons lack
+  explicit `min-h-[44px]` — below the touch target minimum declared in globals.css.
+  Add the missing height enforcement.
+
+  Scope: `app/(authenticated)/layout.tsx`, `components/studio/ShapeSelector.tsx`,
+  `components/studio/WizardProgressStrip.tsx`. No new routes.
+  Anchor: Slice 8 manifest item #5; researcher findings HIGH-1 (sidebar), MED-5
+  (ShapeSelector touch target).
+
+  SCOPE NOTE (per decision-points.md Decision 4): This is tablet-first only.
+  Full phone parity (bottom nav, mobile-specific route layouts) is explicitly out of
+  scope for this epic. The sidebar collapse at md makes routes usable on phone but
+  does not optimize the phone experience.
+
+acceptance_criteria:
+  - 'Given viewport width < 768px (md breakpoint), when an authenticated page renders, then the sidebar is hidden and a hamburger/menu button is visible in the top bar | validates mobile usability'
+  - 'Given the hamburger button is tapped, when the drawer opens, then all sidebar navigation items are reachable and tappable | validates off-canvas navigation'
+  - 'Given viewport ≥ 1024px (lg breakpoint), when an authenticated page renders, then the sidebar is visible and the hamburger button is not rendered | validates desktop regression'
+  - 'Given ShapeSelector renders at any viewport, when a shape button is measured, then computed height is ≥ 44px | validates touch target minimum'
+  - 'Given WizardProgressStrip renders at any viewport, when a step button is measured, then computed height is ≥ 44px | validates touch target minimum'
+  - 'Given viewport 1180×820 (iPad landscape), when the authenticated layout renders, then no horizontal overflow exists on any route | validates tablet ergonomics'
+
+steps:
+  - id: implement
+    description: |
+      PART A — Sidebar responsive collapse in `app/(authenticated)/layout.tsx`:
+
+      1. Add state to the layout: `const [sidebarOpen, setSidebarOpen] = useState(false)`.
+         The layout is currently a server component — convert only the sidebar toggle
+         to a client component wrapper. Keep the session fetch and redirect logic
+         server-side; extract a `<AuthenticatedShell>` client component that receives
+         `displayName` and `email` as props and manages the sidebar open state.
+
+      2. Sidebar `<aside>` class changes:
+         - Add `hidden lg:flex` so it hides below lg by default.
+         - When `sidebarOpen` is true, override with `fixed inset-y-0 left-0 z-50 flex lg:relative lg:z-auto`.
+         - Add an overlay `<div>` behind the open drawer on small screens.
+
+      3. Add a hamburger `<button>` visible only below lg (`lg:hidden`) in the
+         `<main>` header area (top of content, not inside sidebar). Use existing
+         focus-visible ring pattern. Icon: three horizontal lines, 24×24, stroke-based
+         SVG (no external dep).
+
+      4. Close sidebar on navigation: add a click handler on each nav `<Link>` that
+         calls `setSidebarOpen(false)` on small screens.
+
+      PART B — Touch target fixes:
+
+      5. In `components/studio/ShapeSelector.tsx`: add `min-h-[44px]` to the shape
+         button className. Keep existing `px-4 py-2` — the min-h enforces the floor.
+
+      6. In `components/studio/WizardProgressStrip.tsx`: add `min-h-[44px]` to the
+         step button/link className.
+    agent: developer
+    depends_on: []
+  - id: review
+    description: |
+      Typecheck passes. Verify sidebar is `hidden lg:flex` (not md:hidden which would
+      hide at md but show before lg). Confirm server component session fetch is not
+      moved client-side. Check overlay z-index doesn't overlap toast/modal layers.
+      Verify ShapeSelector and WizardProgressStrip buttons have min-h-[44px].
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(f4): sidebar responsive collapse + touch target fixes` on epic-f/polish-tablet-ux.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-f/polish-tablet-ux
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+  key_files:
+    - path: app/(authenticated)/layout.tsx
+      purpose: Contains Sidebar component (w-[260px] shrink-0) and main shell. Primary modification target.
+    - path: components/studio/ShapeSelector.tsx
+      purpose: Shape pill buttons — add min-h-[44px] to button className.
+    - path: components/studio/WizardProgressStrip.tsx
+      purpose: Progress step buttons — add min-h-[44px] to button/link className.
+    - path: app/globals.css
+      purpose: 'Confirms --touch-target-min: 44px token and existing z-index conventions.'
+
+files_to_modify:
+  - file: app/(authenticated)/layout.tsx
+    change: Extract AuthenticatedShell client component; add sidebar responsive collapse + hamburger toggle.
+  - file: components/studio/ShapeSelector.tsx
+    change: Add min-h-[44px] to shape button className.
+  - file: components/studio/WizardProgressStrip.tsx
+    change: Add min-h-[44px] to step button/link className.
+
+design_decisions:
+  - decision: Use lg breakpoint (1024px) for sidebar visibility, not md (768px)
+    rationale: At md (768px) sidebar would hide on small tablets that still have enough room. lg keeps it visible at iPad landscape (1180px > 1024px) while hiding below that.
+  - decision: Extract client shell wrapper, keep server-side session logic
+    rationale: Session redirect must stay server-side for security. Only the toggle state needs to be client-side. Pattern mirrors Next.js recommended server+client component split.
+  - decision: Off-canvas drawer over icon-only sidebar collapse
+    rationale: Simpler implementation; icon-only sidebar requires redesign of nav labels. Off-canvas is sufficient for demo confidence at this deadline.
+
+risks:
+  - severity: medium
+    description: Converting layout to use a client shell wrapper may introduce a hydration mismatch if sidebar state affects SSR output.
+    mitigation: Default sidebarOpen to false (closed); SSR output is always the closed state; no mismatch.
+  - severity: low
+    description: z-index of drawer overlay may conflict with existing toast or modal z-index.
+    mitigation: Use z-50 for overlay; inspect existing z-index usage in globals.css and components before committing.
+
+references:
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+    relevant_excerpt: 'HIGH — Sidebar w-[260px] shrink-0, no responsive behavior. MED-5 — ShapeSelector buttons ~34-36px height, below 44px minimum.'
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/decision-points.md
+    relevant_excerpt: 'Decision 4: Tablet only, phone documented-as-broken. Sidebar collapse at md breakpoint only.'

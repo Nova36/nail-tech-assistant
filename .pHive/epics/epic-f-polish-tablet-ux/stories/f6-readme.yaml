@@ -1,0 +1,125 @@
+id: f6-readme
+epic: epic-f-polish-tablet-ux
+title: 'README: setup docs, env vars, Firebase + Pinterest prerequisites'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+description: |
+  The current README.md is 6 lines — app name, capability bullets, tech stack,
+  privacy note. It contains no setup instructions, no env var list, no Firebase
+  configuration steps, and no Pinterest token requirements.
+
+  This story produces a setup-sufficient README: enough for a fresh machine to
+  reproduce the full P0 flow. Does not include full architecture documentation
+  (that is deferred per decision-points.md Decision 3).
+
+  Scope: `README.md` only. No code changes.
+  Anchor: Slice 8 manifest item #8; researcher finding MED-7.
+
+  The README must cover:
+  - Prerequisites (Node ≥ 20, pnpm, Firebase CLI, Java 21 for emulator)
+  - Clone + install steps
+  - `.env.local` env vars with descriptions (not values):
+    NEXT_PUBLIC_FIREBASE_* (6 vars), FIREBASE_SERVICE_ACCOUNT_JSON,
+    FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY,
+    ALLOWED_EMAIL, APP_URL, PINTEREST_ACCESS_TOKEN
+  - Firebase Console: Authorized Domains setup (add localhost:3000)
+  - Pinterest: static access token requirement + where to get it
+  - pnpm dev (default, port 3000) vs pnpm dev:e2e (e2e port 3100, emulator-wrapped)
+  - pnpm test (unit/rules) vs pnpm exec playwright test (e2e)
+  - Vercel deploy notes: env vars must be set in Vercel dashboard
+
+acceptance_criteria:
+  - 'Given a developer with zero project context, when they read the README, then they can set up a working local environment without asking any questions | validates setup sufficiency'
+  - 'Given the README env var section, when compared against .env.local keys actually used in the codebase, then no required var is missing and no phantom var is listed | validates accuracy'
+  - 'Given the Firebase Authorized Domains note, when a developer follows it, then localhost:3000 auth sign-in works without "auth/unauthorized-domain" error | validates Firebase setup'
+
+steps:
+  - id: research
+    description: |
+      Grep the codebase for all `process.env` and `env.` references to compile the
+      definitive env var list. Check `lib/env.ts` or equivalent for the validated
+      env schema. Check `package.json` for the actual dev/e2e/test script names.
+      Check `firebase.json` for emulator ports and which emulators are required.
+    agent: researcher
+  - id: implement
+    description: |
+      Rewrite `README.md` with these sections (in order):
+
+      1. **Nail Tech Assistant** — one-paragraph description of what it does
+      2. **Prerequisites** — Node 20+, pnpm 9+, Firebase CLI, Java 21 (for Auth emulator)
+      3. **Setup** — clone, `pnpm install`, copy `.env.local.example` (note: create
+         `.env.local.example` if it does not exist, listing all vars with placeholder
+         values)
+      4. **Environment variables** — table: var name | required | description.
+         Do not include real values. Include a note pointing to Firebase Console and
+         Vercel dashboard for obtaining them.
+      5. **Firebase setup** — Console → Authentication → Settings → Authorized Domains
+         → add `localhost:3000`. Required for email link sign-in locally.
+      6. **Pinterest access token** — where to find it (Pinterest Developer portal →
+         app → Access Token). Note: static token, single-user, expires annually.
+      7. **Running locally** — `pnpm dev` (port 3000, real Firebase). `pnpm dev:e2e`
+         (port 3100, emulator-wrapped, used by Playwright).
+      8. **Tests** — `pnpm test` (unit + rules), `pnpm exec playwright test` (e2e,
+         requires emulator). Note: `pnpm exec playwright test --project=ipad-landscape`
+         for tablet smoke.
+      9. **Deploy** — Vercel dashboard env vars, note on FIREBASE_SERVICE_ACCOUNT_JSON
+         (JSON value, not file path).
+
+      If `.env.local.example` does not exist, create it with placeholder values
+      (e.g. `NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key-here`).
+    agent: developer
+    depends_on: [research]
+  - id: review
+    description: |
+      Verify every env var referenced in lib/env.ts (or equivalent) appears in the
+      README table. Confirm no real credential values were accidentally included.
+      Check that pnpm script names match package.json exactly. Read the Firebase
+      Authorized Domains step — ensure it says localhost:3000, not :3100.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `docs(f6): README setup documentation` on epic-f/polish-tablet-ux.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-f/polish-tablet-ux
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+  key_files:
+    - path: README.md
+      purpose: 6-line current state — full rewrite target.
+    - path: lib/env.ts
+      purpose: Validated env schema — authoritative source for required env vars.
+    - path: package.json
+      purpose: Script names for dev, dev:e2e, test commands.
+    - path: firebase.json
+      purpose: Emulator configuration — ports for auth, Firestore, Storage.
+
+files_to_modify:
+  - file: README.md
+    change: Full rewrite with setup documentation.
+  - file: .env.local.example
+    change: net-new if it does not exist; placeholder values for all required vars.
+
+design_decisions:
+  - decision: README only, no docs/ directory
+    rationale: Per decision-points.md Decision 3. Architecture + integration docs are post-ship maintenance work.
+  - decision: No real credential values in README or .env.local.example
+    rationale: Both files are committed to git. All values must be placeholder strings.
+
+risks:
+  - severity: low
+    description: .env.local.example may diverge from actual .env.local over time.
+    mitigation: Research step greps the codebase for actual env references before writing; not based on memory.
+
+references:
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+    relevant_excerpt: 'MED-7 — README.md is 6 lines. No setup instructions, no env vars, no Firebase/Pinterest steps.'
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/decision-points.md
+    relevant_excerpt: 'Decision 3: README only. Full docs/ is post-ship.'

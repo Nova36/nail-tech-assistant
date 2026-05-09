@@ -1,0 +1,130 @@
+id: f2-loading-states
+epic: epic-f-polish-tablet-ux
+title: 'LoadingStates: generation pending skeleton + library grid skeleton'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: []
+
+description: |
+  Two loading states are absent and create blank-screen gaps during demo:
+
+  1. **Generation pending state**: When the user submits the wizard and Gemini is
+     processing (10–30s), the generation route returns a pending status. No visual
+     placeholder exists — the UI shows nothing while waiting. Add a
+     `components/LoadingStates/GenerationPending.tsx` skeleton that communicates
+     intentional AI latency (brand-consistent, not a raw spinner).
+
+  2. **Library grid skeleton**: When the library page loads and Firestore is
+     fetching designs, there is no skeleton grid. Add
+     `components/LoadingStates/LibrarySkeleton.tsx` matching the `grid-cols-[repeat(auto-fill,minmax(280px,1fr))]`
+     layout of `DesignLibrary`.
+
+  Pinterest already has `BoardGridSkeleton` and `PinGridSkeleton` — reuse their
+  shimmer pattern (`.sk-v1` class defined in `app/globals.css`).
+
+  Scope: two new components + wiring into the pages that surface them.
+  No changes to Firestore data model, no new routes.
+  Anchor: Slice 8 manifest item #3; researcher finding MED-3 (LoadingStates missing).
+
+acceptance_criteria:
+  - 'Given the generation wizard is submitted and status is pending, when the UI re-renders, then GenerationPending skeleton is visible instead of a blank area | validates generation latency UX'
+  - 'Given the library page is loading, when Firestore fetch is in-flight, then LibrarySkeleton grid is visible at the correct column layout | validates library loading state'
+  - 'Given prefers-reduced-motion is active, when either skeleton renders, then shimmer animation is suppressed (matches .sk-v1 prefers-reduced-motion rule in globals.css) | accessibility requirement'
+  - 'Given both skeletons render at 1180px (iPad landscape), when the grid is visible, then no horizontal overflow occurs | tablet ergonomics'
+
+steps:
+  - id: implement
+    description: |
+      1. Create `components/LoadingStates/GenerationPending.tsx`:
+         - A card-shaped skeleton matching the generation preview area dimensions.
+         - Use `.sk-v1` shimmer class from `app/globals.css` for the animated bars.
+         - Include a brief status message: "Creating your design..." in brand
+           typography (font-body, text-sm, text-muted-foreground).
+         - Export: `export function GenerationPending()`.
+
+      2. Create `components/LoadingStates/LibrarySkeleton.tsx`:
+         - A grid of 6 card-shaped skeletons matching DesignCard dimensions
+           (rounded-[28px], aspect-ratio ~4/5, same shadow token).
+         - Use `.sk-v1` shimmer on the image area; static muted bars for title/date.
+         - Grid class: `grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6`
+           (matches DesignLibrary exactly).
+         - Export: `export function LibrarySkeleton()`.
+
+      3. Wire `GenerationPending` into the design wizard flow: locate where the
+         generation pending status is handled in
+         `app/(authenticated)/design/new/page.tsx` or the relevant client component,
+         and render `<GenerationPending />` while status === 'pending'.
+
+      4. Wire `LibrarySkeleton` into the library page: in
+         `app/(authenticated)/library/page.tsx`, add a Suspense boundary or loading
+         state around `<DesignLibrary>` that shows `<LibrarySkeleton />` during fetch.
+         Prefer React Suspense + a `loading.tsx` in the library route segment if the
+         page is a server component.
+
+      5. Create `components/LoadingStates/index.ts` barrel export.
+    agent: developer
+    depends_on: []
+  - id: review
+    description: |
+      Typecheck passes. Confirm .sk-v1 class is used (not a new shimmer implementation).
+      Verify prefers-reduced-motion suppression is inherited via globals.css rule, not
+      re-declared. Check grid class on LibrarySkeleton exactly matches DesignLibrary.
+      Confirm GenerationPending wiring doesn't block the happy-path result render.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(f2): generation pending + library loading skeletons` on epic-f/polish-tablet-ux.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-f/polish-tablet-ux
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: components/pinterest/BoardGridSkeleton.tsx
+      purpose: Existing shimmer skeleton pattern using .sk-v1 — canonical template to follow.
+    - path: components/pinterest/PinGridSkeleton.tsx
+      purpose: Second shimmer skeleton precedent; shows pattern for grid-layout skeletons.
+    - path: app/globals.css
+      purpose: Defines .sk-v1 shimmer animation and prefers-reduced-motion suppression rule.
+    - path: components/DesignLibrary.tsx
+      purpose: Grid layout class to match exactly in LibrarySkeleton.
+    - path: app/(authenticated)/library/page.tsx
+      purpose: Wiring point for LibrarySkeleton — server component with Firestore fetch.
+    - path: app/(authenticated)/design/new/page.tsx
+      purpose: Wiring point for GenerationPending — locate where pending status is rendered.
+
+files_to_modify:
+  - file: components/LoadingStates/GenerationPending.tsx
+    change: net-new skeleton for generation in-progress state.
+  - file: components/LoadingStates/LibrarySkeleton.tsx
+    change: net-new skeleton grid for library loading state.
+  - file: components/LoadingStates/index.ts
+    change: net-new barrel export.
+  - file: app/(authenticated)/library/page.tsx
+    change: Add Suspense/loading wrapper to surface LibrarySkeleton during fetch.
+  - file: app/(authenticated)/design/new/page.tsx
+    change: Render GenerationPending while generation status === 'pending'.
+
+design_decisions:
+  - decision: Reuse .sk-v1 shimmer class, do not create a new animation
+    rationale: globals.css already has the shimmer keyframe + prefers-reduced-motion suppression. Reuse keeps accessibility coverage consistent.
+  - decision: LibrarySkeleton grid must match DesignLibrary class exactly
+    rationale: Visual consistency — the skeleton should look like the loaded state minus content.
+
+risks:
+  - severity: medium
+    description: Generation pending wiring point may differ from expected path if the wizard uses a client-side polling loop rather than a server component status prop.
+    mitigation: Developer reads app/(authenticated)/design/new/page.tsx and the studio wizard components before wiring; adapt wiring to actual pending-state mechanism.
+
+references:
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+    relevant_excerpt: 'MED-3 — LoadingStates/ missing. Pinterest has BoardGridSkeleton + PinGridSkeleton. No generation or library loading state.'
+  - path: components/pinterest/BoardGridSkeleton.tsx
+    relevant_excerpt: 'Canonical .sk-v1 shimmer pattern to replicate.'
