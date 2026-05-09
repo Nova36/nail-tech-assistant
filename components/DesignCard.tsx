@@ -10,7 +10,6 @@ import {
 } from 'react';
 
 import { DesignNameField } from '@/components/DesignNameField';
-import { NailVisualizer } from '@/components/NailVisualizer/NailVisualizer';
 
 import type { Design } from '@/lib/types';
 
@@ -108,12 +107,26 @@ export function DesignCard({ design, latestImageUrl }: Props) {
       />
 
       <div>
-        <div className="aspect-[4/3] overflow-hidden border-b border-border/60 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(244,235,229,0.55)_58%,rgba(232,221,212,0.75))] p-4">
-          <NailVisualizer
-            theme="flat"
-            imageUrl={latestImageUrl}
-            nailShape={design.nailShape}
-          />
+        <div className="aspect-[4/3] overflow-hidden border-b border-border/60 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.9),rgba(244,235,229,0.55)_58%,rgba(232,221,212,0.75))]">
+          {latestImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={latestImageUrl}
+              alt={
+                hasName ? `${design.name} preview` : 'Saved nail design preview'
+              }
+              data-testid="design-thumbnail"
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div
+              data-testid="design-thumbnail-placeholder"
+              className="flex h-full w-full items-center justify-center p-6 text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
+            >
+              No preview yet
+            </div>
+          )}
         </div>
 
         <div className="space-y-3 p-5">

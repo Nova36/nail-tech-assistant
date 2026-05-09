@@ -17,9 +17,13 @@ export function assertAllowedEmail(email: string): AllowlistResult {
     return { ok: false, reason: 'invalid_format' };
   }
 
-  const allowedEmail = env.ALLOWED_EMAIL.trim().toLowerCase();
+  const allowedSet = new Set(
+    env.ALLOWED_EMAIL.split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0)
+  );
 
-  if (normalizedEmail !== allowedEmail) {
+  if (!allowedSet.has(normalizedEmail)) {
     return { ok: false, reason: 'not_allowed' };
   }
 

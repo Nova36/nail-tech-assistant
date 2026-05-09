@@ -58,17 +58,16 @@ describe('DesignCard — root + identity', () => {
 });
 
 describe('DesignCard — thumbnail composition', () => {
-  it('renders a NailVisualizer-themed thumbnail container', () => {
-    const { container } = render(
+  it('renders the generation image as a plain <img> thumbnail', () => {
+    render(
       <DesignCard
         design={designFixture({ nailShape: 'coffin' })}
         latestImageUrl="https://cdn.test/img.png"
       />
     );
-    // The visualizer renders an SVG root. Per dd-1 the thumbnail IS the
-    // mini visualizer — assert presence of its themed container, not internals.
-    const svg = container.querySelector('svg');
-    expect(svg).toBeTruthy();
+    const thumb = screen.getByTestId('design-thumbnail');
+    expect(thumb).toHaveAttribute('src', 'https://cdn.test/img.png');
+    expect(thumb.tagName).toBe('IMG');
   });
 
   it('handles a null latestImageUrl without crashing (placeholder thumbnail)', () => {
@@ -81,6 +80,7 @@ describe('DesignCard — thumbnail composition', () => {
     expect(
       container.querySelector('[data-component="DesignCard"]')
     ).toBeTruthy();
+    expect(screen.getByTestId('design-thumbnail-placeholder')).toBeTruthy();
   });
 });
 
