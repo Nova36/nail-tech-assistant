@@ -1,0 +1,185 @@
+id: e5-chat-refinement-panel-integration
+epic: epic-e-chat-refinement
+title: 'ChatRefinementPanel + /design/[id] integration'
+status: pending
+complexity: high
+methodology: tdd
+depends_on: [e4-chat-route]
+
+description: |
+  Add the user-facing Epic E surface by integrating `components/ChatRefinementPanel.tsx`
+  into the saved-design detail page and, if the approved wireframe requires it,
+  ship `components/IterationTimeline.tsx` inside the same story. This story owns
+  the current-image clarity problem for US-E-2: users need to see ordered turns,
+  understand whether generation is pending/succeeded/failed, and know which result
+  is current without destabilizing the existing Confirm state machine
+  (`prd.md` L641-L648, L669-L676; `structured-outline.md` L429-L435, L451-L456).
+
+  The insertion point is already known from research: the success branch in
+  `app/(authenticated)/design/[designId]/Confirm.tsx` should mount the new panel
+  after the `VisualizerFrame` and prompt display, before the "Back to adjust"
+  affordance (`Confirm.tsx:253-313`, `research-brief.md` UI integration surface).
+  There is no existing two-column shell, so layout, current-image indicator,
+  failed-turn UX, optional timeline, and phone scope all stay gated behind the
+  wireframe decisions preserved in `epic.yaml`'s `wireframe_approval` block.
+
+  Scope includes page hydration updates if `initialChatTurns` or related props are
+  needed, but does not include Playwright verification; that belongs to e6. This
+  story is the only Epic E story with a `ui-design` hard gate and the only one that
+  carries the animations-specialist review sidecar.
+
+acceptance_criteria:
+  - 'Given a saved design with prior chat turns, when the design detail page loads, then the panel shows ordered turn history and current iteration state without obscuring the existing visualizer result | maps to US-E-2 AC1 and FR-E-4 (`prd.md` L641-L671)'
+  - 'Given a failed chat-driven generation after turn persistence, when the panel renders the turn list, then the failure state is visible and understandable per the approved wireframe decision | maps to US-E-2 AC2 and FR-E-6 (`prd.md` L645-L676)'
+  - 'Given the approved wireframe collapses or ships `IterationTimeline`, when implementation lands, then the result matches that decision without creating a second unsanctioned UI variant | maps to Slice 7 manifest item #8 (`structured-outline.md` L435)'
+
+steps:
+  - id: research
+    description: Confirm the current Confirm/page hydration seam, verify whether any existing component test lane already covers `/design/[designId]`, and collect the exact wireframe-gate inputs from `epic.yaml`.
+    agent: researcher
+  - id: ui-design
+    description: |
+      Wireframes produced via Claude Design (Don's separate token budget) — not
+      ui-designer agent. Don runs the prompt at
+      .pHive/epics/epic-e-chat-refinement/docs/claude-design-prompt.md after
+      resolving the 5 open decisions in epic.yaml `wireframe_approval`. Output
+      lands at .pHive/wireframes/epic-e-chat-refinement/. This step is complete
+      when the manifest at .pHive/wireframes/epic-e-chat-refinement/manifest.yaml
+      has wireframe_approval.status == 'approved'.
+    agent: human # Don running Claude Design externally
+    depends_on: [research]
+  - id: test-spec
+    description: |
+      Write failing UI tests against the approved wireframes before implementation.
+      Prefer extending an existing design-detail test lane if one exists; otherwise
+      add focused coverage for the panel component and Confirm integration. Assert
+      ordered turn rendering, pending/success/failure states, current-image indicator,
+      disabled/blocked input states, and optional IterationTimeline presence or absence
+      according to wireframe decision #2.
+    agent: tester
+    depends_on: [ui-design]
+  - id: implement
+    description: |
+      Add `components/ChatRefinementPanel.tsx` and conditionally add
+      `components/IterationTimeline.tsx` only if wireframe decision #2 requires it.
+      Extend `app/(authenticated)/design/[designId]/Confirm.tsx` in the success branch
+      after `VisualizerFrame` and the prompt block (`Confirm.tsx:268-297`), and update
+      `app/(authenticated)/design/[designId]/page.tsx` hydration if the panel needs
+      initial turn data from `loadDesignDetail`.
+
+      Preserve the existing tablet-first shell and accessibility semantics. Do not
+      invent a sidebar architecture unless the approved wireframe explicitly chooses it.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + component/integration tests pass. Confirm tablet-landscape fit, accessible status messaging, and motion quality for pending→ready / image transition states.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(e5): add chat refinement panel to design detail` on epic-e/chat-refinement.'
+    agent: developer
+    depends_on: [review]
+
+review_sidecars:
+  - persona: animations-specialist
+    trigger: ui:animations
+    placement: append
+    rationale: 'Turn-by-turn iteration feedback (pending → generating → result-ready, image transitions) is animation territory. Mirror b2 sidecar pattern (memory feedback_animations_sidecar_review.md).'
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-e/chat-refinement
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: app/(authenticated)/design/[designId]/Confirm.tsx
+      purpose: Existing client state machine and the known insertion point for the panel (`Confirm.tsx:235-330`).
+    - path: app/(authenticated)/design/[designId]/page.tsx
+      purpose: Server component hydration seam if `initialChatTurns` or related props need to flow into Confirm (`page.tsx:13-41`).
+    - path: components/ChatRefinementPanel.tsx
+      purpose: Net-new chat UI surface for ordered turns, input, and iteration state.
+    - path: components/IterationTimeline.tsx
+      purpose: Optional companion visual sequence surface gated by wireframe decision #2.
+
+files_to_modify:
+  - file: components/ChatRefinementPanel.tsx
+    change: net-new panel UI for turns, composer, and iteration status.
+  - file: components/IterationTimeline.tsx
+    change: conditional net-new component only if wireframe decision #2 ships it.
+  - file: app/(authenticated)/design/[designId]/Confirm.tsx
+    change: extend success-state layout with chat refinement surface after the visualizer/prompt blocks.
+  - file: app/(authenticated)/design/[designId]/page.tsx
+    change: extend hydration props only if the panel needs initial turn data from the server.
+
+code_examples:
+  - title: Current Confirm success-branch insertion seam
+    file: app/(authenticated)/design/[designId]/Confirm.tsx:253
+    snippet: |
+      {state.phase === 'success' ? (
+        <div className="space-y-6">
+          <div className="space-y-2 text-center">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
+              Step 3 of 3
+            </p>
+            <h2 className="font-heading-display text-4xl font-light tracking-[-0.03em] text-foreground md:text-5xl">
+              Here&apos;s your design.
+            </h2>
+          </div>
+  - title: Current page hydration into Confirm
+    file: app/(authenticated)/design/[designId]/page.tsx:33
+    snippet: |
+      return (
+        <main className="mx-auto max-w-6xl px-5 py-6 md:px-6 md:py-10 lg:py-12">
+          <Confirm
+            designId={designDetail.design.id}
+            nailShape={designDetail.design.nailShape}
+            promptText={designDetail.design.promptText}
+            latestGenerationId={designDetail.design.latestGenerationId}
+            initialImageUrl={initialImageUrl}
+          />
+        </main>
+      );
+
+design_decisions:
+  - decision: Gate UI implementation behind a dedicated wireframe step
+    rationale: This is the only story where unresolved decisions materially change the component shape; the repo has no existing chat/timeline shell to inherit (`research-brief.md` UI integration surface, `design-discussion.md` §6 Q4-Q5).
+  - decision: Fold `IterationTimeline` into e5 rather than creating a separate story
+    rationale: TPM locked the 6-story split and explicitly folded the optional timeline into e5 (`tpm-story-sequence.md` parallelism section; task brief "IterationTimeline.tsx folding").
+  - decision: Start with in-flow placement after the visualizer, not an assumed sidebar
+    rationale: Research shows no current two-column design shell, and the Confirm success branch already has a natural insertion point (`Confirm.tsx:268-313`, `researcher-raw-findings.md` Q3).
+
+cross_cutting:
+  - concern: accessibility
+    action: Ensure ordered turns, status changes, and failure states are exposed with meaningful labels/roles and remain usable on tablet-first layouts.
+
+risks:
+  - severity: high
+    description: Tablet landscape fit is unresolved because the current page has no established two-column shell.
+    mitigation: Use the ui-design step to lock layout before code, then keep implementation aligned to the approved wireframe only.
+  - severity: medium
+    description: Without explicit motion review, pending→result transitions can feel abrupt or ignore reduced-motion expectations.
+    mitigation: Use the reviewer-step animations-specialist sidecar per `feedback_animations_sidecar_review.md`.
+
+references:
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      - Given multiple refinement turns exist on one design, when I view the chat panel, then I can see the ordered turn history tied to the current iteration state.
+      - Given generation fails after a turn is persisted, when the result returns, then the app makes the failed state understandable.
+  - path: app/(authenticated)/design/[designId]/Confirm.tsx
+    relevant_excerpt: |
+      <VisualizerFrame>
+        <div data-testid="nail-visualizer" aria-hidden="true">
+          <NailVisualizer
+            theme="flat"
+            imageUrl={state.imageUrl}
+            nailShape={activeShape}
+          />
+        </div>
+      </VisualizerFrame>
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/feedback_animations_sidecar_review.md
+    relevant_excerpt: |
+      Epic B's `ui:animations` escalation routes the animations-specialist persona into the reviewer step as a sidecar (not a separate phase).
+      The `append` placement turned out to be the genuinely useful one.

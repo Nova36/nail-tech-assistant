@@ -1,0 +1,165 @@
+id: e3-lifecycle-chat-lineage
+epic: epic-e-chat-refinement
+title: 'lifecycle.ts chat-turn lineage attachment'
+status: blocked
+complexity: medium
+methodology: tdd
+depends_on: [e1-chat-turns-persistence, e2-chat-refinement-accumulation]
+
+description: |
+  Extend the lifecycle seam in `lib/designs/lifecycle.ts` so a generated result
+  can attach back to the chat turn that triggered it. This is the Epic E lineage
+  hinge: on success, the generation row gains `chatTurnId`, the chat-turn row gains
+  `generationId`, and the parent design still updates `latestGenerationId` in the
+  same atomic transaction pattern already used by `persistGenerationResult`
+  (`lib/designs/lifecycle.ts:228-316`, `researcher-raw-findings.md` Q1). That maps
+  directly to FR-E-1 and FR-E-3 (`prd.md` L661-L668).
+
+  BLOCKED-UNTIL: Epic D d8 merges. The route and lifecycle design for Epic E are
+  intentionally outlined against the d8 regenerate-from-stored-inputs contract.
+  This story may be authored now, but it cannot be integrated confidently until
+  d8's `persistGenerationResult` and request-building seam are stable on the Epic D
+  branch (`research-brief.md` Epic D Dependency State; `tpm-story-sequence.md`
+  dependency DAG). If d8 is still in flight during execution, the story remains
+  blocked instead of pretending the seam is ready.
+
+  Scope here is additive lifecycle wiring only. Do not invent a second generation
+  pipeline, and do not move route concerns into the lifecycle module. The helper
+  extension should remain compatible with non-chat callers by making `chatTurnId`
+  optional and preserving the current non-chat behavior when it is absent.
+
+acceptance_criteria:
+  - 'Given a successful chat-driven generation, when `persistGenerationResult` completes, then the transaction updates `generations/{id}.chatTurnId`, `designs/{designId}.latestGenerationId`, and `designs/{designId}/chat_turns/{turnId}.generationId` atomically | maps to FR-E-1 and FR-E-3 (`prd.md` L661-L668)'
+  - 'Given a non-chat generation call path, when `chatTurnId` is omitted, then lifecycle behavior matches the current Epic D contract with no regression | maps to FR-E-5 (`prd.md` L672-L673)'
+  - 'Given a Firestore or storage failure in this seam, when the catch path runs, then server logs include code + message for diagnosis | maps to FR-E-6 and feedback_silent_catches_cost_time.md'
+
+steps:
+  - id: research
+    description: Pull the latest d8 story/code state from the Epic D branch, confirm the current `persistGenerationResult` contract, and verify the exact chat-turn subcollection path landed by e1 before test authoring.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing unit tests first in `tests/unit/designs/lifecycle-chat.test.ts`.
+      Cover: success transaction writes `chatTurnId` and `generationId` on the two
+      linked records; non-chat callers still pass when `chatTurnId` is absent; failure
+      updates retain existing error semantics. Do not read the implementation first.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Extend `persistGenerationResult` or a tightly-scoped sibling helper in
+      `lib/designs/lifecycle.ts` so it accepts optional `chatTurnId`. Mirror the
+      existing transaction pattern at `lib/designs/lifecycle.ts:300-316`, but add a
+      third document update for `designs/{designId}/chat_turns/{chatTurnId}` when the
+      ID is present. Write `generations/{generationId}.chatTurnId` and
+      `chat_turns/{turnId}.generationId` in the same transaction as
+      `designs/{designId}.latestGenerationId`.
+
+      Keep catch blocks explicit: log code + message in every Firebase/storage failure
+      branch. Do not move request-building or auth logic into lifecycle.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + unit pass. Confirm the additive signature does not break non-chat callers and every new catch path logs code + message.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(e3): attach lifecycle lineage to chat turns` on epic-e/chat-refinement.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-e/chat-refinement
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: lib/designs/lifecycle.ts
+      purpose: Existing generation lifecycle and canonical transaction seam live here (`lib/designs/lifecycle.ts:119-201`, `228-333`).
+    - path: lib/ai/generate.ts
+      purpose: Lifecycle persists the result shape returned by `generate`, so e3 must stay aligned with the current `GenerateResult` union (`lib/ai/generate.ts:20-39`).
+    - path: tests/unit/designs/persist-generation-result.test.ts
+      purpose: Closest existing unit-lane precedent for extending result persistence behavior.
+
+files_to_modify:
+  - file: lib/designs/lifecycle.ts
+    change: Extend lifecycle result persistence with optional `chatTurnId` linkage.
+  - file: tests/unit/designs/lifecycle-chat.test.ts
+    change: net-new unit coverage for atomic chat-turn/generation lineage writes.
+
+code_examples:
+  - title: Current transaction seam to extend
+    file: lib/designs/lifecycle.ts:300
+    snippet: |
+      try {
+        await db.runTransaction(async (txn) => {
+          txn.update(generationRef, {
+            status: 'success' satisfies GenerationStatus,
+            resultStoragePath: upload.storagePath,
+            providerResponseMetadata: input.outcome.ok
+              ? input.outcome.metadata
+              : null,
+            errorCode: null,
+            errorMessage: null,
+            updatedAt: now,
+          });
+          txn.update(designRef, {
+            latestGenerationId: input.generationId,
+            updatedAt: now,
+          });
+        });
+  - title: Current error logging pattern in lifecycle
+    file: lib/designs/lifecycle.ts:147
+    snippet: |
+      } catch (err) {
+        const code = (err as { code?: string }).code ?? 'unknown';
+        const message = (err as Error).message ?? String(err);
+        console.error('[lifecycle] persistGenerationStart design read failed', {
+          uid: input.userId,
+          designId: input.designId,
+          code,
+          message,
+        });
+        return { ok: false, reason: 'firestore_failure', message };
+      }
+
+design_decisions:
+  - decision: Extend the existing lifecycle seam instead of creating a parallel chat-specific persistence helper
+    rationale: Research brief identifies `persistGenerationResult` as the canonical attachment point for design→generation lineage (`research-brief.md` Saved-design lineage, `lib/designs/lifecycle.ts:228-316`).
+  - decision: Keep `chatTurnId` optional
+    rationale: FR-E-5 requires Epic E to remain cuttable without destabilizing the P0 path, so non-chat callers must preserve today's behavior (`prd.md` L672-L673, `tpm-story-sequence.md` FR coverage).
+  - decision: Treat d8 merge as a hard execution gate
+    rationale: This story is authored against the d8 contract and cannot be integrated honestly until that contract lands (`research-brief.md` Epic D Dependency State, `design-discussion.md` §4 HIGH risk).
+
+cross_cutting:
+  - concern: error-logging
+    action: Every new catch branch must log code + message and safe identifiers such as `generationId`/`designId`.
+
+risks:
+  - severity: high
+    description: d8 (regenerate-from-stored-inputs) is still in flight, so this story can drift against an unstable lifecycle contract.
+    mitigation: Research step must pull the latest d8 state first; if d8 is still unmerged, keep the story blocked and do not integrate.
+  - severity: medium
+    description: A partial transaction design could leave `generationId` and `chatTurnId` out of sync across the linked docs.
+    mitigation: Restrict the happy-path linkage to one Firestore transaction that updates generation, parent design, and chat-turn rows together.
+
+references:
+  - path: lib/designs/lifecycle.ts
+    relevant_excerpt: |
+      export async function persistGenerationResult(input: {
+        generationId: string;
+        userId: string;
+        designId: string;
+        outcome: GenerateResult;
+      }): Promise<PersistGenerationResultResult> {
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      - FR-E-1: The app must persist chat turns as ordered records tied to a design and resulting generation.
+      - FR-E-3: Each successful chat turn must produce a new generation linked back to the design lineage.
+  - path: .pHive/epics/epic-e-chat-refinement/docs/tpm-story-sequence.md
+    relevant_excerpt: |
+      - e3 needs d8's `loadDesignDetail` and generation-result contract stable.
+      - e3, e4 hard-block on Epic D d8-regenerate-from-stored-inputs merging to epic-d/visualizer-library

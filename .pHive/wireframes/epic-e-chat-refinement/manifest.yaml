@@ -1,0 +1,93 @@
+epic: epic-e-chat-refinement
+story: e5-chat-refinement-panel-integration
+artifact: wireframes.html
+created_by: claude-design (Don's separate token budget)
+approved_at: 2026-05-05T00:00:00Z
+
+wireframe_approval:
+  status: approved
+  approved_by: don.matthews.iii@gmail.com
+  decisions:
+    - id: 1
+      label: tablet-landscape-layout
+      chosen: right-side-drawer
+      wireframe_section: '#layout-a'
+      rationale: |
+        Drawer keeps VisualizerFrame primary at 60% width and gives the
+        chat panel a stable 40% column. No state-change reflow.
+    - id: 2
+      label: iteration-timeline-separation
+      chosen: separate-component
+      wireframe_section: '#timeline'
+      rationale: |
+        Ship `components/IterationTimeline.tsx` as a 60×60 thumbnail strip
+        pinned beneath the visualizer. Pairs with decision 4 (user-selectable).
+    - id: 3
+      label: orphaned-turn-failure-ux
+      chosen: system-message-retry
+      wireframe_section: '#failure-ux option-2'
+      diverges_from_recommendation: true
+      recommended_was: inline-error-badge-retry
+      rationale: |
+        Don's call. Turn row shows neutral 'Sent' badge for failed turns.
+        Single SYSTEM message block sits above the input area and aggregates
+        all unresolved failed turns in the current session (collapsed, NOT
+        one block per failed row). Each entry inside the block:
+        "Turn NN didn't generate · Retry · dismiss". Block hides when no
+        unresolved failures remain.
+      multi_failure_rendering: collapsed-aggregate
+    - id: 4
+      label: current-image-indicator
+      chosen: user-selectable
+      wireframe_section: '#timeline'
+      rationale: |
+        Clicking a turn (or its timeline thumbnail) reloads the visualizer
+        with that turn's generated image. Badge label changes by mode:
+        'Current' when viewing the latest successful turn,
+        'Comparing turn NN' when viewing an earlier turn.
+      badge_modes:
+        viewing_latest: 'Current'
+        viewing_earlier: 'Comparing turn NN'
+    - id: 5
+      label: phone-scope
+      chosen: tablet-only
+      wireframe_section: '#phone'
+      rationale: |
+        Sub-640px viewport renders the redirect notice (View design read-only
+        / Back to library). First-class-phone deferred to post-MVP.
+
+implementation_notes:
+  insertion_point: |
+    Confirm.tsx success branch wraps existing children (VisualizerFrame, prompt
+    block, RegenerateButton, back-to-adjust) in a left column (60% landscape /
+    56% portrait). ChatRefinementPanel mounts as the right column (40% / 44%).
+    RegenerateButton STAYS in the left column as the P0 fallback affordance —
+    chat panel layers on top, does not replace it.
+  regenerate_button_disposition: keep-as-p0-fallback
+  layout_split: visualizer 60% / chat panel 40% on iPad landscape (1180×820)
+  portrait_split: visualizer 56% / chat panel 44% on iPad portrait (820×1180)
+  iteration_timeline:
+    location: pinned below VisualizerFrame inside the visualizer column
+    cell_size: 60×60
+    states: [success, failure, pending, current]
+    selectable: true
+  failure_system_message:
+    pattern: |
+      Failed turn rows display a neutral "Sent" badge (no failure encoding
+      on the row itself).
+      Single aggregate SYSTEM block sits above the input area at the
+      bottom of the panel:
+        - "SYSTEM" eyebrow in destructive color
+        - One entry per unresolved failed turn:
+            "Turn NN didn't generate · Retry · dismiss"
+        - Block hides when no unresolved failures remain.
+      Retry re-fires lifecycle for that specific turn; dismiss removes
+      that entry from the block (does not retry).
+  phone_redirect_threshold_px: 640
+  brand_tokens_only: true
+
+references:
+  prd: .pHive/planning/prd.md
+  outline: .pHive/planning/structured-outline.md
+  story: .pHive/epics/epic-e-chat-refinement/stories/e5-chat-refinement-panel-integration.yaml
+  brand_system: .pHive/brand/brand-system.yaml

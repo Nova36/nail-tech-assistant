@@ -3,6 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import {
+  ChatRefinementPanel,
+  type ChatTurnView,
+} from '@/components/ChatRefinementPanel';
+import { IterationTimeline } from '@/components/IterationTimeline';
 import { VisualizerFrame } from '@/components/NailVisualizer';
 import { RegenerateButton } from '@/components/RegenerateButton';
 import { GenerateButton } from '@/components/studio/GenerateButton';
@@ -21,6 +26,8 @@ type ConfirmProps = {
   latestGenerationId?: string | null;
   initialImageUrl?: string | null;
   initialSwatchUrl?: string | null;
+  initialChatTurns?: ChatTurnView[];
+  designName?: string | null;
 };
 
 type GenerationState =
@@ -108,8 +115,12 @@ export function Confirm({
   latestGenerationId,
   initialImageUrl,
   initialSwatchUrl,
+  initialChatTurns = [],
+  designName,
 }: ConfirmProps) {
   const router = useRouter();
+  const [chatTurns] = useState<ChatTurnView[]>(initialChatTurns);
+  const [viewingTurnIndex, setViewingTurnIndex] = useState<number | null>(null);
   const [state, setState] = useState<GenerationState>(
     initialImageUrl && latestGenerationId
       ? {
@@ -194,6 +205,17 @@ export function Confirm({
         : state.phase === 'failure'
           ? FAILURE_STATUS_COPY[state.errorCode]
           : 'Result already generated';
+  const orderedChatTurns = [...chatTurns].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt)
+  );
+  const selectedTurn =
+    viewingTurnIndex !== null
+      ? (orderedChatTurns[viewingTurnIndex] ?? null)
+      : null;
+  const visualizerImageUrl =
+    state.phase === 'success'
+      ? (selectedTurn?.imageUrl ?? state.imageUrl)
+      : null;
 
   return (
     <section className="space-y-6">
@@ -227,66 +249,106 @@ export function Confirm({
                 adjust.
               </p>
             </div>
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)] md:items-start">
+              <div className="space-y-6">
+                <VisualizerFrame>
+                  <div
+                    data-testid="nail-visualizer"
+                    className="flex justify-center"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={visualizerImageUrl ?? ''}
+                      alt="Generated nail design preview"
+                      className="h-auto w-full max-w-[640px] rounded-[20px] object-contain"
+                    />
+                  </div>
+                </VisualizerFrame>
 
-            <VisualizerFrame>
-              <div
-                data-testid="nail-visualizer"
-                className="flex justify-center"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={state.imageUrl}
-                  alt="Generated nail design preview"
-                  className="h-auto w-full max-w-[640px] rounded-[20px] object-contain"
+                <div className="hidden md:block">
+                  <IterationTimeline
+                    turns={orderedChatTurns}
+                    viewingTurnIndex={viewingTurnIndex}
+                    onTurnSelect={(turn) => {
+                      const nextIndex = turn
+                        ? orderedChatTurns.findIndex(
+                            (item) => item.id === turn.id
+                          )
+                        : null;
+                      setViewingTurnIndex(nextIndex);
+                    }}
+                  />
+                </div>
+
+                {promptText ? (
+                  <div className="rounded-[24px] border border-border/70 bg-card/70 p-4 text-sm shadow-[0_20px_50px_rgba(61,53,48,0.08)]">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Prompt
+                    </p>
+                    <p className="mt-2 text-foreground">{promptText}</p>
+                  </div>
+                ) : null}
+
+                <div className="flex justify-center">
+                  <RegenerateButton
+                    designId={designId}
+                    onStart={() => {
+                      if (state.phase === 'success') {
+                        priorSuccessRef.current = state;
+                      }
+                      setViewingTurnIndex(null);
+                      setState({ phase: 'pending' });
+                    }}
+                    onError={() => {
+                      if (priorSuccessRef.current) {
+                        setState(priorSuccessRef.current);
+                      }
+                    }}
+                    onSuccess={(payload) =>
+                      setState({
+                        phase: 'success',
+                        generationId: payload.generationId,
+                        imageUrl:
+                          payload.imageUrl ??
+                          priorSuccessRef.current?.imageUrl ??
+                          '',
+                        swatchUrl: payload.nailSwatchUrl ?? null,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-3 text-center">
+                  <div className="block text-sm text-muted-foreground md:hidden">
+                    Refinement chat works best on tablet — open this design on
+                    your iPad.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/design/new')}
+                    className="min-h-[44px] text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
+                  >
+                    ← Back to adjust
+                  </button>
+                </div>
+              </div>
+
+              <div className="hidden md:flex">
+                <ChatRefinementPanel
+                  designId={designId}
+                  designName={designName}
+                  initialChatTurns={orderedChatTurns}
+                  viewingTurnIndex={viewingTurnIndex}
+                  onTurnImageSelect={(turn) => {
+                    const nextIndex = turn
+                      ? orderedChatTurns.findIndex(
+                          (item) => item.id === turn.id
+                        )
+                      : null;
+                    setViewingTurnIndex(nextIndex);
+                  }}
                 />
               </div>
-            </VisualizerFrame>
-
-            {promptText ? (
-              <div className="rounded-[24px] border border-border/70 bg-card/70 p-4 text-sm shadow-[0_20px_50px_rgba(61,53,48,0.08)]">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Prompt
-                </p>
-                <p className="mt-2 text-foreground">{promptText}</p>
-              </div>
-            ) : null}
-
-            <div className="flex justify-center">
-              <RegenerateButton
-                designId={designId}
-                onStart={() => {
-                  if (state.phase === 'success') {
-                    priorSuccessRef.current = state;
-                  }
-                  setState({ phase: 'pending' });
-                }}
-                onError={() => {
-                  if (priorSuccessRef.current) {
-                    setState(priorSuccessRef.current);
-                  }
-                }}
-                onSuccess={(payload) =>
-                  setState({
-                    phase: 'success',
-                    generationId: payload.generationId,
-                    imageUrl:
-                      payload.imageUrl ??
-                      priorSuccessRef.current?.imageUrl ??
-                      '',
-                    swatchUrl: payload.nailSwatchUrl ?? null,
-                  })
-                }
-              />
-            </div>
-
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => router.push('/design/new')}
-                className="min-h-[44px] text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2"
-              >
-                ← Back to adjust
-              </button>
             </div>
           </div>
         ) : null}

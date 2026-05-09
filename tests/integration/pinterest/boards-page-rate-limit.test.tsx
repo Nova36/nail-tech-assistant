@@ -235,6 +235,16 @@ describe('/pinterest — inline retryable browse error on rate_limit (b5 AC-3, A
       new Error('invalid_token', { cause: { reason: 'invalid_token' } })
     );
 
+    // SUT re-throws on invalid_token so it bubbles to error.tsx in prod;
+    // in jsdom this surfaces as unhandledRejection with no error boundary.
+    // Swallow only this specific reason to keep the test deterministic.
+    const swallowInvalidToken = (reason: unknown) => {
+      const cause = (reason as { cause?: { reason?: string } } | undefined)
+        ?.cause;
+      if (cause?.reason !== 'invalid_token') throw reason;
+    };
+    process.on('unhandledRejection', swallowInvalidToken);
+
     await renderPage();
 
     await waitFor(() => screen.queryByText('Gel Inspo'));
@@ -253,6 +263,7 @@ describe('/pinterest — inline retryable browse error on rate_limit (b5 AC-3, A
       });
     } finally {
       console.error = originalError;
+      process.off('unhandledRejection', swallowInvalidToken);
     }
 
     expect(

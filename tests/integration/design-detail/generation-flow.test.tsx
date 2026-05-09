@@ -156,4 +156,68 @@ describe('generation-flow integration', () => {
       expect(step3).toHaveAttribute('aria-current', 'step');
     });
   });
+
+  it('e5: existing flows still pass when initialChatTurns prop is supplied', async () => {
+    mockGenerateDesign.mockResolvedValue({
+      status: 'success',
+      generationId: 'g1',
+      imageUrl: 'https://example.com/g1.png',
+    });
+
+    render(
+      <Confirm
+        designId="d1"
+        nailShape="almond"
+        promptText="soft marble"
+        latestGenerationId={null}
+        designName="x"
+        initialChatTurns={[]}
+      />
+    );
+
+    await waitFor(() => {
+      const img = screen.getByRole('img');
+      expect(img).toHaveAttribute(
+        'src',
+        expect.stringContaining('https://example.com/g1.png')
+      );
+    });
+  });
+
+  it('e5: regenerate (P0 fallback) still functions when chat panel is mounted', async () => {
+    mockGenerateDesign.mockResolvedValue({
+      status: 'success',
+      generationId: 'g1',
+      imageUrl: 'https://example.com/g1.png',
+    });
+
+    render(
+      <Confirm
+        designId="d1"
+        nailShape="almond"
+        promptText="soft marble"
+        latestGenerationId={null}
+        designName="x"
+        initialChatTurns={[
+          {
+            id: 't1',
+            message: 'first',
+            status: 'success',
+            generationId: 'gen-t1',
+            imageUrl: 'https://example.com/t1.jpg',
+            createdAt: '2026-05-05T00:00:01Z',
+          },
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('nail-visualizer')).toBeTruthy();
+    });
+
+    // RegenerateButton remains in the success branch as P0 fallback.
+    expect(
+      screen.queryByRole('button', { name: /regenerate/i })
+    ).not.toBeNull();
+  });
 });

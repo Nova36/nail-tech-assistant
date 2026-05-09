@@ -230,6 +230,7 @@ export async function persistGenerationResult(input: {
   generationId: string;
   userId: string;
   designId: string;
+  chatTurnId?: string;
   outcome: GenerateResult;
 }): Promise<PersistGenerationResultResult> {
   const db = getFirestore(createServerFirebaseAdmin());
@@ -241,6 +242,13 @@ export async function persistGenerationResult(input: {
     .collection('designs')
     .doc(input.designId)
     .withConverter(designConverter);
+  const chatTurnRef = input.chatTurnId
+    ? db
+        .collection('designs')
+        .doc(input.designId)
+        .collection('chat_turns')
+        .doc(input.chatTurnId)
+    : null;
   const now = new Date().toISOString();
 
   if (!input.outcome.ok) {
@@ -251,6 +259,7 @@ export async function persistGenerationResult(input: {
         errorCode,
         errorMessage: input.outcome.message,
         providerResponseMetadata: input.outcome.metadata,
+        ...(input.chatTurnId ? { chatTurnId: input.chatTurnId } : {}),
         updatedAt: now,
       });
       return { ok: true };
@@ -283,15 +292,19 @@ export async function persistGenerationResult(input: {
         status: 'failure' satisfies GenerationStatus,
         errorCode: 'unknown' satisfies GenerationErrorCode,
         errorMessage: `storage_fail: ${upload.message}`,
+        ...(input.chatTurnId ? { chatTurnId: input.chatTurnId } : {}),
         updatedAt: now,
       });
     } catch (err) {
+      const code = (err as { code?: string }).code ?? 'unknown';
+      const message = (err as Error).message ?? String(err);
       console.error(
         '[lifecycle] persistGenerationResult storage-fail rescue failed',
         {
           uid: input.userId,
           generationId: input.generationId,
-          err: (err as Error).message,
+          code,
+          message,
         }
       );
     }
@@ -308,12 +321,20 @@ export async function persistGenerationResult(input: {
           : null,
         errorCode: null,
         errorMessage: null,
+        ...(input.chatTurnId ? { chatTurnId: input.chatTurnId } : {}),
         updatedAt: now,
       });
       txn.update(designRef, {
         latestGenerationId: input.generationId,
         updatedAt: now,
       });
+      if (chatTurnRef) {
+        txn.update(chatTurnRef, {
+          generationId: input.generationId,
+          status: 'success',
+          updatedAt: now,
+        });
+      }
     });
   } catch (err) {
     const code = (err as { code?: string }).code ?? 'unknown';

@@ -1,0 +1,154 @@
+id: e6-chat-refinement-e2e
+epic: epic-e-chat-refinement
+title: 'Playwright chat-refinement.spec.ts e2e'
+status: blocked
+complexity: medium
+methodology: tdd
+depends_on: [e5-chat-refinement-panel-integration]
+
+description: |
+  Add the end-to-end proof for Epic E's user promise: open a saved design, submit a
+  first refinement such as "make it more pastel," get a new result, submit a second
+  turn such as "add gold accents," and verify the second generation builds on the
+  first. This is the final Slice 7 validation lane named directly in
+  `structured-outline.md` L433-L456 and in Epic E completion criteria
+  (`prd.md` L695-L699).
+
+  BLOCKED-UNTIL: d8 merged and e5 shipped. The UI path has to exist first, and the
+  regenerate-from-stored-inputs contract beneath it has to be real, not planned.
+  Reuse the existing Playwright harness and emulator helpers already checked into the
+  repo: `playwright.config.ts` for webServer env boot and `tests/e2e/fixtures/emulator.ts`
+  for auth helper flows. Provider calls must stay isolated or stubbed; CI should not
+  hit live Gemini/Vertex (`tpm-story-sequence.md` cross-cutting concerns,
+  `playwright.config.ts:25-81`).
+
+  Scope here is the user-visible happy path plus regression protection for the design
+  detail flow. Do not turn this into a snapshot or broad tablet-polish suite; that
+  belongs elsewhere. One high-signal multi-turn spec is the goal.
+
+acceptance_criteria:
+  - "Given a saved design with a successful current generation, when the user submits 'make it more pastel', then a chat-turn row and a linked generation row are created and the image updates | maps to US-E-1 AC1 and FR-E-3 (`prd.md` L631-L668)"
+  - "Given a first refinement already succeeded, when the user submits 'add gold accents', then the second generation completes in sequence and the UI still shows ordered turn history tied to the current image | maps to US-E-1 AC2 and US-E-2 AC1 (`prd.md` L633-L645)"
+  - 'Given the existing `/design/[designId]` success path already works, when Epic E e2e runs, then it does not break the non-chat design-detail flow or emulator auth harness | maps to FR-E-5 and regression guard (`prd.md` L672-L673)'
+
+steps:
+  - id: research
+    description: Confirm the existing Playwright login/seeding helpers and whether the current emulator REST seeding pattern should create design + chat-turn + generation documents directly or via app APIs.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write the Playwright spec first in `tests/e2e/chat-refinement.spec.ts`.
+      Reuse the auth emulator flow and seeding style from `tests/e2e/visualizer-shapes.spec.ts`
+      and `tests/e2e/fixtures/emulator.ts`. Cover the two-turn happy path, current-image
+      update, ordered turn rendering, and a regression assertion that existing design
+      detail controls still remain reachable.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Add `tests/e2e/chat-refinement.spec.ts`. Touch `playwright.config.ts` only if the
+      existing env/webServer setup needs one small extension for chat-specific stubbing.
+      Prefer Playwright network interception or emulator-backed provider isolation over
+      any live provider call. Keep the spec focused on one saved design and two
+      sequential refinements.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Run the Playwright spec and confirm it protects both Epic E's happy path and the existing `/design/[designId]` detail flow from regression.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(e6): add chat refinement e2e coverage` on epic-e/chat-refinement.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-e/chat-refinement
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: tests/e2e/visualizer-shapes.spec.ts
+      purpose: Closest existing saved-design e2e seed/auth pattern to reuse for design-detail behavior (`tests/e2e/visualizer-shapes.spec.ts:1-120`).
+    - path: tests/e2e/fixtures/emulator.ts
+      purpose: Existing auth emulator helpers for account reset and email-link retrieval (`tests/e2e/fixtures/emulator.ts:1-51`).
+    - path: playwright.config.ts
+      purpose: Current E2E harness, webServer env injection, and provider-safe dummy env values (`playwright.config.ts:25-81`).
+
+files_to_modify:
+  - file: tests/e2e/chat-refinement.spec.ts
+    change: net-new Playwright coverage for the two-turn refinement flow.
+  - file: playwright.config.ts
+    change: optional only if chat-specific route/provider interception needs a tiny harness extension.
+
+code_examples:
+  - title: Existing Playwright auth + seed structure
+    file: tests/e2e/visualizer-shapes.spec.ts:99
+    snippet: |
+      async function signInViaEmailLink(page: Page): Promise<void> {
+        await page.goto('/login');
+        await page.getByLabel(/email/i).fill(TEST_EMAIL);
+        await page.getByRole('button', { name: /sign in|send link/i }).click();
+        await page.waitForSelector('[data-testid="email-sent"]');
+        const oobLink = await getLatestOobLink(TEST_EMAIL);
+        await page.goto(oobLink);
+        await page.waitForURL(/\/(?!login)/);
+      }
+  - title: Existing Playwright webServer env isolation
+    file: playwright.config.ts:44
+    snippet: |
+      webServer: RUN_REAL_TOKEN_SMOKE
+        ? undefined
+        : {
+            command: `firebase emulators:exec --only auth --project=nail-tech-assistant-e2e "pnpm dev:e2e -p ${E2E_PORT}"`,
+            url: E2E_BASE_URL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 180_000,
+            env: {
+              FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
+              PINTEREST_ACCESS_TOKEN: 'dummy-pinterest-token-for-e2e',
+            },
+          },
+
+design_decisions:
+  - decision: Reuse the current Playwright emulator harness instead of creating a chat-specific runner
+    rationale: The harness already boots auth emulators, injects safe env vars, and is the accepted E2E lane for saved-design behavior (`playwright.config.ts:25-81`, `tests/e2e/fixtures/emulator.ts:1-51`).
+  - decision: Keep provider isolation in the E2E lane
+    rationale: TPM flagged provider isolation as a cross-cutting concern for e6; CI should verify app behavior, not third-party uptime (`tpm-story-sequence.md` cross-cutting concerns).
+  - decision: Treat this as the final regression guard, not a broad polish suite
+    rationale: Slice 7 validation calls for one multi-turn refinement proof; broader polish remains outside Epic E (`structured-outline.md` L445-L460, `prd.md` Scope OUT notes).
+
+cross_cutting:
+  - concern: regression
+    action: Assert the existing design-detail success path still works while Epic E controls are present.
+  - concern: provider-isolation
+    action: Stub or intercept provider traffic; no live Gemini/Vertex calls in CI.
+
+risks:
+  - severity: high
+    description: This spec is blocked on both d8 and e5, so a partial UI or lineage implementation will produce brittle false negatives.
+    mitigation: Keep story status blocked until the full UI path and d8 contract are real, then seed only the minimal required state for one saved design.
+  - severity: medium
+    description: E2E seeding can drift from the app's actual persisted shape if it hand-writes documents carelessly.
+    mitigation: Research step verifies the current emulator seeding pattern against the latest converters/routes before authoring the spec.
+
+references:
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: |
+      7. **`tests/e2e/chat-refinement.spec.ts`** — verify multi-turn refinement on one saved design.
+      - Verify a saved design accepts a first refinement such as "make it more pastel."
+      - Verify a second refinement can build on the first rather than replacing it accidentally.
+  - path: tests/e2e/fixtures/emulator.ts
+    relevant_excerpt: |
+      export async function clearAuthEmulatorAccounts(): Promise<void> {
+        const res = await fetch(
+          `http://${EMULATOR_HOST}/emulator/v1/projects/${EMULATOR_PROJECT_ID}/accounts`,
+          { method: 'DELETE' }
+        );
+      }
+  - path: .pHive/planning/prd.md
+    relevant_excerpt: |
+      Epic E is complete when a saved design can accept a refinement turn, produce a new generation, accept a second turn that builds on the first, and show turn-linked iteration state clearly enough that the user understands which result is current.

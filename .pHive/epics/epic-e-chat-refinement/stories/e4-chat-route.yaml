@@ -1,0 +1,169 @@
+id: e4-chat-route
+epic: epic-e-chat-refinement
+title: 'POST /api/designs/[id]/chat route'
+status: blocked
+complexity: high
+methodology: tdd
+depends_on:
+  [
+    e1-chat-turns-persistence,
+    e2-chat-refinement-accumulation,
+    e3-lifecycle-chat-lineage,
+  ]
+
+description: |
+  Add `POST /api/designs/[id]/chat` as the route-handler seam for one refinement
+  turn. This story should mirror d8's regenerate ordering as closely as possible:
+  auth via `getSession(req)` → `loadDesignDetail` → stale-reference guard →
+  persist generation start with chat-turn linkage → build the next provider request
+  from stored design inputs plus accumulated refinement instructions → generate →
+  persist the final result. That is the Epic E execution path described in Slice 7
+  interfaces (`structured-outline.md` L439-L449), FR-E-1/2/3/6 (`prd.md`
+  L661-L676), and the design discussion's narrowed proposal (`design-discussion.md`
+  §3).
+
+  BLOCKED-UNTIL: Epic D d8 merges. This story is deliberately downstream of e3's
+  lifecycle seam and the d8 regenerate contract. Like e3, it can be outlined now
+  but should remain blocked in execution if d8 has not landed (`research-brief.md`
+  Epic D Dependency State; `tpm-story-sequence.md` dependency DAG). The request
+  builder path must reference the current real module boundary,
+  `lib/ai/generate.ts:41-98`, not the stale `lib/ai/buildGeminiRequest.ts` wording
+  in older notes (`design-discussion.md` §2 source correction).
+
+  Scope here is the server route only. Do not route this through
+  `app/(authenticated)/design/actions.ts`; that file has transitive env loading
+  side effects tied to `PINTEREST_ACCESS_TOKEN`, and the researcher already called
+  out that chat should follow the route-handler pattern instead (`research-brief.md`
+  UI integration surface; `feedback_actions_file_transitive_env.md`).
+
+acceptance_criteria:
+  - "Given an authenticated owner and a valid non-empty message, when `POST /api/designs/[id]/chat` runs, then it records the turn, triggers one generation on stored design inputs, and returns `{ status: 'success', chatTurnId, generationId }` | maps to US-E-1 AC1 and FR-E-3 (`prd.md` L631-L668)"
+  - 'Given prior chat turns already exist, when a new message is posted, then the route compiles accumulated instructions in chronological order before calling the provider path | maps to US-E-1 AC2 and FR-E-2 (`prd.md` L633-L639)'
+  - 'Given an empty, whitespace-only, or >500 character message, when the route validates input, then it rejects cleanly without ambiguous chat/generation state | maps to US-E-1 AC3 and Reliability NFR (`prd.md` L635-L639, L683-L684)'
+  - 'Given provider or Firestore failure after turn persistence, when the route returns, then the failure is explicit and loggable rather than silent | maps to US-E-2 AC2 and FR-E-6 (`prd.md` L645-L676)'
+
+steps:
+  - id: research
+    description: Verify the latest d8 request path, confirm whether any closer lib/body schema precedent exists beyond `lib/env.ts`'s zod usage, and confirm the route-test filename/lane under `tests/integration/designs/`.
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write failing route tests first in `tests/integration/designs/designs-chat-route.test.tsx`.
+      Use the repo's route-test pattern: `// @vitest-environment node`, real emulator-backed
+      Firestore where useful, mocked provider boundary, and mocked `getSession(req)`.
+      Assert happy path, invalid input, stale-reference guard, unauthorized, cross-user
+      denial, provider failure after turn persistence, and "does not import actions.ts"
+      style isolation if that needs an explicit stub.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      Add `app/api/designs/[id]/chat/route.ts` with `runtime = 'nodejs'` and
+      `dynamic = 'force-dynamic'`, mirroring `app/api/designs/[id]/route.ts:5-6`.
+      Auth must use `getSession(req)` per route-handler convention, not the
+      zero-arg server-action helper (`reference_session_helpers_for_server_actions.md`).
+
+      Input validation defaults to manual trim/non-empty/max-500-char checks unless
+      research finds a stronger nearby route-schema precedent worth reusing. Then run
+      the d8-shaped pipeline: load design detail, reject stale references, load prior
+      chat turns, compile prompt with e2, persist generation start, build provider
+      request with `buildGeminiRequest` from `lib/ai/generate.ts`, call `generate`,
+      and finalize via e3 lifecycle linkage. Keep catch blocks logging code + message.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: Type-check + route tests pass. Confirm the route stays isolated from `actions.ts`, uses node test env, and logs provider/Firebase failures with code + message.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(e4): add chat refinement route` on epic-e/chat-refinement.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-e/chat-refinement
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: app/api/designs/[id]/route.ts
+      purpose: Canonical design-detail route shows auth, runtime flags, sensitive-field stripping, and 500 logging (`app/api/designs/[id]/route.ts:1-69`).
+    - path: lib/designs/load.ts
+      purpose: '`loadDesignDetail` is the stored-input loader the chat route must layer on instead of reconstructing state from the request body (`lib/designs/load.ts:23-96`).'
+    - path: lib/ai/generate.ts
+      purpose: Real current home of `buildGeminiRequest` and `generate`; do not cite the stale file path from older notes (`lib/ai/generate.ts:41-120`).
+    - path: tests/integration/designs/designs-shape-route.test.tsx
+      purpose: Closest emulator-backed route-test precedent, including node env override and mocked `getSession` (`tests/integration/designs/designs-shape-route.test.tsx:1-96`).
+
+files_to_modify:
+  - file: app/api/designs/[id]/chat/route.ts
+    change: net-new POST route for authenticated chat-driven regeneration.
+  - file: tests/integration/designs/designs-chat-route.test.tsx
+    change: net-new route-handler coverage for success, failure, validation, and stale-reference cases.
+
+code_examples:
+  - title: Existing route-handler auth and error envelope
+    file: app/api/designs/[id]/route.ts:21
+    snippet: |
+      export async function GET(
+        req: NextRequest,
+        ctx: { params: Promise<{ id: string }> }
+      ): Promise<NextResponse> {
+        const session = await getSession(req);
+        if (!session?.uid) {
+          return NextResponse.json(
+            { status: 'unauthorized', message: 'sign in required' },
+            { status: 401 }
+          );
+        }
+  - title: Existing node-env route test pattern
+    file: tests/integration/designs/designs-shape-route.test.tsx:1
+    snippet: |
+      // @vitest-environment node
+      import { NextRequest } from 'next/server';
+      import {
+        afterAll,
+        beforeAll,
+        beforeEach,
+        describe,
+        expect,
+        it,
+        vi,
+      } from 'vitest';
+
+design_decisions:
+  - decision: Implement chat as a route handler, not a server action
+    rationale: Research brief explicitly calls chat toward the route-handler transport and the repo already uses `getSession(req)` for that surface (`research-brief.md` UI integration surface, `app/api/designs/[id]/route.ts:21-36`).
+  - decision: Mirror the d8 generate pipeline rather than inventing a second orchestration path
+    rationale: Epic E is layered on saved-design lineage; d8 is the direct implementation template for stored-input regeneration (`research-brief.md` d8 template, `prd.md` L667-L668).
+  - decision: Keep route validation manual unless research finds a closer body-schema precedent
+    rationale: zod exists in `lib/env.ts`, but the surrounding lifecycle/design route surfaces mostly use manual validation today (`research-brief.md` Validation Notes, `design-discussion.md` §6 Q6).
+
+cross_cutting:
+  - concern: error-logging
+    action: Log code + message in every Firebase/provider catch path.
+  - concern: provider-isolation
+    action: Route tests must mock the provider boundary and avoid importing `app/(authenticated)/design/actions.ts`.
+
+risks:
+  - severity: high
+    description: d8 is still in flight, so the request pipeline could drift while this story is blocked.
+    mitigation: Research step verifies the current d8 contract before test authoring; if d8 is unmerged, keep status blocked.
+  - severity: medium
+    description: Importing `actions.ts` transitively can force `PINTEREST_ACCESS_TOKEN` env validation into a route test that does not need it.
+    mitigation: Keep the route isolated from server-action files and follow `feedback_actions_file_transitive_env.md` if any test must import that module family.
+
+references:
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/reference_session_helpers_for_server_actions.md
+    relevant_excerpt: |
+      - `getSession(req: NextRequest): Promise<Session | null>` — for **route handlers** that receive a NextRequest.
+      - `getSessionForServerAction(): Promise<Session | null>` — for **server actions** that have no NextRequest.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/reference_jsdom_formdata_node_env.md
+    relevant_excerpt: |
+      **When NOT needed:** route tests that build a JSON body (`new Request(url, { body: JSON.stringify(...) })`) work fine in jsdom — only the FormData → multipart byte path is broken.
+  - path: /Users/don/.claude/projects/-Users-don-Documents-GitHub-Nail-Tech-Assitant/memory/feedback_actions_file_transitive_env.md
+    relevant_excerpt: |
+      **Rule:** any test that does `await import('@/app/(authenticated)/design/actions')` MUST `vi.stubEnv('PINTEREST_ACCESS_TOKEN', 'pt-test')` in its `beforeAll`.

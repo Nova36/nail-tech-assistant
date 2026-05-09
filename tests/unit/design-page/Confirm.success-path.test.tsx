@@ -248,6 +248,156 @@ describe.skip('AC#4 — PATCH failure reverts shape and shows error', () => {
   });
 });
 
+// ── e5: ChatRefinementPanel mounts in success branch ──────────────────────
+
+describe('e5 — ChatRefinementPanel mounts alongside visualizer', () => {
+  it('renders ChatRefinementPanel empty state when initialChatTurns is empty', async () => {
+    const { Confirm } =
+      await import('@/app/(authenticated)/design/[designId]/Confirm');
+
+    mockGenerateDesign.mockResolvedValue({
+      status: 'success',
+      generationId: 'gen-abc',
+      imageUrl: IMAGE_URL,
+    });
+
+    render(
+      <Confirm
+        designId={DESIGN_ID}
+        nailShape="almond"
+        promptText={PROMPT_TEXT}
+        latestGenerationId={null}
+        designName="Soft Lavender French"
+        initialChatTurns={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('nail-visualizer')).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText(/nudge this design with a quick message/i)
+    ).toBeTruthy();
+  });
+
+  it('renders chat turn list when initialChatTurns has turns', async () => {
+    const turns = [
+      {
+        id: 't1',
+        message: 'first turn',
+        status: 'success' as const,
+        generationId: 'gen-t1',
+        imageUrl: 'https://example.com/t1.jpg',
+        createdAt: '2026-05-05T00:00:01Z',
+      },
+      {
+        id: 't2',
+        message: 'second turn',
+        status: 'success' as const,
+        generationId: 'gen-t2',
+        imageUrl: 'https://example.com/t2.jpg',
+        createdAt: '2026-05-05T00:00:02Z',
+      },
+    ];
+
+    const { Confirm } =
+      await import('@/app/(authenticated)/design/[designId]/Confirm');
+
+    mockGenerateDesign.mockResolvedValue({
+      status: 'success',
+      generationId: 'gen-abc',
+      imageUrl: IMAGE_URL,
+    });
+
+    render(
+      <Confirm
+        designId={DESIGN_ID}
+        nailShape="almond"
+        promptText={PROMPT_TEXT}
+        latestGenerationId={null}
+        designName="x"
+        initialChatTurns={turns}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('nail-visualizer')).toBeTruthy();
+    });
+
+    const items = screen.getAllByRole('listitem');
+    expect(items.length).toBe(2);
+    expect(items[0]).toHaveTextContent('first turn');
+  });
+
+  it('keeps RegenerateButton in the success branch (P0 fallback preserved)', async () => {
+    await renderConfirmSuccess('almond');
+    // RegenerateButton renders a button with /regenerate/i name in some
+    // existing variant; assert at least one regenerate-y button persists.
+    const regenerateButton = screen.queryByRole('button', {
+      name: /regenerate/i,
+    });
+    expect(regenerateButton).not.toBeNull();
+  });
+
+  it('clicking a non-current chat turn updates visualizer image to that turn', async () => {
+    const turns = [
+      {
+        id: 't1',
+        message: 'first',
+        status: 'success' as const,
+        generationId: 'gen-t1',
+        imageUrl: 'https://example.com/turn1-image.jpg',
+        createdAt: '2026-05-05T00:00:01Z',
+      },
+      {
+        id: 't2',
+        message: 'second',
+        status: 'success' as const,
+        generationId: 'gen-t2',
+        imageUrl: 'https://example.com/turn2-image.jpg',
+        createdAt: '2026-05-05T00:00:02Z',
+      },
+    ];
+
+    const { Confirm } =
+      await import('@/app/(authenticated)/design/[designId]/Confirm');
+
+    mockGenerateDesign.mockResolvedValue({
+      status: 'success',
+      generationId: 'gen-abc',
+      imageUrl: IMAGE_URL,
+    });
+
+    const { container } = render(
+      <Confirm
+        designId={DESIGN_ID}
+        nailShape="almond"
+        promptText={PROMPT_TEXT}
+        latestGenerationId={null}
+        designName="x"
+        initialChatTurns={turns}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('nail-visualizer')).toBeTruthy();
+    });
+
+    const items = screen.getAllByRole('listitem');
+    fireEvent.click(items[0]); // turn 1 (not the latest)
+
+    await waitFor(() => {
+      const img = container.querySelector(
+        '[data-testid="nail-visualizer"] img'
+      );
+      expect(img?.getAttribute('src')).toBe(
+        'https://example.com/turn1-image.jpg'
+      );
+    });
+  });
+});
+
 // ── Negative: generateDesign never fires on shape switch ──────────────────
 
 describe.skip('Negative — generateDesign not triggered by shape switch', () => {
