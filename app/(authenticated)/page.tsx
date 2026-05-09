@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 
+import { listDesignsForUser } from '@/lib/designs/list';
 import { getSessionFromCookieString } from '@/lib/firebase/session';
 
 export const runtime = 'nodejs';
@@ -140,6 +141,12 @@ export default async function AuthenticatedHomePage() {
   const session = await getSessionFromCookieString(
     cookieStore.get('session')?.value
   );
+  const designs = session?.uid ? await listDesignsForUser(session.uid) : [];
+  const designsCount = designs.length;
+  // TODO(f1): add isFavorite to Design schema once design favoriting ships
+  const favoritesCount = designs.filter(
+    (d) => (d as { isFavorite?: boolean }).isFavorite
+  ).length;
   const fullName = session
     ? (session.name ?? deriveDisplayName(session.email))
     : 'there';
@@ -239,9 +246,9 @@ export default async function AuthenticatedHomePage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="font-body text-sm text-muted-foreground">
               <span className="font-semibold text-foreground tabular-nums">
-                124 designs
+                {designsCount} designs
               </span>{' '}
-              saved · 18 favorites
+              saved · {favoritesCount} favorites
             </p>
             <Link
               href="/library"
@@ -256,8 +263,7 @@ export default async function AuthenticatedHomePage() {
 
       <section
         aria-label="Studio summary"
-        className="grid items-center gap-4 rounded-[24px] border border-[color:rgb(212_203_197_/_0.6)] bg-card/60 p-6"
-        style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}
+        className="grid grid-cols-1 items-center gap-4 rounded-[24px] border border-[color:rgb(212_203_197_/_0.6)] bg-card/60 p-6 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]"
       >
         {KPI_TILES.map((tile, index) => (
           <div
@@ -283,7 +289,7 @@ export default async function AuthenticatedHomePage() {
         <Link
           href="#"
           aria-disabled="true"
-          data-state="placeholder"
+          aria-label="Studio summary — coming soon"
           style={{ color: '#6B3F5E' }}
           className="inline-flex min-h-[44px] items-center justify-center gap-2 self-center whitespace-nowrap rounded-full px-4 py-2 font-body text-sm italic outline-none transition hover:bg-[color:rgb(107_63_94_/_0.06)] focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.28)]"
         >
