@@ -85,4 +85,19 @@ describe('lib/auth/allowlist — assertAllowedEmail (AC#5)', () => {
       reason: 'invalid_format',
     });
   });
+
+  it('accepts any email in a comma-separated ALLOWED_EMAIL list', async () => {
+    vi.stubEnv(
+      'ALLOWED_EMAIL',
+      'first@example.test , second@example.test, third@example.test'
+    );
+    const { assertAllowedEmail } = await loadAllowlist();
+    expect(assertAllowedEmail('first@example.test')).toEqual({ ok: true });
+    expect(assertAllowedEmail('SECOND@example.test')).toEqual({ ok: true });
+    expect(assertAllowedEmail('third@example.test')).toEqual({ ok: true });
+    expect(assertAllowedEmail('outsider@example.test')).toEqual({
+      ok: false,
+      reason: 'not_allowed',
+    });
+  });
 });
