@@ -29,7 +29,7 @@ export function ShapeSelector({ value, onChange }: ShapeSelectorProps) {
               key={shape}
               type="button"
               onClick={() => onChange(shape)}
-              className={`rounded-full px-4 py-2 text-sm capitalize transition ${
+              className={`inline-flex min-h-[44px] items-center justify-center rounded-full px-4 py-2 text-sm capitalize transition ${
                 isActive
                   ? 'bg-[color:var(--primary)] text-[color:var(--primary-foreground)]'
                   : 'border border-border bg-background text-foreground'

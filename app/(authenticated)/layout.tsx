@@ -173,7 +173,7 @@ function Sidebar({
     .toUpperCase();
 
   return (
-    <aside className="flex w-[260px] shrink-0 flex-col border-r border-[color:rgb(212_203_197_/_0.6)] bg-[color:rgb(240_235_227_/_0.5)] backdrop-blur-sm">
+    <aside className="hidden w-[260px] shrink-0 flex-col border-r border-[color:rgb(212_203_197_/_0.6)] bg-[color:rgb(240_235_227_/_0.5)] backdrop-blur-sm lg:flex">
       <div className="px-6 pb-4 pt-7">
         <Link
           href="/"
@@ -312,9 +312,29 @@ export default async function AuthenticatedLayout({
   const displayName = session.name ?? deriveDisplayName(session.email);
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen flex-col bg-background lg:flex-row">
+      <header className="flex items-center justify-between border-b border-[color:rgb(212_203_197_/_0.6)] bg-[color:rgb(240_235_227_/_0.5)] px-5 py-3 backdrop-blur-sm lg:hidden">
+        <Link
+          href="/"
+          aria-label="Nail Tech Assistant — home"
+          className="inline-flex rounded-lg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.25)]"
+        >
+          <BrandMark />
+        </Link>
+        <nav aria-label="Primary" className="flex items-center gap-1">
+          {NAV_GROUPS[0].items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="inline-flex min-h-[44px] items-center rounded-xl px-3 py-2 font-body text-sm font-medium text-foreground/80 transition outline-none hover:bg-[color:rgb(212_203_197_/_0.45)] focus-visible:ring-2 focus-visible:ring-[color:rgb(107_63_94_/_0.22)]"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </header>
       <Sidebar displayName={displayName} email={session.email} />
-      <main className="flex-1 overflow-x-hidden overflow-y-auto px-8 py-8 lg:px-12 lg:py-10">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-10">
         {children}
       </main>
     </div>

@@ -21,7 +21,7 @@ export function WizardProgressStrip({ step }: WizardProgressStripProps) {
           <button
             key={item.value}
             type="button"
-            className={`rounded-full border px-4 py-2 text-sm transition ${
+            className={`inline-flex min-h-[44px] items-center justify-center rounded-full border px-4 py-2 text-sm transition ${
               isCurrent
                 ? 'border-[color:var(--primary)] bg-[color:var(--primary)] text-[color:var(--primary-foreground)]'
                 : 'border-border bg-background text-muted-foreground'
