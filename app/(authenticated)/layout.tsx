@@ -93,6 +93,23 @@ function GridIcon() {
   );
 }
 
+function PinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-[18px] w-[18px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 2 9 9H4l4 3-2 7 6-4 6 4-2-7 4-3h-5z" />
+    </svg>
+  );
+}
+
 function BoxIcon() {
   return (
     <svg
@@ -130,12 +147,14 @@ function SettingsIcon() {
   );
 }
 
+type NavIconKind = 'home' | 'grid' | 'box' | 'pin';
+
 type NavGroup = {
   label: string;
   items: Array<{
     href: string;
     label: string;
-    icon: 'home' | 'grid' | 'box';
+    icon: NavIconKind;
     badge?: string;
     active?: boolean;
   }>;
@@ -147,14 +166,16 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/', label: 'Dashboard', icon: 'home', active: true },
       { href: '/design/new', label: 'New Design', icon: 'grid', badge: 'New' },
+      { href: '/pinterest', label: 'Boards', icon: 'pin' },
       { href: '/library', label: 'Library', icon: 'box' },
     ],
   },
 ];
 
-function NavIcon({ kind }: { kind: 'home' | 'grid' | 'box' }) {
+function NavIcon({ kind }: { kind: NavIconKind }) {
   if (kind === 'home') return <HomeIcon />;
   if (kind === 'grid') return <GridIcon />;
+  if (kind === 'pin') return <PinIcon />;
   return <BoxIcon />;
 }
 
