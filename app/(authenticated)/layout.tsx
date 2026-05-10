@@ -166,7 +166,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/', label: 'Dashboard', icon: 'home', active: true },
       { href: '/design/new', label: 'New Design', icon: 'grid', badge: 'New' },
-      { href: '/pinterest', label: 'Pinterest', icon: 'pin' },
+      { href: '/pinterest', label: 'Boards', icon: 'pin' },
       { href: '/library', label: 'Library', icon: 'box' },
     ],
   },
