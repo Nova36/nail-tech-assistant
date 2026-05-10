@@ -1,0 +1,103 @@
+id: f1-dashboard-responsive
+epic: epic-f-polish-tablet-ux
+title: 'Dashboard: responsive KPI grid + real stats from Firestore'
+status: pending
+complexity: medium
+methodology: tdd
+depends_on: []
+
+description: |
+  The dashboard (`app/(authenticated)/page.tsx`) has two rough edges that block
+  demo confidence:
+
+  1. The KPI section uses an inline `gridTemplateColumns: '1fr 1fr 1fr auto'` style
+     with no responsive breakpoint. At iPad landscape (1180px, sidebar = 260px →
+     920px content) the 4-column row compresses uncomfortably; at narrower widths it
+     overflows. Replace with a Tailwind responsive class pattern.
+
+  2. The stat values — "124 designs", "18 favorites" — are hardcoded literals. On
+     demo day they will show fake numbers. Wire them to real counts from Firestore
+     via `listDesignsForUser` (already called on the library page) and a favorites
+     count derived from the same data set.
+
+  "View studio" CTA (`href="#" aria-disabled`) is intentionally kept as a
+  placeholder for now — it maps to a future analytics surface. Do NOT wire it in
+  this story; just ensure it does not look broken (current italic style is fine).
+
+  Scope: `page.tsx` changes only. No new routes, no new components.
+  Anchor: Slice 8 manifest item #1; researcher finding HIGH-1 (KPI grid) and MED-1
+  (hardcoded stats).
+
+acceptance_criteria:
+  - 'Given viewport width ≤ 1024px (md breakpoint), when the dashboard KPI section renders, then all 4 cells wrap gracefully without horizontal overflow | validates tablet ergonomics goal'
+  - 'Given a user with 0 saved designs, when the dashboard loads, then the KPI tiles show 0 not the hardcoded 124/18 literals | validates real data binding'
+  - 'Given a user with N saved designs, when the dashboard loads, then the designs count KPI reflects N | validates Firestore wiring'
+  - 'Given viewport 1440×900 (desktop), when the dashboard renders, then the 4-column KPI layout is unchanged from current state | no regression'
+
+steps:
+  - id: implement
+    description: |
+      1. In `page.tsx`, replace the inline `style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}`
+         on the KPI section with Tailwind classes: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]`.
+         This maintains desktop layout while wrapping at narrower breakpoints.
+      2. Move the page component from a pure client render to a server component data
+         fetch (it already has `runtime = 'nodejs'` and `dynamic = 'force-dynamic'`).
+         Call `listDesignsForUser(session.uid)` and derive:
+         - designs count = `designs.length`
+         - favorites count = `designs.filter(d => d.isFavorite).length` (add `isFavorite`
+           field check — if the field does not exist on the Design type, use 0 as fallback
+           with a TODO comment; do NOT add the field to the schema in this story)
+      3. Pass real counts into the `KPI_TILES` array replacing the hardcoded literals.
+      4. The KPI section "View studio" placeholder link: keep as-is, but replace
+         `data-state="placeholder"` with `aria-label="Studio summary — coming soon"` to
+         suppress any future a11y warning without changing visual appearance.
+    agent: developer
+    depends_on: []
+  - id: review
+    description: |
+      Typecheck passes. Verify no hardcoded KPI values remain. Confirm the grid class
+      replacement doesn't break at 1440px (desktop) by reading the Tailwind output.
+      Check that `listDesignsForUser` is not called client-side (should be server component).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(f1): responsive dashboard KPI grid + real stats` on epic-f/polish-tablet-ux.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-f/polish-tablet-ux
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+    persistence: Firebase Firestore
+  key_files:
+    - path: app/(authenticated)/page.tsx
+      purpose: Dashboard page — KPI section, greeting, hero articles. 295 lines, all modifications land here.
+    - path: lib/designs/list.ts
+      purpose: listDesignsForUser already used by library/page.tsx — reuse same call pattern.
+    - path: lib/types.ts
+      purpose: Design type definition — check whether isFavorite field exists before using it.
+
+files_to_modify:
+  - file: app/(authenticated)/page.tsx
+    change: Replace inline KPI gridTemplateColumns with responsive Tailwind class; wire stats to Firestore.
+
+design_decisions:
+  - decision: Keep page as server component, not convert to client
+    rationale: Data fetch on server avoids a loading flash; page already has force-dynamic directive.
+  - decision: Use Tailwind grid-cols responsive classes instead of inline style
+    rationale: Consistent with codebase convention; allows Tailwind breakpoint system to handle tablet without custom media queries.
+
+risks:
+  - severity: low
+    description: isFavorite may not exist on the Design type yet — favorites count would always be 0.
+    mitigation: Add explicit fallback and a TODO comment; do not add the schema field in this story.
+
+references:
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+    relevant_excerpt: 'HIGH — Dashboard KPI section gridTemplateColumns inline style, no responsive breakpoint. MED — Dashboard stats hardcoded.'
+  - path: app/(authenticated)/library/page.tsx
+    relevant_excerpt: 'Calls listDesignsForUser(session.uid) — canonical pattern to follow.'

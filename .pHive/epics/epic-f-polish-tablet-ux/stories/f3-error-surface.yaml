@@ -1,0 +1,118 @@
+id: f3-error-surface
+epic: epic-f-polish-tablet-ux
+title: 'ErrorSurface: centralized cross-domain error component'
+status: pending
+complexity: low
+methodology: tdd
+depends_on: []
+
+description: |
+  Two domain-specific error components exist — `GenerationErrorState` for Gemini
+  failures and `InlineBrowseError` for Pinterest browse failures — but there is no
+  shared fallback for unexpected errors (Firebase cold-start failures, network
+  blips, unknown server errors) that may occur in any route during the demo.
+
+  Add `components/ErrorSurface.tsx`: a thin generic error presentation component
+  that implements the contract defined in the Slice 8 interface spec:
+  `{ title: string; message: string; recoveryAction?: { label: string; action: () => void } }`.
+
+  This is NOT a replacement for the domain-specific components. It is a fallback
+  surface that Next.js error boundaries and any route can render when a more
+  specific component is not appropriate.
+
+  Scope: one new component. Wire it into the root error boundary
+  (`app/error.tsx` if it exists, or create it). Do not refactor GenerationErrorState
+  or InlineBrowseError — they stay as-is.
+  Anchor: Slice 8 manifest item #4 and interface contract; researcher finding MED-4.
+
+acceptance_criteria:
+  - 'Given an unexpected error is thrown in an authenticated route, when Next.js error boundary catches it, then ErrorSurface renders with a fallback title and a "Try again" recovery action | validates cross-domain fallback'
+  - 'Given ErrorSurface is rendered with a recoveryAction, when the user taps the recovery button, then the action callback is invoked | validates recovery UX'
+  - 'Given ErrorSurface is rendered without a recoveryAction, when it displays, then only the title and message are shown with no broken button | validates optional recovery prop'
+  - 'Given the component renders at 390px (iPhone), when no overflow constraints are present, then title and message text wrap correctly without horizontal scroll | validates mobile legibility'
+
+steps:
+  - id: implement
+    description: |
+      1. Create `components/ErrorSurface.tsx`:
+         Props interface (export it):
+         ```ts
+         export interface ErrorSurfaceProps {
+           title: string;
+           message: string;
+           recoveryAction?: { label: string; action: () => void };
+         }
+         ```
+         Visual treatment: match the card style of `GenerationErrorState` —
+         `rounded-[28px] border border-[color:var(--primary)]/20 bg-card/80 p-6`.
+         Include a warning/alert icon (simple SVG, no external dep).
+         Recovery button: same `min-h-11 rounded-xl bg-[color:var(--primary)]` pattern
+         as GenerationErrorState's primary CTA.
+         Mark `'use client'`.
+
+      2. Check if `app/error.tsx` exists. If not, create it as the Next.js App Router
+         error boundary for the authenticated segment:
+         ```
+         app/(authenticated)/error.tsx
+         ```
+         Use the standard Next.js `error.tsx` convention:
+         ```ts
+         'use client';
+         export default function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
+           return <ErrorSurface title="Something went wrong" message={error.message} recoveryAction={{ label: 'Try again', action: reset }} />;
+         }
+         ```
+
+      3. Do NOT modify GenerationErrorState or InlineBrowseError.
+    agent: developer
+    depends_on: []
+  - id: review
+    description: |
+      Typecheck passes. Confirm ErrorSurfaceProps interface is exported (downstream
+      stories may import it). Verify error.tsx is in the (authenticated) segment, not
+      root app/ — root would catch login page errors too. Confirm 'use client' directive
+      on both files (Next.js error boundaries must be client components).
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(f3): ErrorSurface component + authenticated error boundary` on epic-f/polish-tablet-ux.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-f/polish-tablet-ux
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright
+  key_files:
+    - path: components/studio/GenerationErrorState.tsx
+      purpose: Visual reference for card style, button pattern, and icon treatment.
+    - path: app/(authenticated)/
+      purpose: Error boundary scope — error.tsx goes here, not in root app/.
+    - path: app/error.tsx
+      purpose: Check if root error boundary exists before creating authenticated segment one.
+
+files_to_modify:
+  - file: components/ErrorSurface.tsx
+    change: net-new generic error surface component with exported props interface.
+  - file: app/(authenticated)/error.tsx
+    change: net-new Next.js error boundary for authenticated routes wiring ErrorSurface.
+
+design_decisions:
+  - decision: Scope error boundary to (authenticated) segment only
+    rationale: Root app/ error boundary would catch login page errors and render the wrong UI. Authenticated segment scoping is precise.
+  - decision: Keep GenerationErrorState and InlineBrowseError unchanged
+    rationale: Domain-specific components carry domain-specific copy and recovery flows. ErrorSurface is a fallback only, not a replacement.
+
+risks:
+  - severity: low
+    description: Next.js may already have a root error.tsx that conflicts.
+    mitigation: Check app/ and app/(authenticated)/ for existing error.tsx before creating; adapt placement.
+
+references:
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+    relevant_excerpt: 'MED-4 — No centralized cross-domain error surface. GenerationErrorState handles generation only. InlineBrowseError handles browse only.'
+  - path: .pHive/planning/structured-outline.md
+    relevant_excerpt: 'Error surface contract: { title: string; message: string; recoveryAction?: { label: string; action: string } }'

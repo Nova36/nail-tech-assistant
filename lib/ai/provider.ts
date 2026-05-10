@@ -32,6 +32,11 @@ export type ProviderResult =
 const MODEL_ID = 'gemini-3.1-flash-image-preview';
 const GCP_PROJECT = 'nail-tech-assistant';
 const GCP_LOCATION = 'global';
+// 2x2 transparent PNG — minimum valid bytes for VERTEX_MOCK=ok mode.
+const MOCK_PNG_BYTES = Buffer.from(
+  '89504e470d0a1a0a0000000d49484452000000020000000208060000007296de31000000164944415478da626001000000ffff03000005000100bd58e7350000000049454e44ae426082',
+  'hex'
+);
 
 function loadCredentials(): Record<string, unknown> {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -102,6 +107,29 @@ const REQUEST_TIMEOUT_MS = 90_000;
 export async function generateImage(
   req: ProviderRequest
 ): Promise<ProviderResult> {
+  const vertexMock = process.env.VERTEX_MOCK;
+  if (process.env.VERCEL !== '1' && vertexMock) {
+    switch (vertexMock) {
+      case 'ok':
+        return {
+          ok: true,
+          imageBytes: MOCK_PNG_BYTES,
+          mimeType: 'image/png',
+          metadata: { mock: true },
+        };
+      case 'refusal':
+      case 'rate_limit':
+      case 'low_quality':
+      case 'network':
+      case 'unknown':
+        return {
+          ok: false,
+          reason: vertexMock,
+          message: `VERTEX_MOCK forced ${vertexMock}`,
+        };
+    }
+  }
+
   try {
     const credentials = loadCredentials();
     const ai = new GoogleGenAI({

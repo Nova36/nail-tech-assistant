@@ -1,0 +1,184 @@
+name: epic-f-polish-tablet-ux
+title: "Epic F — Polish + Tablet UX: Mother's Day demo confidence (Slice 8)"
+description: |
+  Slice 8 of the Nail Tech Assistant build. Hardens the existing P0 flow for a
+  confident Mother's Day demo on a landscape tablet. No new product capability —
+  this epic polishes existing interfaces, adds loading and error states, fixes
+  the responsive layout for iPad landscape, and ships e2e coverage of the critical
+  path.
+
+  Context: Auth, Pinterest browse, AI generation, visualizer, design library, and
+  chat refinement all shipped in Epics A–E. This epic makes the delivered product
+  demo-ready by 2026-05-10.
+
+  Scope (per decision-points.md scope sign-off):
+  - IN: dashboard responsive fix + real stats (f1), generation + library loading
+    states (f2), centralized ErrorSurface (f3), sidebar responsive collapse +
+    touch targets (f4), e2e core-flow + tablet-smoke + iPad Playwright project (f5),
+    README setup docs (f6).
+  - CUT: components/ui/ shadcn wiring, docs/architecture.md,
+    docs/integrations/pinterest.md, docs/integrations/gemini.md.
+  - Phone parity: out of scope. Sidebar collapse at lg makes phone usable but
+    not optimized. Full phone parity is a post-gift enhancement.
+
+  Deadline: 2026-05-10 (Mother's Day gift delivery).
+
+target_codebase: '/Users/don/Documents/GitHub/Nail Tech Assitant'
+methodology: tdd
+priority: P0
+depends_on:
+  - epic-a-foundation-auth
+  - epic-b-pinterest-integration
+  - epic-c-reference-and-generation
+  - epic-d-visualizer-library
+  - epic-e-chat-refinement
+p0_ship_line: true
+
+planning_artifacts:
+  researcher_findings: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+  decision_points: .pHive/epics/epic-f-polish-tablet-ux/docs/decision-points.md
+  recon_screenshots: .pHive/epics/epic-f-polish-tablet-ux/docs/recon/
+  outline_anchor: .pHive/planning/structured-outline.md
+  prd_anchor: .pHive/planning/prd.md
+
+stories:
+  - id: f1-dashboard-responsive
+    title: 'Dashboard: responsive KPI grid + real stats from Firestore'
+    complexity: medium
+    slice: 8
+    ui: true
+    depends_on: []
+    notes: |
+      Fixes inline gridTemplateColumns on KPI section (no responsive breakpoint).
+      Wires real design count + favorites count from Firestore.
+      View-studio CTA stays disabled — it maps to a future analytics surface.
+
+  - id: f2-loading-states
+    title: 'LoadingStates: generation pending skeleton + library grid skeleton'
+    complexity: medium
+    slice: 8
+    ui: true
+    depends_on: []
+    notes: |
+      Adds components/LoadingStates/GenerationPending.tsx and LibrarySkeleton.tsx.
+      Reuses .sk-v1 shimmer class from globals.css. Pinterest already has
+      BoardGridSkeleton + PinGridSkeleton — do not change those.
+
+  - id: f3-error-surface
+    title: 'ErrorSurface: centralized cross-domain error component'
+    complexity: low
+    slice: 8
+    ui: true
+    depends_on: []
+    notes: |
+      Thin generic fallback — not a replacement for GenerationErrorState or
+      InlineBrowseError. Wired into app/(authenticated)/error.tsx Next.js boundary.
+
+  - id: f4-tablet-layout
+    title: 'Tablet layout: sidebar responsive collapse + touch target fixes'
+    complexity: medium
+    slice: 8
+    ui: true
+    depends_on: [f1-dashboard-responsive]
+    notes: |
+      Sidebar hidden below lg (1024px), off-canvas drawer on small screens.
+      ShapeSelector + WizardProgressStrip get min-h-[44px].
+      f1 is a soft dependency — f4 is easier to validate after f1 is done.
+
+  - id: f5-e2e-critical-path
+    title: 'E2E: core-flow.spec.ts + tablet-smoke.spec.ts + iPad Playwright project'
+    complexity: high
+    slice: 8
+    ui: false
+    depends_on: [f4-tablet-layout]
+    notes: |
+      Critical-path only per scope decision. Generation wait uses graceful timeout
+      skip — Gemini is not available in emulator. tablet-smoke uses role/text
+      assertions only, no pixel assertions.
+
+  - id: f6-readme
+    title: 'README: setup docs, env vars, Firebase + Pinterest prerequisites'
+    complexity: low
+    slice: 8
+    ui: false
+    depends_on: []
+    notes: |
+      Full rewrite of 6-line README. Creates .env.local.example if absent.
+      No real credential values. docs/ directory deferred post-ship.
+
+execution_gates:
+  scope_sign_off:
+    required_for: [f1, f2, f3, f4, f5, f6]
+    status: signed-off
+    signed_off_at: '2026-05-09'
+    signed_off_by: don
+    confirmed: |
+      1=yes (cut components/ui + 3 docs/), 2=yes (keep 6 targets), 3=A (critical-path e2e),
+      4=A (README only), 5=A (sidebar collapse + phone documented broken).
+      Dashboard stats: wire real Firestore counts (f1 default kept).
+      View-studio CTA: stays disabled (default kept).
+
+  tablet_visual_qa:
+    required_for: [f4, f5]
+    trigger: manual
+    note: |
+      After f4 ships, do a manual visual check at 1180×820 in Chrome DevTools
+      or on a physical iPad before f5 e2e is authored. Screenshots go to
+      .pHive/epics/epic-f-polish-tablet-ux/docs/recon/post-f4/.
+
+traceability:
+  slice_8_manifest_coverage:
+    - item: 'app/(authenticated)/page.tsx'
+      covered_by: f1
+      status: in-scope
+    - item: 'components/ui/'
+      covered_by: null
+      status: cut — not a runtime gap; no shadcn usage in codebase
+    - item: 'components/LoadingStates/'
+      covered_by: f2
+      status: in-scope
+    - item: 'components/ErrorSurface.tsx'
+      covered_by: f3
+      status: in-scope
+    - item: 'styles/globals.css (tablet ergonomics)'
+      covered_by: f4
+      status: in-scope (sidebar + touch targets; file is actually app/globals.css)
+    - item: 'tests/e2e/core-flow.spec.ts'
+      covered_by: f5
+      status: in-scope
+    - item: 'tests/e2e/tablet-smoke.spec.ts'
+      covered_by: f5
+      status: in-scope
+    - item: 'README.md'
+      covered_by: f6
+      status: in-scope
+    - item: 'docs/architecture.md'
+      covered_by: null
+      status: cut — post-ship maintenance work
+    - item: 'docs/integrations/pinterest.md'
+      covered_by: null
+      status: cut — post-ship maintenance work
+    - item: 'docs/integrations/gemini.md'
+      covered_by: null
+      status: cut — post-ship maintenance work
+
+agent_ready_checklist:
+  - item: researcher-raw-findings.md present
+    status: done
+    path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+  - item: decision-points.md present
+    status: done
+    path: .pHive/epics/epic-f-polish-tablet-ux/docs/decision-points.md
+  - item: recon screenshots present (login + redirect wall, 3 viewports)
+    status: done
+    path: .pHive/epics/epic-f-polish-tablet-ux/docs/recon/
+  - item: all 6 story YAMLs authored
+    status: done
+  - item: epic.yaml index present
+    status: done
+  - item: scope sign-off
+    status: defaulted — see execution_gates.scope_sign_off
+  - item: branch epic-f/polish-tablet-ux created
+    status: pending — create before first story execution
+  - item: post-f4 tablet visual QA
+    status: pending — manual gate before f5

@@ -1,0 +1,148 @@
+id: f5-e2e-critical-path
+epic: epic-f-polish-tablet-ux
+title: 'E2E: core-flow.spec.ts + tablet-smoke.spec.ts + iPad Playwright project'
+status: pending
+complexity: high
+methodology: tdd
+depends_on: [f4-tablet-layout]
+
+description: |
+  Two e2e spec files required by Slice 8 are missing. This story adds them plus the
+  Playwright infrastructure to run the iPad-landscape viewport.
+
+  Scope per decision-points.md Decision 2 (critical-path only, not full P0):
+
+  **core-flow.spec.ts** — unified critical-path smoke test:
+  login → board browse → pin selection → reference selection → generation form submit
+  → generation pending state visible → visualizer loads → shape switch → library save
+  → library card visible → reopen design
+
+  Regenerate and chat refinement are NOT included here — they have dedicated specs
+  (`visualizer-shapes.spec.ts`, `chat-refinement.spec.ts`).
+
+  **tablet-smoke.spec.ts** — same critical-path flow at iPad Pro landscape (1024×1366
+  or use Playwright's `iPad Pro landscape` device preset). Smoke only — assertions
+  confirm routes load and key elements are visible; no pixel-layout assertions.
+
+  **Playwright config** — add an `ipad-landscape` project using
+  `devices['iPad Pro landscape']` alongside the existing `default` desktop project.
+
+  Auth strategy: use the existing Firebase Auth emulator pattern (oob code flow from
+  `tests/e2e/fixtures/emulator.ts`). Both specs import from that fixture.
+
+  Anchor: Slice 8 manifest items #6 and #7; researcher findings HIGH-3, HIGH-4, HIGH-5.
+
+acceptance_criteria:
+  - 'Given the emulator is running, when core-flow.spec.ts runs, then all steps complete without assertion failure on desktop Chrome | validates P0 critical path'
+  - 'Given the emulator is running, when tablet-smoke.spec.ts runs on iPad Pro landscape, then all routes load and primary CTAs are visible without horizontal overflow | validates tablet smoke'
+  - 'Given pnpm exec playwright test --project=ipad-landscape, when the suite runs, then it uses the iPad Pro landscape device profile (1366×1024) | validates tablet project config'
+  - 'Given the generation step in core-flow, when the wizard is submitted, then GenerationPending skeleton is visible before result (validates f2 wiring) | cross-story dependency check'
+  - 'Given the tablet flow at 1366×1024, when the sidebar is visible, then navigation items are reachable without horizontal scrolling | validates f4 sidebar fix'
+
+steps:
+  - id: research
+    description: |
+      Verify the exact emulator oob code flow used in existing auth.spec.ts and
+      login.spec.ts so core-flow.spec.ts follows the same auth setup pattern.
+      Check what ALLOWED_EMAIL the emulator env uses (playwright.config.ts webServer env).
+      Confirm the Playwright `iPad Pro landscape` device name is valid in
+      `@playwright/test` 1.59.1 (check devices list).
+    agent: researcher
+  - id: test-spec
+    description: |
+      Write `tests/e2e/core-flow.spec.ts`:
+      - Import emulator helpers from `tests/e2e/fixtures/emulator.ts`.
+      - beforeAll: clearAuthEmulatorAccounts, sign in via email link oob flow.
+      - Step assertions (role/text queries only — no CSS class assertions):
+        1. Login → submit allowed email → follow oob link → land on dashboard
+        2. Navigate to /pinterest → board list visible
+        3. Click a board → pin grid visible
+        4. Click a pin → reference selected state visible
+        5. Navigate to /design/new → wizard visible
+        6. Submit generation form → GenerationPending visible (test by role or text)
+        7. (async) Wait for generation result OR timeout gracefully with a skip note
+        8. Visualizer renders → shape selector visible
+        9. Switch shape → visualizer updates
+        10. Navigate to /library → design card visible
+        11. Click design card → design detail page loads
+
+      Write `tests/e2e/tablet-smoke.spec.ts`:
+      - Use `test.use({ ...devices['iPad Pro landscape'] })` at file level.
+      - Same step flow as core-flow but assertions are minimal: only confirm routes
+        load (response 200) and primary heading/CTA visible. No pixel assertions.
+      - Mark generation wait as `test.skip` if the emulator cannot complete it in time.
+    agent: tester
+    depends_on: [research]
+  - id: implement
+    description: |
+      1. Add `ipad-landscape` project to `playwright.config.ts`:
+         ```ts
+         { name: 'ipad-landscape', use: { ...devices['iPad Pro landscape'] } }
+         ```
+         Place alongside the existing `default` project in the projects array.
+
+      2. Verify both spec files pass `tsc --noEmit` (no type errors).
+
+      3. Do NOT change the webServer command — both projects reuse the existing
+         emulator-wrapped dev server.
+    agent: developer
+    depends_on: [test-spec]
+  - id: review
+    description: |
+      Typecheck passes. Confirm test file extensions are `.spec.ts` (not `.spec.tsx`) —
+      e2e lane uses .spec.ts. Confirm no CSS class assertions in tablet-smoke (role/text only).
+      Verify the iPad project name matches what the playwright.config.ts projects array
+      expects. Check that the oob flow matches the pattern in auth.spec.ts exactly.
+    agent: reviewer
+    depends_on: [implement]
+  - id: integrate
+    description: 'Single commit `feat(f5): core-flow + tablet-smoke e2e + iPad Playwright project` on epic-f/polish-tablet-ux.'
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/don/Documents/GitHub/Nail Tech Assitant
+  branch: epic-f/polish-tablet-ux
+  tech_stack:
+    framework: Next.js 15
+    language: TypeScript
+    testing: Vitest + Playwright 1.59.1
+  key_files:
+    - path: tests/e2e/fixtures/emulator.ts
+      purpose: Firebase Auth emulator helpers — clearAuthEmulatorAccounts, getLatestOobLink. Copy auth flow from auth.spec.ts.
+    - path: tests/e2e/auth.spec.ts
+      purpose: Canonical emulator oob code flow pattern to mirror in core-flow.spec.ts.
+    - path: playwright.config.ts
+      purpose: Add ipad-landscape project; understand webServer env and emulator setup.
+    - path: tests/e2e/visualizer-shapes.spec.ts
+      purpose: Reference for shape-switch assertions — do not duplicate, just smoke in core-flow.
+
+files_to_modify:
+  - file: tests/e2e/core-flow.spec.ts
+    change: net-new critical-path smoke spec.
+  - file: tests/e2e/tablet-smoke.spec.ts
+    change: net-new iPad landscape smoke spec.
+  - file: playwright.config.ts
+    change: Add ipad-landscape project using devices['iPad Pro landscape'].
+
+design_decisions:
+  - decision: Critical-path only — no regenerate or chat turns in core-flow
+    rationale: Those flows have dedicated specs. Unified spec should be a confidence check, not duplicate coverage. Deadline-driven decision from decision-points.md.
+  - decision: Tablet smoke uses role/text assertions only, no pixel assertions
+    rationale: Pixel layout tests are brittle and require snapshot maintenance. Smoke confirms the route loads and primary UI is accessible — sufficient for demo confidence.
+  - decision: Generation wait is async with graceful timeout skip
+    rationale: Gemini generation can take 10–30s. Hanging the suite on Gemini latency is unacceptable in CI. Mark as skip-on-timeout with a clear note.
+
+risks:
+  - severity: high
+    description: The emulator oob flow requires Firebase Auth emulator running — if it is not started, all auth-dependent tests fail.
+    mitigation: The playwright.config.ts webServer command already wraps `firebase emulators:exec --only auth`. Tests inherit this. Document in README (f6 story).
+  - severity: medium
+    description: Generation step depends on Vertex AI / Gemini — unavailable in emulator. Test may hang.
+    mitigation: Wrap generation wait in a 30s timeout; on timeout, skip remaining generation-dependent steps with a console note rather than failing.
+
+references:
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/researcher-raw-findings.md
+    relevant_excerpt: 'HIGH-3/4/5 — core-flow.spec.ts missing, tablet-smoke.spec.ts missing, Playwright has no iPad project.'
+  - path: .pHive/epics/epic-f-polish-tablet-ux/docs/decision-points.md
+    relevant_excerpt: 'Decision 2: critical-path only. Decision 4: tablet-first.'
