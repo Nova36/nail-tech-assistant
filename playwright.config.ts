@@ -46,12 +46,14 @@ export default defineConfig({
   webServer: RUN_REAL_TOKEN_SMOKE
     ? undefined
     : {
-        command: `firebase emulators:exec --only auth --project=nail-tech-assistant-e2e "pnpm dev:e2e -p ${E2E_PORT}"`,
+        command: `firebase emulators:exec --only auth,firestore,storage --project=nail-tech-assistant-e2e "pnpm dev:e2e -p ${E2E_PORT}"`,
         url: E2E_BASE_URL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,
         env: {
           FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
+          FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080',
+          FIREBASE_STORAGE_EMULATOR_HOST: '127.0.0.1:9199',
 
           NEXT_PUBLIC_FIREBASE_API_KEY: 'demo-api-key',
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: '127.0.0.1:9099',
@@ -70,6 +72,8 @@ export default defineConfig({
           ALLOWED_EMAIL: 'configured@example.test',
           APP_URL: E2E_BASE_URL,
           PINTEREST_ACCESS_TOKEN: 'dummy-pinterest-token-for-e2e',
+          PINTEREST_MOCK: 'ok',
+          VERTEX_MOCK: 'ok',
         },
       },
   projects: RUN_REAL_TOKEN_SMOKE
@@ -87,6 +91,10 @@ export default defineConfig({
         {
           name: 'default',
           use: { baseURL: E2E_BASE_URL, ...devices['Desktop Chrome'] },
+        },
+        {
+          name: 'ipad-landscape',
+          use: { baseURL: E2E_BASE_URL, ...devices['iPad Pro 11 landscape'] },
         },
       ],
 });
