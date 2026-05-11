@@ -12,7 +12,7 @@
 }
 
 .visualizer-frame {
-  min-width: 768px;
+  min-width: 0;
   width: 100%;
   overflow-x: auto;
 }

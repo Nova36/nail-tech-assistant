@@ -54,18 +54,10 @@ function loadCredentials(): Record<string, unknown> {
 }
 
 const RENDER_DIRECTIVES =
-  'Render five photorealistic glossy painted nails of the requested shape, arranged in a single horizontal row left-to-right in finger order: pinky, ring, middle, index, thumb. Apply a natural size gradient — pinky is the smallest, ring slightly larger, middle the largest, index slightly smaller than middle, thumb second-largest. Flat opaque cream background, soft contact shadows. No hand, no fingers, no skin.';
+  'Render five photorealistic glossy painted nails of the requested shape, arranged in a single horizontal row left-to-right in finger order: pinky, ring, middle, index, thumb. Apply a natural size gradient — pinky is the smallest, ring slightly larger, middle the largest, index slightly smaller than middle, thumb second-largest. Flat opaque cream background, soft contact shadows. No hand, no fingers, no skin, no rings, no jewelry.';
 
 const PRIMARY_ONLY_DIRECTIVE =
-  'Use the primary reference image as the design source; apply the user prompt as a direct edit, preserving everything not explicitly changed.';
-
-function buildBlendDirective(secondaryCount: number): string {
-  const lastIndex = 1 + secondaryCount;
-  const secondaryRange =
-    secondaryCount > 1 ? `Images 2–${lastIndex} are` : 'Image 2 is';
-  const pronoun = secondaryCount > 1 ? 'their' : 'its';
-  return `You are given ${lastIndex} reference images. Image 1 is the PRIMARY base — use it as the foundational design (palette, structure, finish). ${secondaryRange} SECONDARY — incorporate ${pronoun} design elements (patterns, motifs, accents, tip styles, line work, color highlights) into the result. The user prompt below tells you HOW to blend; if the user says "combine" or similar, synthesize meaningfully across all five nails rather than ignoring the secondary. Produce a single cohesive design.`;
-}
+  'Use the reference image as the design source; apply the user prompt as a direct edit, preserving everything not explicitly changed.';
 
 function serializeRequest(req: ProviderRequest) {
   const parts: Array<{
@@ -73,38 +65,57 @@ function serializeRequest(req: ProviderRequest) {
     text?: string;
   }> = [];
 
-  for (const img of req.images) {
-    parts.push({
-      inlineData: {
-        mimeType: img.mimeType,
-        data: img.bytes.toString('base64'),
-      },
-    });
-  }
-
   const secondaryCount = req.images.length - 1;
   const hasSecondary = secondaryCount > 0;
+  const userText = req.promptText?.trim() ?? '';
 
-  const userPromptLine = req.promptText
-    ? hasSecondary
-      ? `USER REQUEST (blend the references per this instruction): ${req.promptText}`
-      : `USER EDIT REQUEST (apply this to the primary reference): ${req.promptText}`
-    : hasSecondary
-      ? 'USER REQUEST: synthesize the references into one design, treating image 1 as the primary base.'
-      : 'USER EDIT REQUEST: render the primary reference design faithfully on a hand.';
+  if (hasSecondary) {
+    parts.push({
+      text: `TASK: Multi-reference nail design synthesis. You have ${req.images.length} labeled reference images below. You MUST visibly incorporate distinctive design elements from EVERY reference into the final result — do not output a design that resembles only one reference. Combine them as a stylist would: base palette + structure from the first, distinctive motifs/patterns/tip work/line art from the rest.`,
+    });
 
-  const styleDirective = hasSecondary
-    ? buildBlendDirective(secondaryCount)
-    : PRIMARY_ONLY_DIRECTIVE;
+    for (let i = 0; i < req.images.length; i += 1) {
+      const img = req.images[i];
+      const label =
+        i === 0
+          ? 'REFERENCE A (base — use its palette, finish, and overall style)'
+          : `REFERENCE ${String.fromCharCode(65 + i)} (style donor — bring its distinctive design elements: patterns, motifs, line art, tip work, color accents, finishes)`;
+      parts.push({ text: `${label}:` });
+      parts.push({
+        inlineData: {
+          mimeType: img.mimeType,
+          data: img.bytes.toString('base64'),
+        },
+      });
+    }
 
-  const textBits = [
-    userPromptLine,
-    `Nail shape: ${req.nailShape}.`,
-    RENDER_DIRECTIVES,
-    styleDirective,
-  ];
+    const blendInstruction = userText
+      ? `USER INSTRUCTION (how to blend the references): "${userText}". Interpret this as a directive to fuse the references — produce ONE cohesive design that visibly draws from each reference above.`
+      : 'USER INSTRUCTION: synthesize the references into one cohesive design that visibly draws from each one.';
+    parts.push({ text: blendInstruction });
+    parts.push({ text: `Nail shape: ${req.nailShape}.` });
+    parts.push({ text: RENDER_DIRECTIVES });
+  } else {
+    parts.push({
+      inlineData: {
+        mimeType: req.images[0].mimeType,
+        data: req.images[0].bytes.toString('base64'),
+      },
+    });
 
-  parts.push({ text: textBits.join('\n\n') });
+    const userPromptLine = userText
+      ? `USER EDIT REQUEST (apply this to the reference): ${userText}`
+      : 'USER EDIT REQUEST: render the reference design faithfully.';
+
+    parts.push({
+      text: [
+        userPromptLine,
+        `Nail shape: ${req.nailShape}.`,
+        RENDER_DIRECTIVES,
+        PRIMARY_ONLY_DIRECTIVE,
+      ].join('\n\n'),
+    });
+  }
 
   return {
     model: MODEL_ID,
