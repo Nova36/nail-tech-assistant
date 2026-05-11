@@ -53,8 +53,19 @@ function loadCredentials(): Record<string, unknown> {
   }
 }
 
-const PRESENTATION_DIRECTIVES =
-  'Render five photorealistic glossy painted nails of the requested shape, arranged in a single horizontal row left-to-right in finger order: pinky, ring, middle, index, thumb. Apply a natural size gradient — pinky is the smallest, ring slightly larger, middle the largest, index slightly smaller than middle, thumb second-largest. Flat opaque cream background, soft contact shadows. No hand, no fingers, no skin. Use the primary reference image as the design source; apply the user prompt as a direct edit, preserving everything not explicitly changed.';
+const RENDER_DIRECTIVES =
+  'Render five photorealistic glossy painted nails of the requested shape, arranged in a single horizontal row left-to-right in finger order: pinky, ring, middle, index, thumb. Apply a natural size gradient — pinky is the smallest, ring slightly larger, middle the largest, index slightly smaller than middle, thumb second-largest. Flat opaque cream background, soft contact shadows. No hand, no fingers, no skin.';
+
+const PRIMARY_ONLY_DIRECTIVE =
+  'Use the primary reference image as the design source; apply the user prompt as a direct edit, preserving everything not explicitly changed.';
+
+function buildBlendDirective(secondaryCount: number): string {
+  const lastIndex = 1 + secondaryCount;
+  const secondaryRange =
+    secondaryCount > 1 ? `Images 2–${lastIndex} are` : 'Image 2 is';
+  const pronoun = secondaryCount > 1 ? 'their' : 'its';
+  return `You are given ${lastIndex} reference images. Image 1 is the PRIMARY base — use it as the foundational design (palette, structure, finish). ${secondaryRange} SECONDARY — incorporate ${pronoun} design elements (patterns, motifs, accents, tip styles, line work, color highlights) into the result. The user prompt below tells you HOW to blend; if the user says "combine" or similar, synthesize meaningfully across all five nails rather than ignoring the secondary. Produce a single cohesive design.`;
+}
 
 function serializeRequest(req: ProviderRequest) {
   const parts: Array<{
@@ -71,14 +82,26 @@ function serializeRequest(req: ProviderRequest) {
     });
   }
 
+  const secondaryCount = req.images.length - 1;
+  const hasSecondary = secondaryCount > 0;
+
   const userPromptLine = req.promptText
-    ? `USER EDIT REQUEST (apply this to the primary reference): ${req.promptText}`
-    : 'USER EDIT REQUEST: render the primary reference design faithfully on a hand.';
+    ? hasSecondary
+      ? `USER REQUEST (blend the references per this instruction): ${req.promptText}`
+      : `USER EDIT REQUEST (apply this to the primary reference): ${req.promptText}`
+    : hasSecondary
+      ? 'USER REQUEST: synthesize the references into one design, treating image 1 as the primary base.'
+      : 'USER EDIT REQUEST: render the primary reference design faithfully on a hand.';
+
+  const styleDirective = hasSecondary
+    ? buildBlendDirective(secondaryCount)
+    : PRIMARY_ONLY_DIRECTIVE;
 
   const textBits = [
     userPromptLine,
     `Nail shape: ${req.nailShape}.`,
-    PRESENTATION_DIRECTIVES,
+    RENDER_DIRECTIVES,
+    styleDirective,
   ];
 
   parts.push({ text: textBits.join('\n\n') });
