@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 
 import type { ChatTurnView as SharedChatTurnView } from '@/lib/designs/loadChatTurns';
@@ -42,6 +43,7 @@ export function ChatRefinementPanel({
   onTurnImageSelect,
   viewingTurnIndex,
 }: ChatRefinementPanelProps) {
+  const router = useRouter();
   const orderedTurns = useMemo(
     () =>
       [...initialChatTurns].sort((a, b) =>
@@ -67,13 +69,16 @@ export function ChatRefinementPanel({
     setRetryingIds((current) => [...current, turnId]);
 
     try {
-      await fetch(`/api/designs/${designId}/chat`, {
+      const response = await fetch(`/api/designs/${designId}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ retryTurnId: turnId }),
       });
+      if (response.ok) {
+        router.refresh();
+      }
     } finally {
       setDismissedFailures((current) => [...current, turnId]);
       setRetryingIds((current) => current.filter((id) => id !== turnId));
@@ -100,6 +105,7 @@ export function ChatRefinementPanel({
 
       if (response.ok) {
         setMessage('');
+        router.refresh();
       }
     } finally {
       setIsSending(false);
@@ -117,7 +123,7 @@ export function ChatRefinementPanel({
   }
 
   return (
-    <aside className="flex h-full flex-col rounded-[28px] border border-border/70 bg-card/80 p-5 shadow-[0_20px_50px_rgba(61,53,48,0.08)]">
+    <aside className="flex h-full flex-col rounded-[28px] border border-border/70 bg-card p-5 shadow-[0_20px_50px_rgba(61,53,48,0.08)]">
       <div className="space-y-2 border-b border-border/60 pb-4">
         <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
           Refine with chat

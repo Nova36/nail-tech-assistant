@@ -81,7 +81,7 @@ export function Confirm({
   designName,
 }: ConfirmProps) {
   const router = useRouter();
-  const [chatTurns] = useState<ChatTurnView[]>(initialChatTurns);
+  const chatTurns = initialChatTurns;
   const [viewingTurnIndex, setViewingTurnIndex] = useState<number | null>(null);
   const [state, setState] = useState<GenerationState>(
     initialImageUrl && latestGenerationId
@@ -95,6 +95,24 @@ export function Confirm({
         ? { phase: 'idle' }
         : { phase: 'pending' }
   );
+
+  useEffect(() => {
+    if (!latestGenerationId || !initialImageUrl) return;
+    setState((current) => {
+      if (
+        current.phase === 'success' &&
+        current.generationId === latestGenerationId
+      ) {
+        return current;
+      }
+      return {
+        phase: 'success',
+        generationId: latestGenerationId,
+        imageUrl: initialImageUrl,
+        swatchUrl: initialSwatchUrl ?? null,
+      };
+    });
+  }, [latestGenerationId, initialImageUrl, initialSwatchUrl]);
   const firedRef = useRef(false);
   const errorHeadingRef = useRef<HTMLHeadingElement>(null);
   const priorSuccessRef = useRef<Extract<
